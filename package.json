@@ -1,0 +1,35 @@
+{
+  "name": "mi-bicla-queretaro",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "workspaces": [
+    "artifacts/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w @mi-bicla/api-server\" \"npm run dev -w @mi-bicla/web\"",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "db:generate": "npm run generate -w @mi-bicla/db",
+    "db:migrate": "npm run migrate -w @mi-bicla/db",
+    "db:seed": "npm run seed -w @mi-bicla/db",
+    "db:create-owner": "npm run create-owner -w @mi-bicla/db",
+    "db:cleanup-rate-limits": "npm run cleanup-rate-limits -w @mi-bicla/db",
+    "benchmark:argon2": "npm run benchmark:argon2 -w @mi-bicla/db"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.17.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^4.1.10"
+  }
+}
