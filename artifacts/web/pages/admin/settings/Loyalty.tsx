@@ -11,6 +11,11 @@ import {
   Toast,
 } from "../../../components/ui";
 import { LoyaltyCard } from "../../../components/domain";
+import {
+  loyaltySettingsChanged,
+  moveLoyaltyStage,
+  replaceLoyaltyRule,
+} from "../../../lib/loyalty-settings";
 
 interface Rule {
   minimumAmount: number;
@@ -29,24 +34,30 @@ const EMPTY = {
   allowNegativeBalance: false,
 };
 
-export function Loyalty() {
+export function Loyalty({ permissions = [] }: { permissions?: string[] }) {
   const [data, setData] = useState(EMPTY);
+  const [original, setOriginal] = useState(EMPTY);
+  const [stage, setStage] = useState(1);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     "loading",
   );
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [requestId, setRequestId] = useState("");
   const [simulatedPurchase, setSimulatedPurchase] = useState(500);
 
   function load() {
     setLoadState("loading");
     apiFetch<typeof EMPTY>("/api/admin/settings/loyalty")
       .then((result) => {
-        setData({ ...EMPTY, ...result });
+        const loaded = { ...EMPTY, ...result };
+        setData(loaded);
+        setOriginal(loaded);
         setLoadState("ready");
       })
       .catch((error) => {
         setStatus(error instanceof ApiError ? error.message : "Error");
+        setRequestId(error instanceof ApiError ? error.requestId ?? "" : "");
         setLoadState("error");
       });
   }
@@ -56,24 +67,26 @@ export function Loyalty() {
   function rule(index: number, patch: Partial<Rule>) {
     setData({
       ...data,
-      purchaseRules: data.purchaseRules.map((item, current) =>
-        current === index ? { ...item, ...patch } : item,
-      ),
+      purchaseRules: replaceLoyaltyRule(data.purchaseRules, index, patch),
     });
   }
 
   async function save(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
+    setStatus("");
+    setRequestId("");
     try {
       await apiFetch("/api/admin/settings/loyalty", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(data),
       });
+      setOriginal(data);
       setStatus("Configuración guardada");
     } catch (error) {
       setStatus(error instanceof ApiError ? error.message : "Error");
+      setRequestId(error instanceof ApiError ? error.requestId ?? "" : "");
     } finally {
       setSaving(false);
     }
@@ -94,16 +107,38 @@ export function Loyalty() {
     );
 
   return (
-    <section className="admin-page loyalty-settings">
-      <PageHeader
+    <section
+      className="admin-page loyalty-settings"
+      data-mobile-stage={stage}
+    >
+      <div className="loyalty-desktop-heading">
+        <PageHeader
         eyebrow="Configuración"
         title="Programa de fidelidad"
         description="Define cómo tus clientes acumulan puntos y obtienen recompensas."
-      />
+        />
+      </div>
+      <header className="loyalty-mobile-heading">
+        <p className="page-eyebrow">Configuración</p>
+        <h1>{["Fidelidad", "Reglas de compra", "Configurar recompensa", "Revisar cambios"][stage - 1]}</h1>
+        <p>Paso {stage} de 4</p>
+      </header>
+      <nav className="loyalty-stage-nav" aria-label="Etapas de configuración">
+        {["Fidelidad", "Reglas", "Recompensa", "Revisar"].map((label, index) => (
+          <button
+            type="button"
+            key={label}
+            aria-current={stage === index + 1 ? "step" : undefined}
+            onClick={() => setStage(index + 1)}
+          >
+            <i>{index + 1}</i><span>{label}</span>
+          </button>
+        ))}
+      </nav>
       <form onSubmit={save}>
         <div className="settings-layout">
           <div className="settings-main">
-            <Card className="settings-card settings-card--status">
+            <Card className="settings-card settings-card--status loyalty-stage loyalty-stage--1">
               <div>
                 <p className="page-eyebrow">Estado del programa</p>
                 <h2>{data.enabled ? "Programa activo" : "Programa pausado"}</h2>
@@ -125,8 +160,25 @@ export function Loyalty() {
                 <b>{data.enabled ? "Activo" : "Pausado"}</b>
               </label>
             </Card>
+            <div className="loyalty-summary-cards loyalty-stage loyalty-stage--1">
+              <Card><small>Meta</small><strong>{data.rewardUnits}</strong><span>unidades</span></Card>
+              <Card><small>Recompensa</small><strong>{data.rewardDiscountPercent}%</strong><span>{data.rewardName || "Sin nombre"}</span></Card>
+            </div>
+            <Card className="loyalty-mobile-preview loyalty-stage loyalty-stage--1">
+              <p className="page-eyebrow">Vista previa</p>
+              <LoyaltyCard current={previewUnits} goal={data.rewardUnits} rewardName={data.rewardName} />
+            </Card>
+            {permissions.includes("adjust_loyalty") && (
+              <Button
+                type="button"
+                className="loyalty-scan-action loyalty-stage loyalty-stage--1"
+                onClick={() => window.dispatchEvent(new Event("scanner:open"))}
+              >
+                Escanear cliente
+              </Button>
+            )}
 
-            <Card className="settings-card">
+            <Card className="settings-card loyalty-stage loyalty-stage--2">
               <header className="card-heading">
                 <div>
                   <p className="page-eyebrow">Reglas de compra</p>
@@ -187,14 +239,16 @@ export function Loyalty() {
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() =>
+                      onClick={() => {
+                        if (!window.confirm(`¿Eliminar la regla ${index + 1}?`))
+                          return;
                         setData({
                           ...data,
                           purchaseRules: data.purchaseRules.filter(
                             (_, current) => current !== index,
                           ),
-                        })
-                      }
+                        });
+                      }}
                     >
                       Eliminar
                     </Button>
@@ -208,7 +262,7 @@ export function Loyalty() {
               </div>
             </Card>
 
-            <Card className="settings-card">
+            <Card className="settings-card loyalty-stage loyalty-stage--3">
               <div className="card-heading">
                 <div>
                   <p className="page-eyebrow">Configuración de recompensa</p>
@@ -307,7 +361,7 @@ export function Loyalty() {
               </div>
             </Card>
 
-            <Card className="settings-card simulator-card">
+            <Card className="settings-card simulator-card loyalty-stage loyalty-stage--2">
               <p className="page-eyebrow">Simulador</p>
               <h2>Prueba una compra</h2>
               <label>
@@ -329,6 +383,23 @@ export function Loyalty() {
                 {simulatedUnits === 1 ? "unidad" : "unidades"}.
               </output>
             </Card>
+            <Card className="settings-card loyalty-review loyalty-stage loyalty-stage--4">
+              <p className="page-eyebrow">Verifica antes de guardar</p>
+              <LoyaltyCard current={previewUnits} goal={data.rewardUnits} rewardName={data.rewardName} />
+              <dl>
+                <div><dt>Estado</dt><dd>{data.enabled ? "Activo" : "Pausado"}</dd></div>
+                <div><dt>Meta</dt><dd>{data.rewardUnits} unidades</dd></div>
+                <div><dt>Recompensa</dt><dd>{data.rewardDiscountPercent}% · {data.rewardName || "Sin nombre"}</dd></div>
+                <div><dt>Reglas</dt><dd>{data.purchaseRules.length} activas</dd></div>
+                <div><dt>Ajustes manuales</dt><dd>{data.allowManualAdjustments ? "Permitidos" : "No permitidos"}</dd></div>
+                <div><dt>Saldo negativo</dt><dd>{data.allowNegativeBalance ? "Permitido" : "No permitido"}</dd></div>
+              </dl>
+              {status && status !== "Configuración guardada" && (
+                <div className="form-error" role="alert">
+                  {status}{requestId && <small>Solicitud: {requestId}</small>}
+                </div>
+              )}
+            </Card>
           </div>
 
           <aside className="loyalty-preview-column">
@@ -343,8 +414,48 @@ export function Loyalty() {
             </Card>
           </aside>
         </div>
+        <div className="loyalty-mobile-actions">
+          {stage > 1 && (
+            <Button type="button" variant="secondary" onClick={() => setStage(moveLoyaltyStage(stage, -1))}>
+              Volver
+            </Button>
+          )}
+          {stage < 4 ? (
+            <Button type="button" onClick={() => setStage(moveLoyaltyStage(stage, 1))}>
+              Continuar
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  if (
+                    loyaltySettingsChanged(data, original) &&
+                    !window.confirm("¿Descartar los cambios sin guardar?")
+                  )
+                    return;
+                  setData(original);
+                  setStatus("");
+                  setRequestId("");
+                  setStage(1);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button disabled={saving}>
+                {saving ? "Guardando…" : "Guardar cambios"}
+              </Button>
+            </>
+          )}
+        </div>
         <div className="sticky-save">
-          <span>{status || "Los cambios no se guardan automáticamente."}</span>
+          <span>
+            {status ||
+              (loyaltySettingsChanged(data, original)
+                ? "Hay cambios pendientes."
+                : "Sin cambios pendientes.")}
+          </span>
           <Button disabled={saving}>
             {saving ? "Guardando…" : "Guardar cambios"}
           </Button>

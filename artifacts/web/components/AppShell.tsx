@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CustomerScanFlow } from "./scanner/CustomerScanFlow";
 import { canShowCustomerScanner } from "./scanner/scanner-utils";
 
@@ -100,6 +100,11 @@ export function AppShell({
   );
   const pathname = window.location.pathname;
   const canScan = canShowCustomerScanner(pathname, user.permissions);
+  useEffect(() => {
+    const openScanner = () => setScannerOpen(true);
+    window.addEventListener("scanner:open", openScanner);
+    return () => window.removeEventListener("scanner:open", openScanner);
+  }, []);
   return (
     <div className="app-shell">
       <aside className="app-sidebar">

@@ -8,6 +8,9 @@
   --app-border: #ebe7ea;
   --app-accent: #e6007e;
   --app-accent-dark: #bb0067;
+  --app-accent-soft: #fff0f7;
+  --app-surface-muted: #faf9fa;
+  --app-shadow-sm: 0 8px 24px rgb(45 20 34 / .05);
   font-family: Inter, var(--mb-font-sans);
   color: var(--app-text);
   background: var(--app-bg);
@@ -255,6 +258,67 @@ img { max-width: 100%; }
 .sticky-save { position: sticky; z-index: 20; bottom: 85px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px; margin-top: 18px; background: rgb(255 255 255 / .94); border: 1px solid var(--app-border); border-radius: 17px; box-shadow: 0 14px 35px rgb(40 20 32 / .1); backdrop-filter: blur(14px); }
 .sticky-save span { display: none; color: var(--app-muted); font-size: 12px; }
 .sticky-save button { width: 100%; }
+.loyalty-desktop-heading, .loyalty-preview-column, .loyalty-settings .sticky-save { display: none; }
+.loyalty-mobile-heading { margin-bottom: 16px; }
+.loyalty-mobile-heading h1 { margin: 3px 0; font-size: 27px; letter-spacing: -.04em; }
+.loyalty-mobile-heading > p:last-child { margin: 0; color: var(--app-muted); font-size: 12px; }
+.loyalty-stage-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 0 0 18px; }
+.loyalty-stage-nav button { display: grid; min-width: 0; justify-items: center; gap: 5px; padding: 4px; color: var(--app-muted); background: transparent; border: 0; font-size: 9px; }
+.loyalty-stage-nav i { display: grid; width: 28px; height: 28px; place-items: center; background: #e9e5e7; border-radius: 50%; font-size: 11px; font-style: normal; font-weight: 800; }
+.loyalty-stage-nav button[aria-current="step"] { color: var(--app-text); }
+.loyalty-stage-nav button[aria-current="step"] i { color: #fff; background: var(--app-accent); box-shadow: 0 0 0 5px var(--app-accent-soft); }
+.loyalty-settings .loyalty-stage { display: none; }
+.loyalty-settings[data-mobile-stage="1"] .loyalty-stage--1,
+.loyalty-settings[data-mobile-stage="2"] .loyalty-stage--2,
+.loyalty-settings[data-mobile-stage="3"] .loyalty-stage--3,
+.loyalty-settings[data-mobile-stage="4"] .loyalty-stage--4 { display: grid; }
+.loyalty-summary-cards { grid-template-columns: 1fr 1fr !important; gap: 10px; }
+.loyalty-summary-cards .ui-card { display: grid; gap: 3px; min-width: 0; padding: 16px; }
+.loyalty-summary-cards small, .loyalty-summary-cards span { color: var(--app-muted); font-size: 10px; }
+.loyalty-summary-cards strong { color: var(--app-accent); font-size: 27px; }
+.loyalty-mobile-preview { gap: 12px; }
+.loyalty-scan-action { width: 100%; }
+.loyalty-review { gap: 18px; }
+.loyalty-review dl { display: grid; gap: 0; margin: 0; }
+.loyalty-review dl div { display: flex; justify-content: space-between; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--app-border); }
+.loyalty-review dt { color: var(--app-muted); }
+.loyalty-review dd { margin: 0; text-align: right; font-weight: 700; }
+.loyalty-mobile-actions { position: sticky; z-index: 20; bottom: 84px; display: flex; gap: 8px; padding: 10px; margin-top: 16px; background: rgb(255 255 255 / .94); border: 1px solid var(--app-border); border-radius: 17px; box-shadow: var(--app-shadow-sm); backdrop-filter: blur(14px); }
+.loyalty-mobile-actions .ui-button { flex: 1; }
+
+.deposit-admin-list { display: grid; gap: 12px; }
+.deposit-admin-card { padding: 18px; background: var(--app-surface); border: 1px solid var(--app-border); border-radius: 20px; box-shadow: var(--app-shadow-sm); }
+.deposit-admin-card > header { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: start; gap: 12px; }
+.deposit-admin-card > header > span { display: grid; width: 42px; height: 42px; color: var(--app-accent); background: var(--app-accent-soft); border-radius: 13px; place-items: center; font-size: 22px; }
+.deposit-admin-card h2, .deposit-form-section h3 { margin: 2px 0 0; font-size: 17px; }
+.deposit-admin-card p { margin: 4px 0 0; overflow: hidden; color: var(--app-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.deposit-status-toggle { display: flex !important; min-height: 50px; align-items: center; flex-direction: row !important; gap: 10px !important; margin-top: 14px; border-top: 1px solid var(--app-border); font-size: 12px; }
+.deposit-status-toggle input, .deposit-checkboxes input { width: 19px; height: 19px; accent-color: var(--app-accent); }
+.deposit-admin-card footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.deposit-admin-card footer > div { display: flex; gap: 5px; }
+.deposit-admin-card footer > div button { width: 38px; height: 38px; color: var(--app-muted); background: var(--app-surface-muted); border: 1px solid var(--app-border); border-radius: 11px; }
+.deposit-form-layout, .deposit-form-fields { display: grid; gap: 18px; }
+.deposit-form-section { padding: 18px; background: var(--app-surface-muted); border: 1px solid var(--app-border); border-radius: 18px; }
+.deposit-form-section > p { margin: 6px 0 18px; color: var(--app-muted); font-size: 12px; }
+.protected-field { margin: 12px 0 0; background: var(--app-surface); }
+.protected-field-status { display: flex; align-items: center; gap: 10px; }
+.protected-field-status > span { display: grid; width: 36px; height: 36px; color: var(--app-accent); background: var(--app-accent-soft); border-radius: 11px; place-items: center; }
+.protected-field-status > div { display: grid; }
+.protected-field-status small, .deposit-admin-preview > small { color: var(--app-muted); }
+.protected-field > .ui-button { justify-self: start; }
+.deposit-checkboxes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 18px; }
+.deposit-checkboxes label { display: flex; min-height: 44px; align-items: center; flex-direction: row; gap: 9px; }
+.deposit-admin-preview { min-width: 0; }
+.deposit-preview-card { padding: 22px; margin: 8px 0; color: #fff; background: linear-gradient(145deg, #171519, #09090a); border: 1px solid rgb(255 255 255 / .1); border-radius: 22px; box-shadow: 0 24px 60px rgb(13 7 11 / .2); }
+.deposit-preview-card header { display: flex; align-items: center; gap: 9px; color: #ff4bac; font-size: 11px; font-weight: 750; text-transform: uppercase; }
+.deposit-preview-card header img { width: 36px; height: 36px; object-fit: contain; }
+.deposit-preview-card h3 { margin: 28px 0 22px; font-size: 26px; letter-spacing: -.04em; }
+.deposit-preview-card p, .deposit-preview-card > div { display: grid; gap: 4px; }
+.deposit-preview-card p small, .deposit-preview-card span small { color: #aaa3a8; }
+.deposit-preview-card p strong, .deposit-preview-card span strong { display: block; }
+.deposit-preview-card > div { gap: 10px; padding-top: 18px; margin-top: 18px; border-top: 1px solid rgb(255 255 255 / .1); }
+.deposit-preview-card em { color: #8f898d; font-size: 12px; }
+.deposit-form-modal .form-error { display: grid; gap: 4px; margin-top: 16px; }
 
 .search-bar { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 20px; }
 .customer-list { display: grid; gap: 10px; }
@@ -379,6 +443,13 @@ img { max-width: 100%; }
   .sticky-save { bottom: 18px; }
   .workshop-overview { grid-template-columns: 1fr 1fr; }
   .create-order-card { padding: 28px; }
+  .deposit-admin-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deposit-form-modal { width: min(calc(100% - 40px), 1040px); }
+  .deposit-form-layout { grid-template-columns: minmax(0, 1fr) 330px; align-items: start; }
+  .deposit-admin-preview { position: sticky; top: 0; }
+  .loyalty-desktop-heading, .loyalty-preview-column, .loyalty-settings .sticky-save { display: block; }
+  .loyalty-mobile-heading, .loyalty-stage-nav, .loyalty-mobile-actions, .loyalty-mobile-preview, .loyalty-summary-cards, .loyalty-scan-action, .loyalty-review { display: none !important; }
+  .loyalty-settings .loyalty-stage { display: grid; }
 }
 
 @media (min-width: 1280px) {
@@ -395,6 +466,7 @@ img { max-width: 100%; }
   .summary-grid { grid-template-columns: 1fr 1fr; }
   .summary-grid .ui-card:last-child { grid-column: 1 / -1; }
   .modal-actions .ui-button { flex: 1; }
+  .deposit-checkboxes { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

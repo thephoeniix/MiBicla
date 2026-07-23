@@ -73,5 +73,8 @@ describe("escáner administrativo de clientes", () => {
     expect(
       canShowCustomerScanner("/admin/workshop", ["adjust_loyalty"]),
     ).toBe(false);
+    expect(
+      canShowCustomerScanner("/admin/settings/loyalty", ["adjust_loyalty"]),
+    ).toBe(false);
   });
 });

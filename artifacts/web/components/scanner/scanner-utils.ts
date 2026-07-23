@@ -63,7 +63,6 @@ export function canShowCustomerScanner(
       "/admin",
       "/admin/settings/general",
       "/admin/customers",
-      "/admin/settings/loyalty",
     ].includes(pathname) && permissions.includes("adjust_loyalty")
   );
 }

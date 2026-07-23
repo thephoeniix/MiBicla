@@ -92,9 +92,9 @@ function AdminApp() {
         ) : window.location.pathname === "/admin/customers" ? (
           <Customers permissions={user.permissions} />
         ) : window.location.pathname.endsWith("/loyalty") ? (
-          <Loyalty />
+          <Loyalty permissions={user.permissions} />
         ) : window.location.pathname.endsWith("/deposits") ? (
-          <Deposits />
+          <Deposits permissions={user.permissions} />
         ) : window.location.pathname.endsWith("/social") ? (
           <Social />
         ) : (
