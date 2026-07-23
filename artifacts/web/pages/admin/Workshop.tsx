@@ -6,6 +6,17 @@ import {
   type ComboboxOption,
 } from "../../components/SearchableCombobox";
 import { WorkshopServices } from "../../components/WorkshopServices";
+import {
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  StatusBadge,
+  Stepper,
+  statusLabel,
+  Toast,
+} from "../../components/ui";
+import { Drawer, WorkshopOrderCard } from "../../components/domain";
 interface Customer {
   id: string;
   firstName: string;
@@ -62,6 +73,8 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       customerVisible: true,
     }),
     [status, setStatus] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [orderFilter, setOrderFilter] = useState("all");
   const load = () =>
     Promise.all([
       apiFetch<RequestItem[]>("/api/admin/workshop/requests"),
@@ -248,10 +261,19 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
     window.open(x.url, "_blank", "noopener,noreferrer");
   }
   return (
-    <section>
-      <h2>Taller</h2>
+    <section className="admin-page workshop-page">
+      <PageHeader
+        eyebrow="Operación"
+        title="Taller"
+        description="Gestiona solicitudes y acompaña cada bicicleta hasta su entrega."
+        action={
+          <Button type="button" variant="secondary" onClick={() => setShowFilters(true)}>
+            Filtros
+          </Button>
+        }
+      />
       {status && (
-        <div role="alert" className="alert">
+        <div role="alert" className="form-error">
           <p>{status}</p>
           {status.startsWith("Tu sesión") && (
             <a className="button-link" href="/admin">
@@ -260,28 +282,57 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           )}
         </div>
       )}
-      <h3>Solicitudes</h3>
-      {requests.map((x) => (
-        <article key={x.id}>
-          <strong>
-            {x.requestNumber} — {x.customerName}
-          </strong>
-          <p>
-            {x.problemDescription} · {x.status}
-          </p>
-          <button type="button" onClick={() => convert(x.id)}>
-            Convertir en orden
-          </button>
-        </article>
-      ))}
-      <h3>Órdenes</h3>
-      {orders.map((x) => (
-        <button type="button" key={x.id} onClick={() => open(x.id)}>
-          {x.orderNumber} — {x.status}
-        </button>
-      ))}
+      <div className="workshop-overview">
+        <section>
+          <div className="section-heading">
+            <div><p className="page-eyebrow">Entrada</p><h2>Solicitudes</h2></div>
+            <span>{requests.length}</span>
+          </div>
+          <div className="workshop-list">
+            {requests.map((request) => (
+              <Card className="workshop-order-card" key={request.id}>
+                <header>
+                  <div>
+                    <small>{request.requestNumber}</small>
+                    <strong>{request.customerName}</strong>
+                  </div>
+                  <StatusBadge status={request.status} />
+                </header>
+                <p>{request.problemDescription}</p>
+                <Button type="button" variant="secondary" onClick={() => void convert(request.id)}>
+                  Convertir en orden
+                </Button>
+              </Card>
+            ))}
+            {!requests.length && <EmptyState title="Sin solicitudes pendientes" description="Las nuevas solicitudes aparecerán aquí." />}
+          </div>
+        </section>
+        <section>
+          <div className="section-heading">
+            <div><p className="page-eyebrow">En servicio</p><h2>Órdenes</h2></div>
+            <span>{orders.length}</span>
+          </div>
+          <div className="workshop-list">
+            {orders
+              .filter((order) => orderFilter === "all" || order.status === orderFilter)
+              .map((order) => (
+                <WorkshopOrderCard
+                  key={order.id}
+                  folio={order.orderNumber}
+                  title={order.problemDescription}
+                  status={order.status}
+                  action={() => void open(order.id)}
+                />
+              ))}
+            {!orders.length && <EmptyState title="Sin órdenes activas" description="Crea una orden para comenzar." />}
+          </div>
+        </section>
+      </div>
+      <Card className="create-order-card">
       <form onSubmit={createOrder}>
-        <h3>Crear orden</h3>
+        <div className="card-heading">
+          <div><p className="page-eyebrow">Nueva recepción</p><h2>Crear orden</h2></div>
+        </div>
         <SearchableCombobox
           label="Cliente"
           options={customers.map((customer): ComboboxOption => ({
@@ -375,8 +426,9 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             }
           />
         </label>
-        <button>Crear</button>
+        <Button>Crear orden</Button>
       </form>
+      </Card>
       {showBicycleForm && orderForm.customerId && (
         <BicycleForm
           customerId={orderForm.customerId}
@@ -391,12 +443,34 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           }}
         />
       )}
+      <Drawer
+        open={showFilters}
+        title="Filtrar órdenes"
+        onClose={() => setShowFilters(false)}
+      >
+        <label>
+          Estado
+          <select value={orderFilter} onChange={(event) => setOrderFilter(event.target.value)}>
+            <option value="all">Todos los estados</option>
+            {["received", "diagnosis", "approved", "in_progress", "ready", "delivered"].map((item) => (
+              <option key={item} value={item}>{statusLabel(item)}</option>
+            ))}
+          </select>
+        </label>
+      </Drawer>
       {detail && (
-        <article>
-          <h3>{detail.order.orderNumber}</h3>
-          <p>
-            {detail.order.problemDescription} · {detail.order.status}
-          </p>
+        <dialog open className="ui-modal workshop-detail" aria-labelledby="workshop-detail-title">
+          <article>
+          <header className="modal-header">
+            <div>
+              <p className="page-eyebrow">Orden de taller</p>
+              <h2 id="workshop-detail-title">{detail.order.orderNumber}</h2>
+              <p>{detail.order.problemDescription}</p>
+            </div>
+            <button type="button" aria-label="Cerrar detalle" onClick={() => setDetail(null)}>×</button>
+          </header>
+          <StatusBadge status={detail.order.status} />
+          <Stepper status={detail.order.status} />
           <label>
             Nuevo estado
             <select
@@ -416,7 +490,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
                 "delivered",
                 "cancelled",
               ].map((x) => (
-                <option key={x}>{x}</option>
+                <option key={x} value={x}>{statusLabel(x)}</option>
               ))}
             </select>
           </label>
@@ -426,7 +500,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             permissions={permissions}
             onChanged={() => open(detail.order.id)}
           />
-          <h4>Agregar pieza</h4>
+          <Card className="detail-section"><h3>Agregar pieza</h3>
           <label>
             Nombre
             <input
@@ -459,7 +533,8 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           <button type="button" onClick={() => add("parts")}>
             Agregar pieza
           </button>
-          <h4>Publicar avance</h4>
+          </Card>
+          <Card className="detail-section"><h3>Publicar avance</h3>
           <label>
             Título
             <input
@@ -494,6 +569,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           <button type="button" onClick={publish}>
             Publicar
           </button>
+          </Card>
           <div className="actions">
             <button type="button" onClick={token}>
               Generar seguimiento
@@ -506,7 +582,9 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             </button>
           </div>
         </article>
+        </dialog>
       )}
+      {status && <Toast>{status}</Toast>}
     </section>
   );
 }

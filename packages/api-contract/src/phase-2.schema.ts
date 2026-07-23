@@ -88,6 +88,11 @@ export const loyaltyAdjustmentSchema = z
     reason: safe(500),
   })
   .strict();
+export const customerScanTokenSchema = z
+  .object({
+    token: z.string().trim().regex(/^[a-f0-9]{64}$/, "Token inválido"),
+  })
+  .strict();
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
 export type LoyaltySettingsInput = z.infer<typeof loyaltySettingsSchema>;

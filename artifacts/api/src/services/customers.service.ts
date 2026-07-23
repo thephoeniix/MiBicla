@@ -4,6 +4,7 @@ import {
   customerPublicTokens,
   customerRewards,
   customers,
+  loyaltySettings,
   type createDatabase,
 } from "@mi-bicla/db";
 import { generateSessionToken, sha256 } from "@mi-bicla/shared";
@@ -169,14 +170,66 @@ export class CustomersService {
       .update(customerPublicTokens)
       .set({ lastUsedAt: now })
       .where(eq(customerPublicTokens.id, row.token.id));
-    const detail = await this.get(row.customer.id);
+    const [detail, [loyaltyProgram]] = await Promise.all([
+      this.get(row.customer.id),
+      this.db.select().from(loyaltySettings).limit(1),
+    ]);
     return detail
       ? {
           name: `${row.customer.firstName} ${row.customer.lastName}`,
           balance: detail.balance,
           rewards: detail.rewards.filter((r) => r.status === "available"),
+          loyaltyProgram: loyaltyProgram
+            ? {
+                enabled: loyaltyProgram.enabled,
+                rewardUnits: loyaltyProgram.rewardUnits,
+                rewardName: loyaltyProgram.rewardName,
+                rewardDescription: loyaltyProgram.rewardDescription,
+              }
+            : null,
           updatedAt: detail.balance.updatedAt,
         }
       : null;
+  }
+  async resolvePublicToken(token: string) {
+    const now = new Date();
+    const [match] = await this.db
+      .select({ token: customerPublicTokens, customer: customers })
+      .from(customerPublicTokens)
+      .innerJoin(customers, eq(customerPublicTokens.customerId, customers.id))
+      .where(
+        and(
+          eq(customerPublicTokens.publicTokenHash, sha256(token)),
+          eq(customerPublicTokens.active, true),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (
+      !match ||
+      (match.token.expiresAt && match.token.expiresAt <= now)
+    )
+      return null;
+    const [detail, [program]] = await Promise.all([
+      this.get(match.customer.id),
+      this.db.select().from(loyaltySettings).limit(1),
+    ]);
+    if (!detail) return null;
+    return {
+      customer: {
+        id: match.customer.id,
+        name: `${match.customer.firstName} ${match.customer.lastName}`,
+      },
+      balance: detail.balance,
+      rewards: detail.rewards.filter((reward) => reward.status === "available"),
+      loyaltyProgram: program
+        ? {
+            enabled: program.enabled,
+            rewardUnits: program.rewardUnits,
+            rewardName: program.rewardName,
+            allowManualAdjustments: program.allowManualAdjustments,
+          }
+        : null,
+    };
   }
 }

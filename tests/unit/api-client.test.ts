@@ -35,6 +35,25 @@ describe("cliente API autenticado", () => {
     expect(init.credentials).toBe("include");
     expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-test");
   });
+  it("envía cookie y CSRF en el ajuste manual del escáner", async () => {
+    sessionStorage.setItem("mb_csrf", "csrf-scanner");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ availableUnits: 3, rewardsCreated: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { apiFetch } = await import("../../artifacts/web/lib/api-client");
+    await apiFetch("/api/admin/customers/customer-id/loyalty-adjustments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ units: 1, reason: "Compra en tienda" }),
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.credentials).toBe("include");
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-scanner");
+  });
   it.each([
     [400, "datos inválidos"],
     [401, "sesión expiró"],
@@ -46,5 +65,33 @@ describe("cliente API autenticado", () => {
     );
     const { apiFetch } = await import("../../artifacts/web/lib/api-client");
     await expect(apiFetch("/api/admin/settings")).rejects.toThrow(text);
+  });
+  it("conserva el requestId de un error administrativo", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "INVALID",
+              requestId: "request-test",
+            },
+          }),
+          {
+            status: 400,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      ),
+    );
+    const { apiFetch, ApiError } =
+      await import("../../artifacts/web/lib/api-client");
+    const error = await apiFetch("/api/admin/customers/resolve-token", {
+      method: "POST",
+    }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as InstanceType<typeof ApiError>).requestId).toBe(
+      "request-test",
+    );
   });
 });

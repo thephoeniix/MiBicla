@@ -1,0 +1,69 @@
+const TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
+
+export function extractCustomerToken(value: string): string | null {
+  const candidate = value.trim();
+  if (TOKEN_PATTERN.test(candidate)) return candidate.toLowerCase();
+  try {
+    const url = new URL(candidate);
+    if (!["http:", "https:"].includes(url.protocol)) return null;
+    const match = url.pathname.match(/^\/c\/([^/]+)\/?$/);
+    if (!match || !TOKEN_PATTERN.test(match[1] ?? "")) return null;
+    return match[1]!.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export function createScanGate() {
+  let paused = false;
+  let lastValue = "";
+  return {
+    accept(value: string) {
+      if (paused || value === lastValue) return false;
+      lastValue = value;
+      paused = true;
+      return true;
+    },
+    reset() {
+      paused = false;
+      lastValue = "";
+    },
+    get paused() {
+      return paused;
+    },
+  };
+}
+
+export function stopMediaStream(
+  stream: Pick<MediaStream, "getTracks"> | null,
+) {
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
+export function cameraErrorMessage(error: unknown): string {
+  if (
+    error instanceof DOMException &&
+    ["NotAllowedError", "SecurityError"].includes(error.name)
+  )
+    return "No diste permiso para usar la cámara.";
+  if (
+    error instanceof DOMException &&
+    ["NotFoundError", "OverconstrainedError"].includes(error.name)
+  )
+    return "No encontramos una cámara disponible.";
+  return "No fue posible iniciar la cámara.";
+}
+
+export function canShowCustomerScanner(
+  pathname: string,
+  permissions: readonly string[],
+) {
+  return (
+    [
+      "/admin",
+      "/admin/settings/general",
+      "/admin/customers",
+      "/admin/settings/loyalty",
+    ].includes(pathname) && permissions.includes("adjust_loyalty")
+  );
+}

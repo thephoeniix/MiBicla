@@ -12,6 +12,8 @@ import { Workshop } from "./pages/admin/Workshop";
 import { WorkshopRequest } from "./pages/public/WorkshopRequest";
 import { WorkshopTracking } from "./pages/public/WorkshopTracking";
 import { apiFetch, ApiError } from "./lib/api-client";
+import { AppShell } from "./components/AppShell";
+import { Button, Input, LoadingState } from "./components/ui";
 interface Administrator {
   id: string;
   name: string;
@@ -21,14 +23,18 @@ interface Administrator {
 }
 function AdminApp() {
   const [user, setUser] = useState<Administrator | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [sessionLoading, setSessionLoading] = useState(true),
+    [loginLoading, setLoginLoading] = useState(false),
+    [showPassword, setShowPassword] = useState(false);
   const session = () =>
     apiFetch<{ administrator: Administrator }>("/auth/session")
       .then((x) => setUser(x.administrator))
       .catch((e) => {
         setUser(null);
         if (e instanceof ApiError && e.status !== 401) setError(e.message);
-      });
+      })
+      .finally(() => setSessionLoading(false));
   useEffect(() => {
     session();
     const unauthorized = () => setUser(null);
@@ -38,6 +44,7 @@ function AdminApp() {
   async function login(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    setLoginLoading(true);
     try {
       const x = await apiFetch<{ csrfToken: string }>("/auth/login", {
         method: "POST",
@@ -56,6 +63,8 @@ function AdminApp() {
           ? error.message
           : "No fue posible iniciar sesión.",
       );
+    } finally {
+      setLoginLoading(false);
     }
   }
   async function logout() {
@@ -69,55 +78,84 @@ function AdminApp() {
       setUser(null);
     }
   }
+  if (sessionLoading)
+    return (
+      <main className="login-page">
+        <LoadingState label="Preparando tu espacio…" />
+      </main>
+    );
+  if (user)
+    return (
+      <AppShell user={user} onLogout={logout}>
+        {window.location.pathname === "/admin/workshop" ? (
+          <Workshop permissions={user.permissions} />
+        ) : window.location.pathname === "/admin/customers" ? (
+          <Customers permissions={user.permissions} />
+        ) : window.location.pathname.endsWith("/loyalty") ? (
+          <Loyalty />
+        ) : window.location.pathname.endsWith("/deposits") ? (
+          <Deposits />
+        ) : window.location.pathname.endsWith("/social") ? (
+          <Social />
+        ) : (
+          <General />
+        )}
+      </AppShell>
+    );
   return (
-    <main>
-      <img src="/pink-simple.png" alt="Mi Bicla" />
-      <h1>Mi Bicla</h1>
-      {user ? (
-        <div className="admin-layout">
-          <aside>
-            <p>Hola, {user.name}</p>
-            <nav aria-label="Configuración">
-              <strong>Configuración</strong>
-              <a href="/admin/settings/general">General</a>
-              <a href="/admin/settings/deposits">Depósitos</a>
-              <a href="/admin/settings/social">Redes Sociales</a>
-              <a href="/admin/settings/loyalty">Programa de Fidelidad</a>
-              <a href="/admin/customers">Clientes</a>
-              <a href="/admin/workshop">Taller</a>
-            </nav>
-            <button onClick={logout}>Cerrar sesión</button>
-          </aside>
-          <section>
-            {window.location.pathname === "/admin/workshop" ? (
-              <Workshop permissions={user.permissions} />
-            ) : window.location.pathname === "/admin/customers" ? (
-              <Customers />
-            ) : window.location.pathname.endsWith("/loyalty") ? (
-              <Loyalty />
-            ) : window.location.pathname.endsWith("/deposits") ? (
-              <Deposits />
-            ) : window.location.pathname.endsWith("/social") ? (
-              <Social />
-            ) : (
-              <General />
-            )}
-          </section>
+    <main className="login-page">
+      <section className="login-card">
+        <header>
+          <img src="/pink-simple.png" alt="Mi Bicla" />
+          <p>Mi Bicla Querétaro</p>
+        </header>
+        <div className="login-heading">
+          <p className="page-eyebrow">Panel administrativo</p>
+          <h1>Qué gusto verte</h1>
+          <p>Inicia sesión para continuar con tu taller.</p>
         </div>
-      ) : (
         <form onSubmit={login}>
           <label>
-            Correo
-            <input name="email" type="email" maxLength={254} required />
+            Correo electrónico
+            <Input
+              name="email"
+              type="email"
+              autoComplete="username"
+              inputMode="email"
+              maxLength={254}
+              placeholder="nombre@ejemplo.com"
+              required
+            />
           </label>
           <label>
             Contraseña
-            <input name="password" type="password" maxLength={128} required />
+            <span className="password-field">
+              <Input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                maxLength={128}
+                placeholder="Tu contraseña"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={
+                  showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                }
+              >
+                {showPassword ? "Ocultar" : "Mostrar"}
+              </button>
+            </span>
           </label>
-          <button>Iniciar sesión</button>
-          {error && <p role="alert">{error}</p>}
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <Button disabled={loginLoading}>
+            {loginLoading ? "Iniciando sesión…" : "Iniciar sesión"}
+          </Button>
         </form>
-      )}
+        <small>Acceso exclusivo para el equipo Mi Bicla.</small>
+      </section>
     </main>
   );
 }

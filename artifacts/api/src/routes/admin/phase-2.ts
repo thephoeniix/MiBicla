@@ -7,6 +7,7 @@ import {
 import {
   customerCreateSchema,
   customerListQuerySchema,
+  customerScanTokenSchema,
   customerUpdateSchema,
   loyaltyAdjustmentSchema,
   loyaltySettingsSchema,
@@ -47,6 +48,15 @@ export function createPhase2AdminRouter(
     run(async (req, res) =>
       res.json(await customers.list(customerListQuerySchema.parse(req.query))),
     ),
+  );
+  r.post(
+    "/customers/resolve-token",
+    ...guard("adjust_loyalty"),
+    run(async (req, res) => {
+      const { token } = customerScanTokenSchema.parse(req.body),
+        result = await customers.resolvePublicToken(token);
+      res.status(result ? 200 : 404).json(result ?? { error: "NOT_FOUND" });
+    }),
   );
   r.post(
     "/customers",
