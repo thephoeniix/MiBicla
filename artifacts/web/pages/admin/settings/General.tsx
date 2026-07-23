@@ -32,12 +32,64 @@ export const EMPTY_BUSINESS: BusinessForm = {
   faviconUrl: "",
   themeColor: "#ec3d92",
 };
+export type BusinessResponse = Omit<
+  BusinessForm,
+  | "secondaryWhatsapp"
+  | "facebook"
+  | "instagram"
+  | "tiktok"
+  | "website"
+  | "logoUrl"
+  | "faviconUrl"
+> & {
+  secondaryWhatsapp: string | null;
+  facebook: string | null;
+  instagram: string | null;
+  tiktok: string | null;
+  website: string | null;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  updatedBy: string | null;
+};
+const cleanOptional = (value: string) => value.trim() || null;
+export function hydrateBusiness(
+  value: Partial<BusinessResponse>,
+): BusinessForm {
+  return {
+    ...EMPTY_BUSINESS,
+    ...value,
+    secondaryWhatsapp: value.secondaryWhatsapp ?? "",
+    facebook: value.facebook ?? "",
+    instagram: value.instagram ?? "",
+    tiktok: value.tiktok ?? "",
+    website: value.website ?? "",
+    logoUrl: value.logoUrl ?? "",
+    faviconUrl: value.faviconUrl ?? "",
+  };
+}
+export function buildGeneralPayload(data: BusinessForm) {
+  return {
+    businessName: data.businessName.trim(),
+    address: data.address.trim(),
+    phone: data.phone.trim(),
+    email: data.email.trim(),
+    primaryWhatsapp: data.primaryWhatsapp.trim(),
+    secondaryWhatsapp: cleanOptional(data.secondaryWhatsapp),
+    logoUrl: cleanOptional(data.logoUrl),
+    faviconUrl: cleanOptional(data.faviconUrl),
+    themeColor: data.themeColor,
+    openingHours: data.openingHours,
+  };
+}
 export function General() {
   const [data, setData] = useState(EMPTY_BUSINESS),
     [status, setStatus] = useState("");
   useEffect(() => {
-    apiFetch<BusinessForm | null>("/api/admin/settings")
-      .then((v) => v && setData(v))
+    apiFetch<BusinessResponse | null>("/api/admin/settings")
+      .then((v) => v && setData(hydrateBusiness(v)))
       .catch((e) =>
         setStatus(e instanceof ApiError ? e.message : "No se pudo cargar"),
       );
@@ -48,7 +100,7 @@ export function General() {
       await apiFetch("/api/admin/settings", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(buildGeneralPayload(data)),
       });
       setStatus("Guardado");
     } catch (error) {

@@ -5,31 +5,73 @@ const plain = (max: number) =>
     .trim()
     .max(max)
     .refine((v) => !/[<>]/.test(v), "No se permite HTML");
-const optionalUrl = z.union([z.literal(""), z.string().url().max(500)]);
+const optionalUrl = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === ""
+      ? null
+      : typeof value === "string"
+        ? value.trim()
+        : value,
+  z.union([
+    z.null(),
+    z.undefined(),
+    z
+      .string()
+      .max(500)
+      .url("Debe ser una URL válida")
+      .refine(
+        (v) => /^https?:\/\//i.test(v),
+        "Debe comenzar con http:// o https://",
+      ),
+  ]),
+);
+const optionalWhatsapp = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === ""
+      ? null
+      : typeof value === "string"
+        ? value.trim()
+        : value,
+  z.union([
+    z.null(),
+    z.undefined(),
+    z.string().regex(/^\+[1-9]\d{7,14}$/, "Usa formato internacional E.164"),
+  ]),
+);
 const whatsapp = z.union([
   z.literal(""),
   z.string().regex(/^\+[1-9]\d{7,14}$/),
 ]);
-export const businessSettingsSchema = z
-  .object({
-    businessName: plain(150),
-    address: plain(500),
-    phone: plain(30),
-    email: z.union([z.literal(""), z.string().email().max(254)]),
-    primaryWhatsapp: whatsapp,
-    secondaryWhatsapp: whatsapp,
-    facebook: optionalUrl,
-    instagram: optionalUrl,
-    tiktok: optionalUrl,
-    website: optionalUrl,
-    openingHours: z
-      .record(z.string().max(30), z.string().max(100))
-      .refine((v) => JSON.stringify(v).length <= 4000),
-    logoUrl: optionalUrl,
-    faviconUrl: optionalUrl,
-    themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  })
+const editableBusinessFields = {
+  businessName: plain(150),
+  address: plain(500),
+  phone: plain(30),
+  email: z.union([z.literal(""), z.string().email().max(254)]),
+  primaryWhatsapp: whatsapp,
+  secondaryWhatsapp: optionalWhatsapp,
+  facebook: optionalUrl,
+  instagram: optionalUrl,
+  tiktok: optionalUrl,
+  website: optionalUrl,
+  openingHours: z
+    .record(z.string().max(30), z.string().max(100))
+    .refine((v) => JSON.stringify(v).length <= 4000),
+  logoUrl: optionalUrl,
+  faviconUrl: optionalUrl,
+  themeColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+};
+export const businessSettingsUpdateSchema = z
+  .object(editableBusinessFields)
+  .partial()
   .strict();
+export const businessSettingsResponseSchema = z.object({
+  ...editableBusinessFields,
+  id: z.string().uuid(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  updatedBy: z.string().uuid().nullable(),
+});
+export const businessSettingsSchema = businessSettingsUpdateSchema;
 export const depositSettingsSchema = z
   .object({
     displayName: z
@@ -74,5 +116,10 @@ export const depositReorderSchema = z
       .max(100),
   })
   .strict();
-export type BusinessSettingsInput = z.infer<typeof businessSettingsSchema>;
+export type BusinessSettingsInput = z.infer<
+  typeof businessSettingsUpdateSchema
+>;
+export type BusinessSettingsResponse = z.infer<
+  typeof businessSettingsResponseSchema
+>;
 export type DepositSettingsInput = z.infer<typeof depositSettingsSchema>;

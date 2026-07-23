@@ -8,6 +8,7 @@ import express, {
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
+import { ZodError } from "zod";
 import { and, eq, sql } from "drizzle-orm";
 import { loginSchema } from "@mi-bicla/api-contract";
 import {
@@ -383,6 +384,24 @@ app.use(
 );
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   void next;
+  if (err instanceof ZodError) {
+    const fieldErrors = Object.fromEntries(
+      err.issues.map((issue) => [
+        issue.path.join(".") || "payload",
+        issue.message,
+      ]),
+    );
+    return res
+      .status(400)
+      .json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Datos inválidos",
+          requestId: res.locals.requestId,
+          fieldErrors,
+        },
+      });
+  }
   console.error(err);
   res.status(400).json({
     error: {

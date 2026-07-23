@@ -5,7 +5,8 @@ import {
   type NextFunction,
 } from "express";
 import {
-  businessSettingsSchema,
+  businessSettingsResponseSchema,
+  businessSettingsUpdateSchema,
   depositReorderSchema,
   depositSettingsSchema,
   depositStatusSchema,
@@ -28,7 +29,11 @@ export function createAdminBusinessSettingsRouter(
 ) {
   const router = Router();
   router.get("/", ...guard("view_business_settings"), async (_req, res) =>
-    res.json(await service.getBusiness()),
+    res.json(
+      businessSettingsResponseSchema
+        .nullable()
+        .parse(await service.getBusiness()),
+    ),
   );
   router.put(
     "/",
@@ -37,11 +42,11 @@ export function createAdminBusinessSettingsRouter(
       try {
         const id = res.locals.auth.administrator.id,
           result = await service.saveBusiness(
-            businessSettingsSchema.parse(req.body),
+            businessSettingsUpdateSchema.parse(req.body),
             id,
           );
         await audit(req, "business_settings.update", true, id);
-        res.json(result);
+        res.json(businessSettingsResponseSchema.parse(result));
       } catch (e) {
         next(e);
       }

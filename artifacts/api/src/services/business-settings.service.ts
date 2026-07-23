@@ -10,20 +10,20 @@ import type {
   DepositSettingsInput,
 } from "@mi-bicla/api-contract";
 type Db = ReturnType<typeof createDatabase>["db"];
-const EMPTY: BusinessSettingsInput = {
+const EMPTY = {
   businessName: "",
   address: "",
   phone: "",
   email: "",
   primaryWhatsapp: "",
-  secondaryWhatsapp: "",
-  facebook: "",
-  instagram: "",
-  tiktok: "",
-  website: "",
+  secondaryWhatsapp: null,
+  facebook: null,
+  instagram: null,
+  tiktok: null,
+  website: null,
   openingHours: {},
-  logoUrl: "",
-  faviconUrl: "",
+  logoUrl: null,
+  faviconUrl: null,
   themeColor: "#ec3d92",
 };
 export class BusinessSettingsService {
@@ -43,9 +43,26 @@ export class BusinessSettingsService {
       if (!saved) throw new Error("No se pudo guardar la configuración");
       return saved;
     }
+    const initial: typeof businessSettings.$inferInsert = {
+      businessName: input.businessName ?? EMPTY.businessName,
+      address: input.address ?? EMPTY.address,
+      phone: input.phone ?? EMPTY.phone,
+      email: input.email ?? EMPTY.email,
+      primaryWhatsapp: input.primaryWhatsapp ?? EMPTY.primaryWhatsapp,
+      secondaryWhatsapp: input.secondaryWhatsapp ?? EMPTY.secondaryWhatsapp,
+      facebook: input.facebook ?? EMPTY.facebook,
+      instagram: input.instagram ?? EMPTY.instagram,
+      tiktok: input.tiktok ?? EMPTY.tiktok,
+      website: input.website ?? EMPTY.website,
+      openingHours: input.openingHours ?? EMPTY.openingHours,
+      logoUrl: input.logoUrl ?? EMPTY.logoUrl,
+      faviconUrl: input.faviconUrl ?? EMPTY.faviconUrl,
+      themeColor: input.themeColor ?? EMPTY.themeColor,
+      updatedBy: administratorId,
+    };
     const [saved] = await this.db
       .insert(businessSettings)
-      .values({ ...EMPTY, ...input, updatedBy: administratorId })
+      .values(initial)
       .returning();
     if (!saved) throw new Error("No se pudo crear la configuración");
     return saved;

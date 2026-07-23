@@ -1,12 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { EMPTY_BUSINESS, type BusinessForm } from "./General";
+import {
+  EMPTY_BUSINESS,
+  hydrateBusiness,
+  type BusinessForm,
+  type BusinessResponse,
+} from "./General";
 import { apiFetch, ApiError } from "../../../lib/api-client";
 export function Social() {
   const [data, setData] = useState<BusinessForm>(EMPTY_BUSINESS),
     [status, setStatus] = useState("");
   useEffect(() => {
-    apiFetch<BusinessForm | null>("/api/admin/settings")
-      .then((v) => v && setData(v))
+    apiFetch<BusinessResponse | null>("/api/admin/settings")
+      .then((v) => v && setData(hydrateBusiness(v)))
       .catch((e) =>
         setStatus(e instanceof ApiError ? e.message : "No se pudo cargar"),
       );
@@ -17,7 +22,7 @@ export function Social() {
       await apiFetch("/api/admin/settings", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(buildSocialPayload(data)),
       });
       setStatus("Guardado");
     } catch (error) {
@@ -43,4 +48,13 @@ export function Social() {
       <output>{status}</output>
     </form>
   );
+}
+const optional = (value: string) => value.trim() || null;
+export function buildSocialPayload(data: BusinessForm) {
+  return {
+    facebook: optional(data.facebook),
+    instagram: optional(data.instagram),
+    tiktok: optional(data.tiktok),
+    website: optional(data.website),
+  };
 }

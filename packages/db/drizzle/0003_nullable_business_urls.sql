@@ -1,0 +1,14 @@
+ALTER TABLE business_settings ALTER COLUMN secondary_whatsapp DROP NOT NULL;
+ALTER TABLE business_settings ALTER COLUMN facebook DROP NOT NULL;
+ALTER TABLE business_settings ALTER COLUMN instagram DROP NOT NULL;
+ALTER TABLE business_settings ALTER COLUMN tiktok DROP NOT NULL;
+ALTER TABLE business_settings ALTER COLUMN website DROP NOT NULL;
+ALTER TABLE business_settings ALTER COLUMN logo_url DROP NOT NULL;
+ALTER TABLE business_settings ALTER COLUMN favicon_url DROP NOT NULL;
+UPDATE business_settings SET secondary_whatsapp=NULL WHERE secondary_whatsapp='';
+UPDATE business_settings SET facebook=NULL WHERE facebook='';
+UPDATE business_settings SET instagram=NULL WHERE instagram='';
+UPDATE business_settings SET tiktok=NULL WHERE tiktok='';
+UPDATE business_settings SET website=NULL WHERE website='';
+UPDATE business_settings SET logo_url=NULL WHERE logo_url='';
+UPDATE business_settings SET favicon_url=NULL WHERE favicon_url='';

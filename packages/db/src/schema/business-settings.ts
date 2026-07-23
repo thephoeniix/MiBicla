@@ -20,17 +20,17 @@ export const businessSettings = pgTable(
     phone: text("phone").notNull(),
     email: text("email").notNull(),
     primaryWhatsapp: text("primary_whatsapp").notNull(),
-    secondaryWhatsapp: text("secondary_whatsapp").notNull(),
-    facebook: text("facebook").notNull(),
-    instagram: text("instagram").notNull(),
-    tiktok: text("tiktok").notNull(),
-    website: text("website").notNull(),
+    secondaryWhatsapp: text("secondary_whatsapp"),
+    facebook: text("facebook"),
+    instagram: text("instagram"),
+    tiktok: text("tiktok"),
+    website: text("website"),
     openingHours: jsonb("opening_hours")
       .$type<Record<string, string>>()
       .notNull()
       .default({}),
-    logoUrl: text("logo_url").notNull(),
-    faviconUrl: text("favicon_url").notNull(),
+    logoUrl: text("logo_url"),
+    faviconUrl: text("favicon_url"),
     themeColor: text("theme_color").notNull().default("#ec3d92"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
