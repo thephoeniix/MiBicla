@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDatabase } from "./client.js";
 const { db, client } = createDatabase();

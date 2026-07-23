@@ -1,3 +1,4 @@
+import "dotenv/config";
 import {
   PERMISSION_NAMES,
   ROLE_NAMES,

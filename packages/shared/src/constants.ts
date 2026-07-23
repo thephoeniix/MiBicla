@@ -1,20 +1,57 @@
-export const ROLE_NAMES = ['owner', 'admin', 'employee'] as const;
+export const ROLE_NAMES = ["owner", "admin", "employee"] as const;
 export type RoleName = (typeof ROLE_NAMES)[number];
 
 export const PERMISSION_NAMES = [
-  'manage_employees', 'manage_roles', 'manage_settings', 'manage_products',
-  'manage_promotions', 'manage_events', 'manage_services', 'manage_customers',
-  'view_customers', 'create_customers', 'register_purchase', 'register_service',
-  'redeem_reward', 'reverse_movement', 'view_audit_logs', 'view_reports',
+  "manage_employees",
+  "manage_roles",
+  "manage_settings",
+  "manage_products",
+  "manage_promotions",
+  "manage_events",
+  "manage_services",
+  "manage_customers",
+  "view_customers",
+  "create_customers",
+  "register_purchase",
+  "register_service",
+  "redeem_reward",
+  "reverse_movement",
+  "view_audit_logs",
+  "view_reports",
+  "view_business_settings",
+  "manage_business_settings",
+  "view_deposit_settings",
+  "manage_deposit_settings",
 ] as const;
 export type PermissionName = (typeof PERMISSION_NAMES)[number];
 
 export const ROLE_PERMISSIONS: Record<RoleName, readonly PermissionName[]> = {
   owner: PERMISSION_NAMES,
-  admin: ['manage_products', 'manage_promotions', 'manage_events', 'manage_services',
-    'manage_customers', 'view_customers', 'create_customers', 'register_purchase',
-    'register_service', 'redeem_reward', 'reverse_movement', 'view_reports'],
-  employee: ['view_customers', 'create_customers', 'register_purchase', 'register_service', 'redeem_reward'],
+  admin: [
+    "manage_products",
+    "manage_promotions",
+    "manage_events",
+    "manage_services",
+    "manage_customers",
+    "view_customers",
+    "create_customers",
+    "register_purchase",
+    "register_service",
+    "redeem_reward",
+    "reverse_movement",
+    "view_reports",
+    "view_business_settings",
+    "manage_business_settings",
+    "view_deposit_settings",
+    "manage_deposit_settings",
+  ],
+  employee: [
+    "view_customers",
+    "create_customers",
+    "register_purchase",
+    "register_service",
+    "redeem_reward",
+  ],
 };
 
 export const SESSION_IDLE_MS = 30 * 60 * 1000;

@@ -33,3 +33,13 @@ Las pruebas de integración requieren una PostgreSQL desechable indicada por `TE
 `DATABASE_URL`, `NODE_ENV`, `APP_BASE_URL`, `API_BASE_URL`, `SESSION_SECRET`, `TRUST_PROXY`, `ALLOWED_ORIGINS`, `PORT`; para scripts del owner: `OWNER_NAME`, `OWNER_EMAIL`, `OWNER_PASSWORD`; para integración: `TEST_DATABASE_URL`. El frontend acepta `VITE_API_BASE_URL`.
 
 No se incluyen clientes, QR, puntos, compras, recompensas, taller, catálogo, promociones, eventos ni almacenamiento de imágenes: están fuera de la Fase 1.
+
+## Business Settings
+
+La migración `0001_business_settings.sql` agrega un registro singleton para información pública y una configuración de depósitos asociada. El panel ofrece General, Depósitos y Redes Sociales; `/depositos` sólo presenta campos activos y visibles. Cuenta, CLABE y tarjeta se cifran con AES-256-GCM y nunca se incluyen en auditoría.
+
+La migración `0002_multiple_deposit_options.sql` conserva y renombra la configuración previa, permitiendo múltiples opciones activables y ordenables. Los secretos vacíos durante una edición se conservan; `clearAccountNumber`, `clearClabe` y `clearCardNumber` permiten borrarlos explícitamente. Las respuestas administrativas sólo incluyen indicadores y valores enmascarados.
+
+Endpoints: `GET/PUT /api/admin/settings`; `GET/POST /api/admin/settings/deposits`; `GET/PUT/DELETE /api/admin/settings/deposits/:id`; `PATCH /api/admin/settings/deposits/:id/status`; `PATCH /api/admin/settings/deposits/reorder`; `GET /api/public/business` y `GET /api/public/depositos`. Los endpoints administrativos requieren sus permisos `view_*` o `manage_*` correspondientes.
+
+Genera `APP_ENCRYPTION_KEY` como 32 bytes en hexadecimal (64 caracteres), consérvala fuera del repositorio y respáldala: perderla impide descifrar los datos bancarios. Ejemplo de generación: `openssl rand -hex 32`.

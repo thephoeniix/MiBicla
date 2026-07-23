@@ -1,1 +1,1 @@
-{"version":"7","dialect":"postgresql","entries":[{"idx":0,"version":"7","when":1784732400000,"tag":"0000_phase_1","breakpoints":true}]}
+{"version":"7","dialect":"postgresql","entries":[{"idx":0,"version":"7","when":1784732400000,"tag":"0000_phase_1","breakpoints":true},{"idx":1,"version":"7","when":1784736000000,"tag":"0001_business_settings","breakpoints":true},{"idx":2,"version":"7","when":1784740000000,"tag":"0002_multiple_deposit_options","breakpoints":true}]}

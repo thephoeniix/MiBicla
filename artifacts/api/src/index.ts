@@ -1,3 +1,4 @@
+import "dotenv/config";
 import crypto from "node:crypto";
 import express, {
   type Request,
@@ -37,6 +38,9 @@ import {
   verifyPassword,
   parseEnv,
 } from "@mi-bicla/shared";
+import { BusinessSettingsService } from "./services/business-settings.service.js";
+import { createAdminBusinessSettingsRouter } from "./routes/admin/business-settings.js";
+import { createPublicBusinessSettingsRouter } from "./routes/public/business-settings.js";
 const env = parseEnv(process.env),
   { db } = createDatabase();
 const app = express();
@@ -67,19 +71,20 @@ const audit = async (
   administratorId?: string,
   reason?: string,
   metadata: unknown = {},
+  entityId?: string,
 ) =>
-  db
-    .insert(auditLogs)
-    .values({
-      requestId: req.res!.locals.requestId,
-      administratorId,
-      action,
-      success,
-      failureReasonCode: reason,
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-      metadata: sanitizeAuditMetadata(metadata),
-    });
+  db.insert(auditLogs).values({
+    requestId: req.res!.locals.requestId,
+    administratorId,
+    action,
+    success,
+    failureReasonCode: reason,
+    entityType: entityId ? "payment_deposit_option" : undefined,
+    entityId,
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent"),
+    metadata: sanitizeAuditMetadata(metadata),
+  });
 function windowStart(now = new Date()) {
   return new Date(
     Math.floor(now.getTime() / LOGIN_WINDOW_MS) * LOGIN_WINDOW_MS,
@@ -120,15 +125,13 @@ const csrfGuard = (req: Request, res: Response, next: NextFunction) => {
     !env.ALLOWED_ORIGINS.includes(origin) ||
     (fetchSite && fetchSite === "cross-site")
   )
-    return res
-      .status(403)
-      .json({
-        error: {
-          code: "CSRF_ORIGIN",
-          message: "Solicitud no permitida",
-          requestId: res.locals.requestId,
-        },
-      });
+    return res.status(403).json({
+      error: {
+        code: "CSRF_ORIGIN",
+        message: "Solicitud no permitida",
+        requestId: res.locals.requestId,
+      },
+    });
   next();
 };
 app.use(csrfGuard);
@@ -144,15 +147,13 @@ app.post("/auth/login", async (req, res, next) => {
     );
     if (ipLimited || emailLimited) {
       await audit(req, "auth.login", false, undefined, "RATE_LIMITED");
-      return res
-        .status(429)
-        .json({
-          error: {
-            code: "LOGIN_FAILED",
-            message: "Credenciales inválidas",
-            requestId: res.locals.requestId,
-          },
-        });
+      return res.status(429).json({
+        error: {
+          code: "LOGIN_FAILED",
+          message: "Credenciales inválidas",
+          requestId: res.locals.requestId,
+        },
+      });
     }
     const [a] = await db
       .select()
@@ -180,47 +181,41 @@ app.post("/auth/login", async (req, res, next) => {
               updatedAt: new Date(),
             })
             .where(eq(administrators.id, a.id));
-          await tx
-            .insert(auditLogs)
-            .values({
-              requestId: res.locals.requestId,
-              administratorId: a.id,
-              action: "auth.login",
-              success: false,
-              failureReasonCode: "INVALID_CREDENTIALS",
-              ipAddress: req.ip,
-              userAgent: req.get("user-agent"),
-              metadata: {},
-            });
+          await tx.insert(auditLogs).values({
+            requestId: res.locals.requestId,
+            administratorId: a.id,
+            action: "auth.login",
+            success: false,
+            failureReasonCode: "INVALID_CREDENTIALS",
+            ipAddress: req.ip,
+            userAgent: req.get("user-agent"),
+            metadata: {},
+          });
         });
       else
         await audit(req, "auth.login", false, undefined, "INVALID_CREDENTIALS");
-      return res
-        .status(401)
-        .json({
-          error: {
-            code: "LOGIN_FAILED",
-            message: "Credenciales inválidas",
-            requestId: res.locals.requestId,
-          },
-        });
+      return res.status(401).json({
+        error: {
+          code: "LOGIN_FAILED",
+          message: "Credenciales inválidas",
+          requestId: res.locals.requestId,
+        },
+      });
     }
     const token = generateSessionToken(),
       csrf = generateCsrfToken(),
       now = new Date(),
       absolute = new Date(now.getTime() + SESSION_ABSOLUTE_MS);
     await db.transaction(async (tx) => {
-      await tx
-        .insert(sessions)
-        .values({
-          administratorId: a.id,
-          tokenHash: hashSessionToken(token),
-          csrfTokenHash: hashSessionToken(csrf),
-          ipAddress: req.ip,
-          userAgent: req.get("user-agent"),
-          expiresAt: new Date(now.getTime() + SESSION_IDLE_MS),
-          absoluteExpiresAt: absolute,
-        });
+      await tx.insert(sessions).values({
+        administratorId: a.id,
+        tokenHash: hashSessionToken(token),
+        csrfTokenHash: hashSessionToken(csrf),
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+        expiresAt: new Date(now.getTime() + SESSION_IDLE_MS),
+        absoluteExpiresAt: absolute,
+      });
       await tx
         .update(administrators)
         .set({
@@ -230,17 +225,15 @@ app.post("/auth/login", async (req, res, next) => {
           updatedAt: now,
         })
         .where(eq(administrators.id, a.id));
-      await tx
-        .insert(auditLogs)
-        .values({
-          requestId: res.locals.requestId,
-          administratorId: a.id,
-          action: "auth.login",
-          success: true,
-          ipAddress: req.ip,
-          userAgent: req.get("user-agent"),
-          metadata: {},
-        });
+      await tx.insert(auditLogs).values({
+        requestId: res.locals.requestId,
+        administratorId: a.id,
+        action: "auth.login",
+        success: true,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+        metadata: {},
+      });
     });
     res
       .cookie("mb_session", token, cookie)
@@ -253,15 +246,13 @@ async function auth(req: Request, res: Response, next: NextFunction) {
   try {
     const token = req.cookies.mb_session as string | undefined;
     if (!token)
-      return res
-        .status(401)
-        .json({
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Sesión requerida",
-            requestId: res.locals.requestId,
-          },
-        });
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Sesión requerida",
+          requestId: res.locals.requestId,
+        },
+      });
     const [row] = await db
         .select({
           session: sessions,
@@ -286,15 +277,13 @@ async function auth(req: Request, res: Response, next: NextFunction) {
       row.administrator.deletedAt
     ) {
       res.clearCookie("mb_session", { path: "/" });
-      return res
-        .status(401)
-        .json({
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Sesión inválida",
-            requestId: res.locals.requestId,
-          },
-        });
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Sesión inválida",
+          requestId: res.locals.requestId,
+        },
+      });
     }
     const csrf = req.get("x-csrf-token");
     if (
@@ -302,15 +291,13 @@ async function auth(req: Request, res: Response, next: NextFunction) {
       (!csrf ||
         !safeTokenCompare(hashSessionToken(csrf), row.session.csrfTokenHash))
     )
-      return res
-        .status(403)
-        .json({
-          error: {
-            code: "CSRF_TOKEN",
-            message: "Token CSRF inválido",
-            requestId: res.locals.requestId,
-          },
-        });
+      return res.status(403).json({
+        error: {
+          code: "CSRF_TOKEN",
+          message: "Token CSRF inválido",
+          requestId: res.locals.requestId,
+        },
+      });
     const renewal = calculateSessionRenewal(
       now,
       row.session.lastSeenAt,
@@ -370,29 +357,39 @@ export const requirePermission = (permission: string) => [
       )
       .limit(1);
     if (!allowed)
-      return res
-        .status(403)
-        .json({
-          error: {
-            code: "FORBIDDEN",
-            message: "Permiso insuficiente",
-            requestId: res.locals.requestId,
-          },
-        });
+      return res.status(403).json({
+        error: {
+          code: "FORBIDDEN",
+          message: "Permiso insuficiente",
+          requestId: res.locals.requestId,
+        },
+      });
     next();
   },
 ];
+const businessSettingsService = new BusinessSettingsService(db);
+app.use(
+  "/api/admin/settings",
+  createAdminBusinessSettingsRouter(
+    businessSettingsService,
+    requirePermission,
+    (req, action, success, administratorId, entityId) =>
+      audit(req, action, success, administratorId, undefined, {}, entityId),
+  ),
+);
+app.use(
+  "/api/public",
+  createPublicBusinessSettingsRouter(businessSettingsService),
+);
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   void next;
   console.error(err);
-  res
-    .status(400)
-    .json({
-      error: {
-        code: "BAD_REQUEST",
-        message: "Solicitud inválida",
-        requestId: res.locals.requestId,
-      },
-    });
+  res.status(400).json({
+    error: {
+      code: "BAD_REQUEST",
+      message: "Solicitud inválida",
+      requestId: res.locals.requestId,
+    },
+  });
 });
 app.listen(env.PORT, () => console.log(`API en ${env.API_BASE_URL}`));

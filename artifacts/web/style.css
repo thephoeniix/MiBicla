@@ -1,1 +1,135 @@
-:root{font-family:system-ui;color:#241824;background:#fff7fb}body{margin:0;display:grid;place-items:center;min-height:100vh}main{width:min(360px,calc(100% - 3rem));padding:2.5rem;background:white;border-radius:20px;box-shadow:0 12px 40px #6c365522;text-align:center}img{width:72px}form,label{display:grid;gap:.5rem;text-align:left}form{gap:1rem}input,button{font:inherit;padding:.8rem;border-radius:9px;border:1px solid #d8c6d0}button{background:#ec3d92;color:white;border:0;font-weight:700;cursor:pointer}
+:root {
+  font-family: system-ui;
+  color: #241824;
+  background: #fff7fb;
+}
+body {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+main {
+  width: min(760px, calc(100% - 3rem));
+  padding: 2.5rem;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px #6c365522;
+  text-align: center;
+}
+img {
+  width: 72px;
+}
+form,
+label {
+  display: grid;
+  gap: 0.5rem;
+  text-align: left;
+}
+form {
+  gap: 1rem;
+}
+input,
+button,
+textarea {
+  font: inherit;
+  padding: 0.8rem;
+  border-radius: 9px;
+  border: 1px solid #d8c6d0;
+}
+button {
+  background: #ec3d92;
+  color: white;
+  border: 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-layout {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 2rem;
+  text-align: left;
+}
+.admin-layout aside,
+.admin-layout nav {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+.admin-layout a {
+  color: #7d2752;
+}
+.admin-layout section {
+  min-width: 0;
+}
+.check {
+  display: flex;
+  align-items: center;
+}
+.check input {
+  width: auto;
+}
+.deposit-card,
+.receipt {
+  display: grid;
+  gap: 0.8rem;
+}
+.copy-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid #eadbe3;
+  border-radius: 12px;
+}
+.copy-row span {
+  display: grid;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.copy-row small {
+  color: #735d68;
+}
+.button {
+  display: block;
+  background: #25d366;
+  color: #102819;
+  padding: 0.8rem;
+  border-radius: 9px;
+  text-decoration: none;
+  font-weight: 700;
+}
+.receipt {
+  margin-top: 1.5rem;
+}
+.admin-cards {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.admin-cards article {
+  border: 1px solid #eadbe3;
+  border-radius: 12px;
+  padding: 1rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.actions button {
+  padding: 0.55rem;
+}
+@media (max-width: 640px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+  main {
+    width: calc(100% - 2rem);
+    padding: 1rem;
+  }
+  .copy-row {
+    align-items: flex-start;
+  }
+}

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { lt } from "drizzle-orm";
 import { createDatabase } from "./client.js";
 import { rateLimits } from "./schema.js";

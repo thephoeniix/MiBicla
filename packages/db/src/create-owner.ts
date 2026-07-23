@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { ownerEnvironmentSchema } from "@mi-bicla/api-contract";
 import { hashPassword, normalizeEmail } from "@mi-bicla/shared";
@@ -20,15 +21,13 @@ await db.transaction(async (tx) => {
     .where(eq(administrators.emailNormalized, email))
     .limit(1);
   if (existing) return;
-  await tx
-    .insert(administrators)
-    .values({
-      roleId: owner.id,
-      name: env.OWNER_NAME,
-      email: env.OWNER_EMAIL.trim(),
-      emailNormalized: email,
-      passwordHash: await hashPassword(env.OWNER_PASSWORD),
-    });
+  await tx.insert(administrators).values({
+    roleId: owner.id,
+    name: env.OWNER_NAME,
+    email: env.OWNER_EMAIL.trim(),
+    emailNormalized: email,
+    passwordHash: await hashPassword(env.OWNER_PASSWORD),
+  });
   created = true;
 });
 await client.end();
