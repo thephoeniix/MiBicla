@@ -9,7 +9,7 @@ const ARGON2_OPTIONS = {
   parallelism: 1,
 } as const;
 const SENSITIVE_KEY =
-  /(password|password_hash|token|token_hash|cookie|authorization|csrf|secret)/i;
+  /(password|password_hash|token|token_hash|cookie|authorization|csrf|secret|phone|email)/i;
 
 export const normalizeEmail = (email: string): string =>
   email.trim().toLowerCase();

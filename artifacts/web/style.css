@@ -31,11 +31,114 @@ form {
 }
 input,
 button,
-textarea {
+textarea,
+select {
   font: inherit;
   padding: 0.8rem;
   border-radius: 9px;
   border: 1px solid #d8c6d0;
+}
+.combobox {
+  position: relative;
+}
+.combobox-input {
+  display: flex;
+  position: relative;
+}
+.combobox-input input {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+.combobox-clear {
+  position: absolute;
+  right: 0.35rem;
+  top: 0.35rem;
+  padding: 0.35rem 0.65rem;
+}
+.combobox-options {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 15rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  border: 1px solid #d8c6d0;
+  border-radius: 9px;
+  background: white;
+  box-shadow: 0 8px 24px #6c365533;
+}
+.combobox-options button {
+  width: 100%;
+  color: #241824;
+  background: transparent;
+  text-align: left;
+}
+.combobox-options button:hover,
+.combobox-options button.active {
+  background: #fff0f7;
+}
+.secondary {
+  color: #7d2752;
+  background: #f8e7ef;
+}
+.alert {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  border: 1px solid #b42318;
+  border-radius: 9px;
+  background: #fff4f2;
+}
+.button-link {
+  display: inline-block;
+  padding: 0.6rem 0.8rem;
+  border-radius: 9px;
+  color: white;
+  background: #ec3d92;
+}
+.bicycle-summary,
+fieldset {
+  padding: 1rem;
+  border: 1px solid #eadbe3;
+  border-radius: 12px;
+}
+.bicycle-summary dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+}
+.bicycle-summary dd {
+  margin: 0;
+}
+dialog {
+  width: min(680px, calc(100% - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 12px 60px #24182455;
+}
+.bicycle-form fieldset {
+  display: grid;
+  gap: 1rem;
+}
+.service-catalog,
+.selected-services {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.service-catalog article,
+.selected-services article {
+  padding: 0.8rem;
+  border: 1px solid #eadbe3;
+  border-radius: 10px;
+}
+.service-catalog .check span {
+  display: grid;
 }
 button {
   background: #ec3d92;

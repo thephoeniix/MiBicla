@@ -1,3 +1,5 @@
 export * from "./client.js";
 export * from "./schema.js";
 export * from "./schema/business-settings.js";
+export * from "./schema/phase-2.js";
+export * from "./schema/workshop.js";

@@ -5,6 +5,7 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public fieldErrors: Record<string, string> = {},
+    public code = "",
   ) {
     super(message);
     this.name = "ApiError";
@@ -37,7 +38,7 @@ export async function apiFetch<T>(
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
-      error?: { fieldErrors?: Record<string, string> };
+      error?: { code?: string; fieldErrors?: Record<string, string> };
     } | null;
     if (response.status === 401) {
       sessionStorage.removeItem("mb_csrf");
@@ -49,6 +50,7 @@ export async function apiFetch<T>(
       response.status,
       detail ? `${detail[0]}: ${detail[1]}` : messageForStatus(response.status),
       fields,
+      payload?.error?.code ?? "",
     );
   }
   if (response.status === 204) return undefined as T;

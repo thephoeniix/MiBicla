@@ -1,1 +1,62 @@
-{"version":"7","dialect":"postgresql","entries":[{"idx":0,"version":"7","when":1784732400000,"tag":"0000_phase_1","breakpoints":true},{"idx":1,"version":"7","when":1784736000000,"tag":"0001_business_settings","breakpoints":true},{"idx":2,"version":"7","when":1784740000000,"tag":"0002_multiple_deposit_options","breakpoints":true},{"idx":3,"version":"7","when":1784744000000,"tag":"0003_nullable_business_urls","breakpoints":true}]}
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1784732400000,
+      "tag": "0000_phase_1",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784736000000,
+      "tag": "0001_business_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784740000000,
+      "tag": "0002_multiple_deposit_options",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784744000000,
+      "tag": "0003_nullable_business_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784748000000,
+      "tag": "0004_phase_2",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784752000000,
+      "tag": "0005_workshop",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784756000000,
+      "tag": "0006_bicycle_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784760000000,
+      "tag": "0007_workshop_service_catalog",
+      "breakpoints": true
+    }
+  ]
+}

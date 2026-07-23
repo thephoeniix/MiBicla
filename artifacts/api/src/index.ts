@@ -42,6 +42,13 @@ import {
 import { BusinessSettingsService } from "./services/business-settings.service.js";
 import { createAdminBusinessSettingsRouter } from "./routes/admin/business-settings.js";
 import { createPublicBusinessSettingsRouter } from "./routes/public/business-settings.js";
+import { CustomersService } from "./services/customers.service.js";
+import { LoyaltyService } from "./services/loyalty.service.js";
+import { createPhase2AdminRouter } from "./routes/admin/phase-2.js";
+import { createPublicCustomerRouter } from "./routes/public/customer.js";
+import { WorkshopService } from "./services/workshop.service.js";
+import { createWorkshopAdminRouter } from "./routes/admin/workshop.js";
+import { createWorkshopPublicRouter } from "./routes/public/workshop.js";
 const env = parseEnv(process.env),
   { db } = createDatabase();
 const app = express();
@@ -369,6 +376,9 @@ export const requirePermission = (permission: string) => [
   },
 ];
 const businessSettingsService = new BusinessSettingsService(db);
+const customersService = new CustomersService(db),
+  loyaltyService = new LoyaltyService(db);
+const workshopService = new WorkshopService(db);
 app.use(
   "/api/admin/settings",
   createAdminBusinessSettingsRouter(
@@ -382,6 +392,26 @@ app.use(
   "/api/public",
   createPublicBusinessSettingsRouter(businessSettingsService),
 );
+app.use(
+  "/api/admin",
+  createPhase2AdminRouter(
+    customersService,
+    loyaltyService,
+    requirePermission,
+    audit,
+  ),
+);
+app.use("/api/public", createPublicCustomerRouter(customersService));
+app.use(
+  "/api/admin",
+  createWorkshopAdminRouter(
+    workshopService,
+    requirePermission,
+    audit,
+    env.APP_BASE_URL,
+  ),
+);
+app.use("/api/public", createWorkshopPublicRouter(workshopService));
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   void next;
   if (err instanceof ZodError) {
@@ -391,16 +421,14 @@ app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
         issue.message,
       ]),
     );
-    return res
-      .status(400)
-      .json({
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Datos inválidos",
-          requestId: res.locals.requestId,
-          fieldErrors,
-        },
-      });
+    return res.status(400).json({
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Datos inválidos",
+        requestId: res.locals.requestId,
+        fieldErrors,
+      },
+    });
   }
   console.error(err);
   res.status(400).json({

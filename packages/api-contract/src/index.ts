@@ -74,3 +74,6 @@ export const ownerEnvironmentSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 export * from "./business-settings.schema.js";
+export * from "./phone.schema.js";
+export * from "./phase-2.schema.js";
+export * from "./workshop.schema.js";

@@ -5,6 +5,12 @@ import { General } from "./pages/admin/settings/General";
 import { Deposits } from "./pages/admin/settings/Deposits";
 import { Social } from "./pages/admin/settings/Social";
 import { Depositos } from "./pages/public/Depositos";
+import { CustomerCard } from "./pages/public/CustomerCard";
+import { Customers } from "./pages/admin/Customers";
+import { Loyalty } from "./pages/admin/settings/Loyalty";
+import { Workshop } from "./pages/admin/Workshop";
+import { WorkshopRequest } from "./pages/public/WorkshopRequest";
+import { WorkshopTracking } from "./pages/public/WorkshopTracking";
 import { apiFetch, ApiError } from "./lib/api-client";
 interface Administrator {
   id: string;
@@ -76,11 +82,20 @@ function AdminApp() {
               <a href="/admin/settings/general">General</a>
               <a href="/admin/settings/deposits">Depósitos</a>
               <a href="/admin/settings/social">Redes Sociales</a>
+              <a href="/admin/settings/loyalty">Programa de Fidelidad</a>
+              <a href="/admin/customers">Clientes</a>
+              <a href="/admin/workshop">Taller</a>
             </nav>
             <button onClick={logout}>Cerrar sesión</button>
           </aside>
           <section>
-            {window.location.pathname.endsWith("/deposits") ? (
+            {window.location.pathname === "/admin/workshop" ? (
+              <Workshop permissions={user.permissions} />
+            ) : window.location.pathname === "/admin/customers" ? (
+              <Customers />
+            ) : window.location.pathname.endsWith("/loyalty") ? (
+              <Loyalty />
+            ) : window.location.pathname.endsWith("/deposits") ? (
               <Deposits />
             ) : window.location.pathname.endsWith("/social") ? (
               <Social />
@@ -107,6 +122,13 @@ function AdminApp() {
   );
 }
 function App() {
+  if (window.location.pathname === "/taller/solicitud")
+    return <WorkshopRequest />;
+  const workshopToken =
+    window.location.pathname.match(/^\/taller\/([^/]+)$/)?.[1];
+  if (workshopToken) return <WorkshopTracking token={workshopToken} />;
+  const customerToken = window.location.pathname.match(/^\/c\/([^/]+)$/)?.[1];
+  if (customerToken) return <CustomerCard token={customerToken} />;
   return window.location.pathname === "/depositos" ? (
     <Depositos />
   ) : (
