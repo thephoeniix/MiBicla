@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api-client";
+import { BrandLogo } from "../../components/brand";
 import {
   EmptyState,
   ErrorState,
@@ -90,8 +91,7 @@ export function WorkshopTracking({ token }: { token: string }) {
       <div className="public-page-container tracking-shell">
         <header className="tracking-header">
           <a href="/" aria-label="Mi Bicla Querétaro">
-            <img src="/pink-simple.png" alt="" />
-            <span><strong>Mi Bicla</strong><small>Querétaro</small></span>
+            <BrandLogo variant="full" color="auto" decorative />
           </a>
           <span>Seguimiento</span>
         </header>

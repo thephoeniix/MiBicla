@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { apiFetch } from "../../lib/api-client";
+import { BrandLogo } from "../../components/brand";
 import "./customer-card.css";
 
 const MAX_VISIBLE_LOYALTY_ICONS = 10;
@@ -29,11 +30,7 @@ type LoadState = "loading" | "ready" | "error";
 function BrandMark() {
   return (
     <div className="loyalty-brand">
-      <img src="/pink-simple.png" alt="" />
-      <div>
-        <strong>Mi Bicla</strong>
-        <span>Querétaro</span>
-      </div>
+      <BrandLogo variant="full" color="auto" />
     </div>
   );
 }

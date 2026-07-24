@@ -62,6 +62,7 @@ export function WorkshopServices({
 }) {
   const [catalog, setCatalog] = useState<CatalogService[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [showCatalog, setShowCatalog] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [editingCatalog, setEditingCatalog] = useState<CatalogService | null>(
     null,
@@ -230,10 +231,13 @@ export function WorkshopServices({
   }
 
   return (
-    <section>
-      <h4>Servicios</h4>
+    <section className="workshop-services">
+      <header className="workshop-services-heading">
+        <div><p className="page-eyebrow">Orden</p><h4>Servicios</h4></div>
+        {canManage && <button type="button" className="secondary" onClick={() => setShowCatalog((current) => !current)}>{showCatalog ? "Cerrar catálogo" : "Editar catálogo"}</button>}
+      </header>
       {error && <p role="alert">{error}</p>}
-      <div className="service-catalog">
+      {showCatalog && <div className="service-catalog">
         {catalog.map((service) => (
           <article key={service.id}>
             <label className="check">
@@ -256,25 +260,20 @@ export function WorkshopServices({
               </span>
             </label>
             {canManage && (
-              <div className="actions">
-                <button type="button" onClick={() => editCatalog(service)}>
-                  Editar catálogo
-                </button>
-                <button type="button" onClick={() => move(service, -1)}>
-                  Subir
-                </button>
-                <button type="button" onClick={() => move(service, 1)}>
-                  Bajar
-                </button>
-                <button type="button" onClick={() => removeCatalog(service)}>
-                  Eliminar
-                </button>
-              </div>
+              <details className="service-actions-menu">
+                <summary aria-label={`Acciones para ${service.name}`}>•••</summary>
+                <div>
+                  <button type="button" onClick={() => editCatalog(service)}>Editar</button>
+                  <button type="button" onClick={() => move(service, -1)}>Mover arriba</button>
+                  <button type="button" onClick={() => move(service, 1)}>Mover abajo</button>
+                  <button type="button" onClick={() => removeCatalog(service)}>Eliminar</button>
+                </div>
+              </details>
             )}
           </article>
         ))}
-      </div>
-      {canManage && (
+      </div>}
+      {canManage && showCatalog && (
         <button
           type="button"
           className="secondary"
@@ -290,43 +289,24 @@ export function WorkshopServices({
       <div className="selected-services">
         {services.map((service) => (
           <article key={service.id}>
-            <h5>{service.serviceName}</h5>
-            <p>
-              Cantidad: {service.quantity} · Precio:{" "}
+            <span className={`service-state service-state--${service.status}`} aria-hidden="true" />
+            <div><h5>{service.serviceName}</h5>
+            <p>{service.quantity} ×{" "}
               {service.unitPriceCents === undefined
                 ? "Restringido"
                 : formatMxn(service.unitPriceCents)}
             </p>
-            <p>
-              Estado: {service.status} · Visible para cliente:{" "}
-              {service.isCustomerVisible ? "Sí" : "No"}
-            </p>
-            <div className="actions">
-              <button type="button" onClick={() => editLine(service)}>
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => updateStatus(service, "in_progress")}
-              >
-                Marcar en proceso
-              </button>
-              <button
-                type="button"
-                onClick={() => updateStatus(service, "completed")}
-              >
-                Marcar completado
-              </button>
-              <button
-                type="button"
-                onClick={() => updateStatus(service, "cancelled")}
-              >
-                Cancelar
-              </button>
-              <button type="button" onClick={() => removeLine(service)}>
-                Eliminar de la orden
-              </button>
-            </div>
+            <small>{service.status} · {service.isCustomerVisible ? "Visible para cliente" : "Uso interno"}</small></div>
+            <details className="service-actions-menu">
+              <summary aria-label={`Acciones para ${service.serviceName}`}>•••</summary>
+              <div>
+                <button type="button" onClick={() => editLine(service)}>Editar</button>
+                <button type="button" onClick={() => updateStatus(service, "in_progress")}>Marcar en proceso</button>
+                <button type="button" onClick={() => updateStatus(service, "completed")}>Marcar completado</button>
+                <button type="button" onClick={() => updateStatus(service, "cancelled")}>Cancelar</button>
+                <button type="button" onClick={() => removeLine(service)}>Eliminar</button>
+              </div>
+            </details>
           </article>
         ))}
       </div>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ThemeSelector } from "../ThemeSelector";
 import { TokenAccessDialog } from "./TokenAccessDialog";
-import { ChainDivider } from "../brand";
+import { BrandLogo } from "../brand";
+import footerChain from "../../../../logo/footer.svg";
 
 export interface PublicBusiness {
   businessName?: string;
@@ -24,6 +25,41 @@ const NAV = [
   ["/fidelidad", "Fidelidad", "♡"],
   ["/marcas", "Marcas", "✦"],
 ] as const;
+
+function FooterChainDivider() {
+  return (
+    <div className="footer-chain-divider" aria-hidden="true">
+      <img src={footerChain} alt="" width={2048} height={65} />
+    </div>
+  );
+}
+
+function PublicFooter() {
+  const year = new Date().getFullYear();
+  const goTop = () => {
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+  };
+  return (
+    <footer className="brand-footer">
+      <div className="footer-simple">
+        <section className="footer-brand">
+          <BrandLogo variant="full" color="white" />
+          <strong>QUERÉTARO · MÉXICO</strong>
+          <p>Taller, comunidad y recompensas para seguir rodando.</p>
+        </section>
+        <FooterChainDivider />
+        <div className="footer-legal">
+          <span>© {year} MI BICLA QUERÉTARO</span>
+          <nav aria-label="Información legal"><a href="/aviso-de-privacidad">Aviso de privacidad</a><a href="/terminos">Términos</a></nav>
+          <button type="button" onClick={goTop}>Ir arriba <span aria-hidden="true">↑</span></button>
+        </div>
+      </div>
+    </footer>
+  );
+}
 
 export function PublicShell({
   children,
@@ -82,8 +118,11 @@ export function PublicShell({
       <a className="mb-sr-only mb-sr-only-focusable" href="#public-content">Saltar al contenido</a>
       <header className="public-header">
         <a className="app-brand" href="/">
-          <img src={business?.logoUrl || "/pink-simple.png"} alt="" />
-          <strong>{business?.businessName || "Mi Bicla"}</strong>
+          {business?.logoUrl ? (
+            <img src={business.logoUrl} alt={business.businessName || "Mi Bicla"} />
+          ) : (
+            <BrandLogo variant="full" color="white" />
+          )}
         </a>
         <button
           ref={menuButton}
@@ -126,22 +165,7 @@ export function PublicShell({
         </div>
       )}
       <main id="public-content">{children}</main>
-      <footer className="brand-footer">
-        <ChainDivider />
-        <div>
-          <a className="app-brand" href="/">
-            <img src="/pink-simple.png" alt="" />
-            <span><strong>MI BICLA</strong><small>QUERÉTARO</small></span>
-          </a>
-          <p>Taller, comunidad y recompensas para seguir rodando.</p>
-          <nav aria-label="Enlaces del pie de página">
-            <a href="/taller">Taller</a>
-            <a href="/fidelidad">Fidelidad</a>
-            <a href="/depositos">Depósitos</a>
-            <a href="/admin">Administración</a>
-          </nav>
-        </div>
-      </footer>
+      <PublicFooter />
       <nav className="public-bottom-nav" aria-label="Navegación pública móvil">
         {NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}
         <button type="button" aria-expanded={more} onClick={() => setMore(!more)}><i aria-hidden="true">•••</i>Más</button>

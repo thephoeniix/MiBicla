@@ -9,6 +9,7 @@ import {
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui";
 import "./deposits.css";
 import { PublicShell } from "../../components/public/PublicShell";
+import { BrandLogo } from "../../components/brand";
 
 export interface PublicDepositOption {
   id: string;
@@ -282,7 +283,7 @@ export function Depositos() {
     <PublicShell><div className="public-deposits-page">
       <div className="public-page-container public-deposits-shell">
         <header className="public-deposits-header">
-          <img src="/pink-simple.png" alt="" />
+          <BrandLogo variant="symbol" color="pink" decorative />
           <div><small>Mi Bicla Querétaro</small><h1>Depósitos</h1></div>
         </header>
         <p className="public-deposits-intro">

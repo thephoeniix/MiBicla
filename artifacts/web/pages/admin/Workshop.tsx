@@ -57,6 +57,32 @@ const ORDER_EMPTY = {
   assignedTo: null,
   discountCents: 0,
 };
+const ORDER_STATES = [
+  "received", "inspection", "diagnosis", "waiting_approval", "approved",
+  "in_progress", "waiting_parts", "quality_check", "ready", "delivered",
+  "cancelled",
+] as const;
+const PRIMARY_TRANSITION: Record<string, string | undefined> = {
+  received: "inspection",
+  inspection: "diagnosis",
+  diagnosis: "waiting_approval",
+  waiting_approval: "approved",
+  approved: "in_progress",
+  in_progress: "quality_check",
+  waiting_parts: "in_progress",
+  quality_check: "ready",
+  ready: "delivered",
+};
+const TRANSITION_LABEL: Record<string, string> = {
+  inspection: "Iniciar inspección",
+  diagnosis: "Iniciar diagnóstico",
+  waiting_approval: "Solicitar aprobación",
+  approved: "Registrar aprobación",
+  in_progress: "Iniciar reparación",
+  quality_check: "Iniciar control de calidad",
+  ready: "Marcar como lista",
+  delivered: "Entregar bicicleta",
+};
 export function Workshop({ permissions = [] }: { permissions?: string[] }) {
   const [requests, setRequests] = useState<RequestItem[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
@@ -79,6 +105,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
     [status, setStatus] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [detailTab, setDetailTab] = useState("summary");
   const [mobileSection, setMobileSection] = useState("requests");
   const [orderFilter, setOrderFilter] = useState("all");
   const load = () =>
@@ -354,7 +381,10 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
                   folio={order.orderNumber}
                   title={order.problemDescription}
                   status={order.status}
-                  action={() => void open(order.id)}
+                  action={() => {
+                    setDetailTab("summary");
+                    void open(order.id);
+                  }}
                 />
               ))}
             {!visibleOrders.length && <EmptyState title="Sin órdenes activas" description="Crea una orden o cambia el filtro." />}
@@ -499,46 +529,55 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       </Drawer>
       {detail && (
         <Modal open className="workshop-detail" aria-labelledby="workshop-detail-title">
-          <article>
-          <header className="modal-header">
+          <article className="workshop-detail-shell">
+          <header className="modal-header workshop-detail-header">
             <div>
               <p className="page-eyebrow">Orden de taller</p>
               <h2 id="workshop-detail-title">{detail.order.orderNumber}</h2>
-              <p>{detail.order.problemDescription}</p>
+              <p>{detail.order.problemDescription || "Bicicleta registrada"}</p>
+              <StatusBadge status={detail.order.status} />
             </div>
-            <button type="button" aria-label="Cerrar detalle" onClick={() => setDetail(null)}>×</button>
+            <div className="workshop-detail-header-actions">
+              <details className="service-actions-menu"><summary aria-label="Más acciones">•••</summary><div><button type="button" onClick={token}>Generar seguimiento</button><button type="button" onClick={whatsapp}>Preparar WhatsApp</button></div></details>
+              <button type="button" aria-label="Cerrar detalle" onClick={() => setDetail(null)}>×</button>
+            </div>
           </header>
-          <StatusBadge status={detail.order.status} />
-          <Stepper status={detail.order.status} />
-          <label>
-            Nuevo estado
-            <select
-              value={detail.order.status}
-              onChange={(e) => change(e.target.value)}
-            >
-              {[
-                "received",
-                "inspection",
-                "diagnosis",
-                "waiting_approval",
-                "approved",
-                "in_progress",
-                "waiting_parts",
-                "quality_check",
-                "ready",
-                "delivered",
-                "cancelled",
-              ].map((x) => (
-                <option key={x} value={x}>{statusLabel(x)}</option>
-              ))}
-            </select>
-          </label>
-          <WorkshopServices
+          <Tabs label="Secciones de la orden" active={detailTab} onChange={setDetailTab} items={[
+            { id: "summary", label: "Resumen" },
+            { id: "status", label: "Estado" },
+            { id: "services", label: "Servicios" },
+            { id: "costs", label: "Costos" },
+            { id: "customer", label: "Cliente" },
+          ]} />
+          <div className="workshop-detail-content">
+          {detailTab === "summary" && <section className="order-summary">
+            <div className="order-summary-grid">
+              <Card><small>Cliente</small><strong>{customers.find((customer) => customer.id === detail.order.customerId)?.firstName ?? "Cliente registrado"} {customers.find((customer) => customer.id === detail.order.customerId)?.lastName ?? ""}</strong></Card>
+              <Card><small>Bicicleta</small><strong>Bicicleta registrada</strong></Card>
+              <Card className="order-summary-problem"><small>Problema reportado</small><strong>{detail.order.problemDescription}</strong></Card>
+              <Card><small>Estado actual</small><strong>{statusLabel(detail.order.status)}</strong></Card>
+              <Card><small>Total estimado</small><strong>{detail.order.totalCents === undefined ? "Restringido" : `$${(detail.order.totalCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN`}</strong></Card>
+              <Card><small>Próxima acción</small><strong>{PRIMARY_TRANSITION[detail.order.status] ? TRANSITION_LABEL[PRIMARY_TRANSITION[detail.order.status]!] : "Sin acciones pendientes"}</strong></Card>
+            </div>
+          </section>}
+          {detailTab === "status" && <section className="order-status-panel">
+            <div className="current-order-status"><small>Estado actual</small><StatusBadge status={detail.order.status} /></div>
+            <Stepper status={detail.order.status} />
+            <label>Actualizar estado<select value={detail.order.status} onChange={(event) => change(event.target.value)}>{ORDER_STATES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}</select></label>
+          </section>}
+          {detailTab === "services" && <WorkshopServices
             orderId={detail.order.id}
             services={detail.services}
             permissions={permissions}
             onChanged={() => open(detail.order.id)}
-          />
+          />}
+          {detailTab === "costs" && <section className="order-costs">
+            <dl>
+              <div><dt>Servicios</dt><dd>{detail.order.subtotalServicesCents === undefined ? "Restringido" : `$${(detail.order.subtotalServicesCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`}</dd></div>
+              <div><dt>Refacciones</dt><dd>{detail.order.subtotalPartsCents === undefined ? "Restringido" : `$${(detail.order.subtotalPartsCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`}</dd></div>
+              {detail.order.discountCents > 0 && <div><dt>Descuento</dt><dd>−${(detail.order.discountCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</dd></div>}
+              <div className="order-cost-total"><dt>Total</dt><dd>{detail.order.totalCents === undefined ? "Restringido" : `$${(detail.order.totalCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN`}</dd></div>
+            </dl>
           <Card className="detail-section"><h3>Agregar pieza</h3>
           <label>
             Nombre
@@ -573,7 +612,12 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             Agregar pieza
           </button>
           </Card>
-          <Card className="detail-section"><h3>Publicar avance</h3>
+          </section>}
+          {detailTab === "customer" && <section className="order-customer-panel">
+            <Card><small>Cliente</small><h3>{customers.find((customer) => customer.id === detail.order.customerId)?.firstName ?? "Cliente registrado"} {customers.find((customer) => customer.id === detail.order.customerId)?.lastName ?? ""}</h3><p>{customers.find((customer) => customer.id === detail.order.customerId)?.phone ?? "Teléfono no disponible en esta vista"}</p></Card>
+            <div className="order-customer-actions"><Button type="button" variant="secondary" onClick={token}>Generar seguimiento</Button><Button type="button" onClick={whatsapp}>Preparar WhatsApp</Button></div>
+          </section>}
+          {detailTab === "status" && <Card className="detail-section"><h3>Publicar avance</h3>
           <label>
             Título
             <input
@@ -608,18 +652,12 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           <button type="button" onClick={publish}>
             Publicar
           </button>
-          </Card>
-          <div className="actions">
-            <button type="button" onClick={token}>
-              Generar seguimiento
-            </button>
-            <button type="button" onClick={whatsapp}>
-              Abrir WhatsApp
-            </button>
-            <button type="button" onClick={() => change("delivered")}>
-              Marcar entregada
-            </button>
+          </Card>}
           </div>
+          <footer className="workshop-detail-sticky">
+            {PRIMARY_TRANSITION[detail.order.status] ? <Button type="button" onClick={() => change(PRIMARY_TRANSITION[detail.order.status]!)}>{TRANSITION_LABEL[PRIMARY_TRANSITION[detail.order.status]!]}</Button> : <span>{statusLabel(detail.order.status)}</span>}
+            <details className="service-actions-menu"><summary>Más</summary><div><button type="button" onClick={() => setDetailTab("status")}>Ver estado</button><button type="button" onClick={token}>Generar seguimiento</button><button type="button" onClick={whatsapp}>Preparar WhatsApp</button></div></details>
+          </footer>
         </article>
         </Modal>
       )}

@@ -37,8 +37,8 @@ export function Landing() {
   const business = useBusiness();
   return <PublicShell business={business}><Container>
     <section className="public-hero">
-      <div className="public-hero-copy"><p className="page-eyebrow">QUERÉTARO · MTB · TALLER</p><h1>VIVE TU BICI</h1><p>Taller, comunidad y recompensas para seguir rodando.</p><div className="public-actions"><a className="ui-button" href="/registro">Crear mi cuenta</a><a className="ui-button ui-button--outline" href="/taller/solicitud">Agendar taller</a><a className="hero-text-link" href="/iniciar-sesion">Iniciar sesión</a></div></div>
-      <div className="hero-status-card"><span aria-hidden="true">⚒</span><div><small>TU BICI ESTÁ</small><strong>LISTA</strong><p>Taller Mi Bicla Querétaro</p></div><i aria-hidden="true">✓</i></div>
+      <div className="public-hero-copy"><p className="page-eyebrow">QUERÉTARO · MTB · TALLER</p><h1>VIVE TU BICI</h1><p>Taller, comunidad y recompensas para seguir rodando.</p><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Agendar taller</a><a className="ui-button ui-button--outline" href="/registro">Crear mi cuenta</a></div></div>
+      <div className="hero-status-card"><span aria-hidden="true">⚒</span><div><small>EJEMPLO · TU BICI ESTÁ</small><strong>LISTA</strong><p>Así puede verse tu seguimiento</p></div><i aria-hidden="true">✓</i></div>
       <ChainDivider className="hero-chain" />
     </section>
     <section className="public-section brand-features">
@@ -68,5 +68,10 @@ export function LoyaltyInfo() {
 
 export function Brands() {
   const business = useBusiness();
-  return <PublicShell business={business}><Container><header className="public-page-hero"><p className="page-eyebrow">Selección Mi Bicla</p><h1>Marcas</h1></header><section className="public-section">{AUTHORIZED_BRANDS.length === 0 ? <EmptyState title="Consulta en tienda las marcas disponibles" description="Nuestro equipo puede ayudarte a encontrar equipo para tu próxima rodada." /> : null}</section></Container></PublicShell>;
+  const action = business?.primaryWhatsapp
+    ? <a className="ui-button" href={`https://wa.me/${business.primaryWhatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Consultar por WhatsApp</a>
+    : business?.address
+      ? <a className="ui-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`} target="_blank" rel="noreferrer">Visitar tienda</a>
+      : null;
+  return <PublicShell business={business}><Container className="brands-page"><header className="public-page-hero"><p className="page-eyebrow">Selección Mi Bicla</p><h1>Marcas</h1></header><section className="public-section brands-empty">{AUTHORIZED_BRANDS.length === 0 ? <><EmptyState title="Consulta en tienda las marcas disponibles" description="Nuestro equipo puede ayudarte a encontrar equipo para tu próxima rodada." />{action}</> : null}</section></Container></PublicShell>;
 }

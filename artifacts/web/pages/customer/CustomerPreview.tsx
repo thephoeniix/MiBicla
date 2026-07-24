@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Button, Card, Input } from "../../components/ui";
 import { Container } from "../../components/primitives";
 import { ThemeSelector } from "../../components/ThemeSelector";
+import { BrandLogo } from "../../components/brand";
 
 function DemoNotice({ compact = false }: { compact?: boolean }) {
   return <div className={`customer-demo-notice${compact ? " is-compact" : ""}`} role="note"><strong>DEMO</strong>{!compact && <span>La cuenta y autenticación de clientes todavía no está habilitada.</span>}</div>;
@@ -9,6 +10,7 @@ function DemoNotice({ compact = false }: { compact?: boolean }) {
 
 export function CustomerAuthPreview({ mode }: { mode: "register" | "login" | "recovery" }) {
   const [notice, setNotice] = useState("");
+  const [registerStep, setRegisterStep] = useState<1 | 2>(1);
   const register = mode === "register";
   const recovery = mode === "recovery";
   function submit(event: FormEvent) {
@@ -16,15 +18,13 @@ export function CustomerAuthPreview({ mode }: { mode: "register" | "login" | "re
     setNotice("Vista visual: no se guardó ni envió ningún dato.");
   }
   return <main className="customer-auth-page"><Container>
-    <header className="customer-auth-header"><a href="/" className="app-brand"><img src="/pink-simple.png" alt="" /><strong>Mi Bicla</strong></a><ThemeSelector compact /></header>
+    <header className="customer-auth-header"><a href="/" className="app-brand"><BrandLogo variant="full" color="white" /></a><ThemeSelector compact /></header>
     <div className="customer-auth-layout">
-      <section className="customer-auth-intro"><p className="page-eyebrow">{register ? "PASO 1 DE 2" : "TU ESPACIO MI BICLA"}</p><h1>{register ? "CREA TU CUENTA" : recovery ? "RECUPERA TU ACCESO" : "INICIA TU RUTA"}</h1><p>{register ? "Todo sobre tu bici, siempre contigo." : recovery ? "Recupera tu cuenta mediante un código enviado a tu teléfono." : "Ingresa para continuar con tus bicicletas, puntos y taller."}</p><div className="auth-art" aria-hidden="true"><span>QUERÉTARO · MTB</span></div></section>
+      <section className="customer-auth-intro"><p className="page-eyebrow">{register ? `${registerStep} DE 2 · ${registerStep === 1 ? "DATOS PERSONALES" : "SEGURIDAD"}` : "TU ESPACIO MI BICLA"}</p><h1>{register ? "CREA TU CUENTA" : recovery ? "RECUPERA TU ACCESO" : "INICIA TU RUTA"}</h1><p>{register ? "Todo sobre tu bici, siempre contigo." : recovery ? "Recupera tu cuenta mediante un código enviado a tu teléfono." : "Ingresa para continuar con tus bicicletas, puntos y taller."}</p><div className="auth-art" aria-hidden="true"><span>QUERÉTARO · MTB</span></div></section>
       <Card className="customer-auth-card"><DemoNotice /><form onSubmit={submit}>
-        {register && <label>Nombre<Input name="name" autoComplete="name" required /></label>}
-        <label>Teléfono<Input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="Tu número a 10 dígitos" required /></label>
-        {!recovery && <label>Contraseña<Input name="password" type="password" autoComplete={register ? "new-password" : "current-password"} minLength={8} required /></label>}
-        {register && <><label>Confirmar contraseña<Input name="passwordConfirmation" type="password" autoComplete="new-password" minLength={8} required /></label><label className="privacy-check"><input type="checkbox" required />Acepto el aviso de privacidad</label></>}
-        <Button>{register ? "Continuar" : recovery ? "Solicitar código" : "Iniciar sesión"}</Button>
+        {register && registerStep === 1 && <><label>Nombre<Input name="name" autoComplete="name" required /></label><label>Teléfono<Input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="Tu número a 10 dígitos" required /></label><Button type="button" onClick={() => setRegisterStep(2)}>Continuar</Button></>}
+        {register && registerStep === 2 && <><label>Contraseña<Input name="password" type="password" autoComplete="new-password" minLength={8} required /></label><label>Confirmar contraseña<Input name="passwordConfirmation" type="password" autoComplete="new-password" minLength={8} required /></label><label className="privacy-check"><input type="checkbox" required />Acepto el aviso de privacidad</label><div className="register-step-actions"><Button type="button" variant="secondary" onClick={() => setRegisterStep(1)}>Atrás</Button><Button>Crear cuenta</Button></div></>}
+        {!register && <><label>Teléfono<Input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="Tu número a 10 dígitos" required /></label>{!recovery && <label>Contraseña<Input name="password" type="password" autoComplete="current-password" minLength={8} required /></label>}<Button>{recovery ? "Solicitar código" : "Iniciar sesión"}</Button></>}
         {notice && <p className="form-notice" role="status">{notice}</p>}
       </form>
       <footer>{register ? <>¿Ya tienes cuenta? <a href="/iniciar-sesion">Inicia sesión</a></> : recovery ? <a href="/iniciar-sesion">Volver a iniciar sesión</a> : <><a href="/recuperar-acceso">Olvidé mi contraseña</a><span>¿Aún no tienes cuenta? <a href="/registro">Crear cuenta</a></span></>}</footer></Card>
@@ -34,7 +34,7 @@ export function CustomerAuthPreview({ mode }: { mode: "register" | "login" | "re
 
 export function CustomerVerifyPreview() {
   const [notice, setNotice] = useState("");
-  return <main className="customer-auth-page"><Container><header className="customer-auth-header"><a href="/" className="app-brand"><img src="/pink-simple.png" alt="" /><strong>Mi Bicla</strong></a><span className="page-eyebrow">PASO 2 DE 2</span></header><div className="customer-auth-layout"><section className="customer-auth-intro"><p className="page-eyebrow">VERIFICACIÓN</p><h1>VERIFICA TU TELÉFONO</h1><p>En esta demostración no se envió ningún código por WhatsApp.</p><div className="auth-art" aria-hidden="true"><span>SEGURIDAD MI BICLA</span></div></section><Card className="customer-auth-card"><DemoNotice /><form onSubmit={(event) => { event.preventDefault(); setNotice("Vista visual: no se verificó ningún código."); }}><fieldset className="otp-fieldset"><legend>Código de seis dígitos</legend><div>{Array.from({ length: 6 }, (_, index) => <Input key={index} aria-label={`Dígito ${index + 1}`} inputMode="numeric" maxLength={1} autoComplete={index === 0 ? "one-time-code" : "off"} />)}</div></fieldset><Button>Verificar</Button><button className="auth-link-button" type="button">Reenviar código</button><a href="/registro">Corregir teléfono</a>{notice && <p role="status" className="form-notice">{notice}</p>}</form></Card></div></Container></main>;
+  return <main className="customer-auth-page"><Container><header className="customer-auth-header"><a href="/" className="app-brand"><BrandLogo variant="full" color="white" /></a><span className="page-eyebrow">PASO 2 DE 2</span></header><div className="customer-auth-layout"><section className="customer-auth-intro"><p className="page-eyebrow">VERIFICACIÓN</p><h1>VERIFICA TU TELÉFONO</h1><p>En esta demostración no se envió ningún código por WhatsApp.</p><div className="auth-art" aria-hidden="true"><span>SEGURIDAD MI BICLA</span></div></section><Card className="customer-auth-card"><DemoNotice /><form onSubmit={(event) => { event.preventDefault(); setNotice("Vista visual: no se verificó ningún código."); }}><fieldset className="otp-fieldset"><legend>Código de seis dígitos</legend><div>{Array.from({ length: 6 }, (_, index) => <Input key={index} aria-label={`Dígito ${index + 1}`} inputMode="numeric" maxLength={1} autoComplete={index === 0 ? "one-time-code" : "off"} />)}</div></fieldset><Button>Verificar</Button><button className="auth-link-button" type="button">Reenviar código</button><a href="/registro">Corregir teléfono</a>{notice && <p role="status" className="form-notice">{notice}</p>}</form></Card></div></Container></main>;
 }
 
 const CLIENT_NAV = [
@@ -46,7 +46,7 @@ const CLIENT_NAV = [
 
 function CustomerShell({ title, children }: { title: string; children: ReactNode }) {
   const path = window.location.pathname;
-  return <div className="customer-shell"><header className="customer-topbar"><a href="/mi" className="app-brand"><img src="/pink-simple.png" alt="" /><strong>Mi Bicla</strong></a><div><span aria-hidden="true">D</span><ThemeSelector compact /></div></header><Container as="main"><header className="customer-page-title"><div><p className="page-eyebrow">PORTAL DEL CLIENTE</p><DemoNotice compact /></div><h1>{title}</h1></header>{children}</Container><nav className="customer-bottom-nav" aria-label="Navegación del cliente">{CLIENT_NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}</nav></div>;
+  return <div className="customer-shell"><header className="customer-topbar"><a href="/mi" className="app-brand"><BrandLogo variant="full" color="white" /></a><div><span aria-hidden="true">D</span><ThemeSelector compact /></div></header><Container as="main"><header className="customer-page-title"><div><p className="page-eyebrow">PORTAL DEL CLIENTE</p><DemoNotice compact /></div><h1>{title}</h1></header>{children}</Container><nav className="customer-bottom-nav" aria-label="Navegación del cliente">{CLIENT_NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}</nav></div>;
 }
 
 function ProgressDots({ earned = 6 }: { earned?: number }) {

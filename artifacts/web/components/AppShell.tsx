@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CustomerScanFlow } from "./scanner/CustomerScanFlow";
 import { canShowCustomerScanner } from "./scanner/scanner-utils";
 import { ThemeSelector } from "./ThemeSelector";
+import { BrandLogo } from "./brand";
 
 interface User {
   name: string;
@@ -70,8 +71,7 @@ function MobileHeader({ user }: { user: User }) {
   return (
     <header className="mobile-header">
       <a className="app-brand" href="/admin/settings/general">
-        <img src="/pink-simple.png" alt="" />
-        <strong>Mi Bicla</strong>
+        <BrandLogo variant="full" color="white" />
       </a>
       <div>
         <ThemeSelector compact />
@@ -131,11 +131,7 @@ export function AppShell({
     <div className="app-shell">
       <aside className="app-sidebar">
         <a className="app-brand" href="/admin/settings/general">
-          <img src="/pink-simple.png" alt="" />
-          <span>
-            <strong>Mi Bicla</strong>
-            <small>Querétaro</small>
-          </span>
+          <BrandLogo variant="full" color="white" />
         </a>
         <nav aria-label="Navegación principal">
           {available.map((item) => (

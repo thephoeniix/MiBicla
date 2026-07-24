@@ -14,6 +14,7 @@ import { WorkshopTracking } from "./pages/public/WorkshopTracking";
 import { apiFetch, ApiError } from "./lib/api-client";
 import { AppShell } from "./components/AppShell";
 import { Button, Input, LoadingState } from "./components/ui";
+import { BrandLogo } from "./components/brand";
 import { Brands, Landing, LoyaltyInfo, WorkshopInfo } from "./pages/public/PublicPages";
 import { resolvePublicRoute } from "./lib/public-routes";
 import {
@@ -117,8 +118,7 @@ function AdminApp() {
     <main className="login-page">
       <section className="login-card">
         <header>
-          <img src="/pink-simple.png" alt="Mi Bicla" />
-          <p>Mi Bicla Querétaro</p>
+          <BrandLogo variant="full" color="pink" />
         </header>
         <div className="login-heading">
           <p className="page-eyebrow">Panel administrativo</p>
