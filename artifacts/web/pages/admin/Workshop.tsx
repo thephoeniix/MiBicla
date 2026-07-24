@@ -10,9 +10,13 @@ import {
   Button,
   Card,
   EmptyState,
+  MetricCard,
+  Modal,
   PageHeader,
+  PageSection,
   StatusBadge,
   Stepper,
+  Tabs,
   statusLabel,
   Toast,
 } from "../../components/ui";
@@ -74,6 +78,8 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
     }),
     [status, setStatus] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [mobileSection, setMobileSection] = useState("requests");
   const [orderFilter, setOrderFilter] = useState("all");
   const load = () =>
     Promise.all([
@@ -165,6 +171,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       setStatus(`Orden creada: ${location.origin}/taller/${x.publicToken}`);
       setOrderForm(ORDER_EMPTY);
       setBicycles([]);
+      setShowCreateOrder(false);
       await load();
     } catch (e) {
       show(e);
@@ -260,6 +267,9 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
     );
     window.open(x.url, "_blank", "noopener,noreferrer");
   }
+  const visibleOrders = orders.filter(
+    (order) => orderFilter === "all" || order.status === orderFilter,
+  );
   return (
     <section className="admin-page workshop-page">
       <PageHeader
@@ -267,9 +277,14 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
         title="Taller"
         description="Gestiona solicitudes y acompaña cada bicicleta hasta su entrega."
         action={
-          <Button type="button" variant="secondary" onClick={() => setShowFilters(true)}>
-            Filtros
-          </Button>
+          <div className="page-header-actions">
+            <Button type="button" variant="secondary" onClick={() => setShowFilters(true)}>
+              Filtros
+            </Button>
+            <Button type="button" onClick={() => setShowCreateOrder(true)}>
+              + Crear orden
+            </Button>
+          </div>
         }
       />
       {status && (
@@ -282,8 +297,28 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           )}
         </div>
       )}
-      <div className="workshop-overview">
-        <section>
+      <div className="workshop-metrics responsive-grid">
+        <MetricCard label="Solicitudes" value={requests.length} detail="Por revisar" />
+        <MetricCard label="Órdenes" value={orders.length} detail="En el taller" />
+        <MetricCard
+          label="Listas"
+          value={orders.filter((order) => order.status === "ready").length}
+          detail="Para entregar"
+        />
+      </div>
+      <div className="workshop-mobile-tabs">
+        <Tabs
+          label="Vista del taller"
+          active={mobileSection}
+          onChange={setMobileSection}
+          items={[
+            { id: "requests", label: `Solicitudes · ${requests.length}` },
+            { id: "orders", label: `Órdenes · ${orders.length}` },
+          ]}
+        />
+      </div>
+      <div className="workshop-overview" data-mobile-section={mobileSection}>
+        <PageSection className="workshop-panel workshop-panel--requests">
           <div className="section-heading">
             <div><p className="page-eyebrow">Entrada</p><h2>Solicitudes</h2></div>
             <span>{requests.length}</span>
@@ -306,16 +341,14 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             ))}
             {!requests.length && <EmptyState title="Sin solicitudes pendientes" description="Las nuevas solicitudes aparecerán aquí." />}
           </div>
-        </section>
-        <section>
+        </PageSection>
+        <PageSection className="workshop-panel workshop-panel--orders">
           <div className="section-heading">
             <div><p className="page-eyebrow">En servicio</p><h2>Órdenes</h2></div>
             <span>{orders.length}</span>
           </div>
           <div className="workshop-list">
-            {orders
-              .filter((order) => orderFilter === "all" || order.status === orderFilter)
-              .map((order) => (
+            {visibleOrders.map((order) => (
                 <WorkshopOrderCard
                   key={order.id}
                   folio={order.orderNumber}
@@ -324,15 +357,17 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
                   action={() => void open(order.id)}
                 />
               ))}
-            {!orders.length && <EmptyState title="Sin órdenes activas" description="Crea una orden para comenzar." />}
+            {!visibleOrders.length && <EmptyState title="Sin órdenes activas" description="Crea una orden o cambia el filtro." />}
           </div>
-        </section>
+        </PageSection>
       </div>
-      <Card className="create-order-card">
+      {showCreateOrder && (
+      <Modal open className="create-order-modal" aria-labelledby="create-order-title">
       <form onSubmit={createOrder}>
-        <div className="card-heading">
-          <div><p className="page-eyebrow">Nueva recepción</p><h2>Crear orden</h2></div>
-        </div>
+        <header className="modal-header">
+          <div><p className="page-eyebrow">Nueva recepción</p><h2 id="create-order-title">Crear orden</h2></div>
+          <button type="button" aria-label="Cerrar" onClick={() => setShowCreateOrder(false)}>×</button>
+        </header>
         <SearchableCombobox
           label="Cliente"
           options={customers.map((customer): ComboboxOption => ({
@@ -426,9 +461,13 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             }
           />
         </label>
-        <Button>Crear orden</Button>
+        <footer className="modal-actions">
+          <Button type="button" variant="secondary" onClick={() => setShowCreateOrder(false)}>Cancelar</Button>
+          <Button>Crear orden</Button>
+        </footer>
       </form>
-      </Card>
+      </Modal>
+      )}
       {showBicycleForm && orderForm.customerId && (
         <BicycleForm
           customerId={orderForm.customerId}

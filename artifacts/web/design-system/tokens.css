@@ -59,6 +59,22 @@
   --mb-color-info: var(--mb-color-blue-600);
   --mb-color-info-soft: var(--mb-color-blue-50);
 
+  /* Public semantic API shared by every application surface. */
+  --color-background: var(--mb-color-bg);
+  --color-surface: var(--mb-color-surface);
+  --color-surface-elevated: var(--mb-color-surface-raised);
+  --color-surface-subtle: var(--mb-color-surface-subtle);
+  --color-text: var(--mb-color-text);
+  --color-text-muted: var(--mb-color-text-muted);
+  --color-border: var(--mb-color-border);
+  --color-primary: var(--mb-color-primary);
+  --color-primary-hover: var(--mb-color-primary-hover);
+  --color-primary-contrast: var(--mb-color-on-primary);
+  --color-success: var(--mb-color-success);
+  --color-warning: var(--mb-color-warning);
+  --color-danger: var(--mb-color-danger);
+  --color-overlay: rgb(20 15 18 / 0.48);
+
   /* Typography. */
   --mb-font-sans: Inter, "SF Pro Text", "SF Pro Display", -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -106,6 +122,8 @@
     0 8px 20px rgb(17 15 16 / 0.08), 0 2px 6px rgb(17 15 16 / 0.04);
   --mb-shadow-lg:
     0 18px 48px rgb(17 15 16 / 0.12), 0 4px 12px rgb(17 15 16 / 0.05);
+  --shadow-card: var(--mb-shadow-md);
+  --shadow-overlay: var(--mb-shadow-lg);
   --mb-duration-fast: 120ms;
   --mb-duration-normal: 180ms;
   --mb-duration-slow: 280ms;
@@ -118,6 +136,8 @@
   --mb-content-sm: 40rem;
   --mb-content-md: 64rem;
   --mb-content-lg: 80rem;
+  --page-max-width: 76rem;
+  --page-reading-width: 44rem;
 }
 
 [data-theme="dark"] {
@@ -144,4 +164,5 @@
   --mb-shadow-sm: 0 2px 6px rgb(0 0 0 / 0.28);
   --mb-shadow-md: 0 10px 24px rgb(0 0 0 / 0.32);
   --mb-shadow-lg: 0 20px 52px rgb(0 0 0 / 0.4);
+  --color-overlay: rgb(0 0 0 / 0.72);
 }

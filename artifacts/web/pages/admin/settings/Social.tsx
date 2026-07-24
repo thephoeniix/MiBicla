@@ -6,6 +6,13 @@ import {
   type BusinessResponse,
 } from "./General";
 import { apiFetch, ApiError } from "../../../lib/api-client";
+import {
+  ActionBar,
+  Button,
+  Card,
+  Input,
+  PageHeader,
+} from "../../../components/ui";
 export function Social() {
   const [data, setData] = useState<BusinessForm>(EMPTY_BUSINESS),
     [status, setStatus] = useState("");
@@ -32,21 +39,50 @@ export function Social() {
     }
   }
   return (
-    <form onSubmit={save}>
-      <h2>Redes sociales</h2>
-      {(["facebook", "instagram", "tiktok", "website"] as const).map((k) => (
-        <label key={k}>
-          {k}
-          <input
-            type="url"
-            value={data[k]}
-            onChange={(e) => setData({ ...data, [k]: e.target.value })}
-          />
-        </label>
-      ))}
-      <button>Guardar</button>
-      <output>{status}</output>
-    </form>
+    <section className="admin-page social-settings">
+      <PageHeader
+        eyebrow="Configuración"
+        title="Presencia digital"
+        description="Mantén actualizados los enlaces públicos de Mi Bicla."
+      />
+      <form onSubmit={save}>
+        <Card className="settings-card settings-reading-card">
+          <div className="card-heading">
+            <div>
+              <p className="page-eyebrow">Canales públicos</p>
+              <h2>Redes sociales</h2>
+            </div>
+          </div>
+          <div className="form-grid">
+            {(
+              [
+                ["facebook", "Facebook"],
+                ["instagram", "Instagram"],
+                ["tiktok", "TikTok"],
+                ["website", "Sitio web"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key}>
+                {label}
+                <Input
+                  type="url"
+                  value={data[key]}
+                  onChange={(event) =>
+                    setData({ ...data, [key]: event.target.value })
+                  }
+                />
+              </label>
+            ))}
+          </div>
+        </Card>
+        <ActionBar className="sticky-save">
+          <output aria-live="polite">
+            {status || "Los cambios se aplicarán al guardar."}
+          </output>
+          <Button>Guardar cambios</Button>
+        </ActionBar>
+      </form>
+    </section>
   );
 }
 const optional = (value: string) => value.trim() || null;

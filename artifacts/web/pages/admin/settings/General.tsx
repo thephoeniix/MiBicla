@@ -1,5 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, ApiError } from "../../../lib/api-client";
+import {
+  ActionBar,
+  Button,
+  Card,
+  Input,
+  PageHeader,
+  ResponsiveGrid,
+} from "../../../components/ui";
+import { ThemeSelector } from "../../../components/ThemeSelector";
 export interface BusinessForm {
   businessName: string;
   address: string;
@@ -110,38 +119,94 @@ export function General() {
     }
   }
   return (
-    <form onSubmit={save}>
-      <h2>General</h2>
-      {(
-        [
-          "businessName",
-          "address",
-          "phone",
-          "email",
-          "primaryWhatsapp",
-          "secondaryWhatsapp",
-          "logoUrl",
-          "faviconUrl",
-        ] as const
-      ).map((k) => (
-        <label key={k}>
-          {k}
-          <input
-            value={data[k]}
-            onChange={(e) => setData({ ...data, [k]: e.target.value })}
-          />
-        </label>
-      ))}
-      <label>
-        Color
-        <input
-          type="color"
-          value={data.themeColor}
-          onChange={(e) => setData({ ...data, themeColor: e.target.value })}
-        />
-      </label>
-      <button>Guardar</button>
-      <output>{status}</output>
-    </form>
+    <section className="admin-page general-settings">
+      <PageHeader
+        eyebrow="Configuración"
+        title="Mi Bicla Querétaro"
+        description="Administra la identidad y los datos de contacto visibles del negocio."
+      />
+      <form onSubmit={save}>
+        <ResponsiveGrid className="settings-overview-grid">
+          <Card className="settings-card">
+            <div className="card-heading">
+              <div>
+                <p className="page-eyebrow">Negocio</p>
+                <h2>Información general</h2>
+              </div>
+            </div>
+            <div className="form-grid">
+              {(
+                [
+                  ["businessName", "Nombre comercial"],
+                  ["address", "Dirección"],
+                  ["phone", "Teléfono"],
+                  ["email", "Correo electrónico"],
+                  ["primaryWhatsapp", "WhatsApp principal"],
+                  ["secondaryWhatsapp", "WhatsApp secundario"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key}>
+                  {label}
+                  <Input
+                    type={key === "email" ? "email" : "text"}
+                    value={data[key]}
+                    onChange={(event) =>
+                      setData({ ...data, [key]: event.target.value })
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          </Card>
+          <div className="settings-side-stack">
+            <Card className="settings-card">
+              <p className="page-eyebrow">Apariencia</p>
+              <h2>Interfaz</h2>
+              <ThemeSelector />
+              <label>
+                Color de marca
+                <Input
+                  type="color"
+                  value={data.themeColor}
+                  onChange={(event) =>
+                    setData({ ...data, themeColor: event.target.value })
+                  }
+                />
+              </label>
+            </Card>
+            <Card className="settings-card">
+              <p className="page-eyebrow">Identidad</p>
+              <h2>Recursos públicos</h2>
+              <label>
+                URL del logotipo
+                <Input
+                  type="url"
+                  value={data.logoUrl}
+                  onChange={(event) =>
+                    setData({ ...data, logoUrl: event.target.value })
+                  }
+                />
+              </label>
+              <label>
+                URL del favicon
+                <Input
+                  type="url"
+                  value={data.faviconUrl}
+                  onChange={(event) =>
+                    setData({ ...data, faviconUrl: event.target.value })
+                  }
+                />
+              </label>
+            </Card>
+          </div>
+        </ResponsiveGrid>
+        <ActionBar className="sticky-save">
+          <output aria-live="polite">
+            {status || "Los cambios se aplicarán al guardar."}
+          </output>
+          <Button>Guardar cambios</Button>
+        </ActionBar>
+      </form>
+    </section>
   );
 }

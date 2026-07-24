@@ -265,9 +265,9 @@ export function Depositos() {
 
   return (
     <main className="public-deposits-page">
-      <div className="public-deposits-shell">
+      <div className="public-page-container public-deposits-shell">
         <header className="public-deposits-header">
-          <img src="/white-simple.png" alt="" />
+          <img src="/pink-simple.png" alt="" />
           <div><small>Mi Bicla Querétaro</small><h1>Depósitos</h1></div>
         </header>
         <p className="public-deposits-intro">

@@ -1,5 +1,5 @@
 .loyalty-page {
-  --loyalty-bg: #0b0b0d;
+  --loyalty-bg: var(--color-background);
   --loyalty-card: #161618;
   --loyalty-card-raised: #1c1c1f;
   --loyalty-accent: #e6007e;
@@ -12,13 +12,7 @@
   padding: 36px 20px 48px;
   overflow: hidden;
   color: var(--loyalty-text);
-  background:
-    radial-gradient(
-      circle at 50% -20%,
-      rgb(230 0 126 / 0.15),
-      transparent 40%
-    ),
-    var(--loyalty-bg);
+  background: var(--loyalty-bg);
   border-radius: 0;
   box-shadow: none;
   text-align: left;
@@ -39,8 +33,7 @@
 .loyalty-shell {
   position: relative;
   z-index: 1;
-  width: min(100%, 720px);
-  margin: 0 auto;
+  max-width: 720px;
 }
 
 .loyalty-header,
@@ -57,6 +50,8 @@
   gap: 24px;
   margin-bottom: 40px;
 }
+.loyalty-header { color: var(--color-text); }
+.loyalty-header .loyalty-brand span { color: var(--color-text-muted); }
 
 .loyalty-brand {
   display: flex;

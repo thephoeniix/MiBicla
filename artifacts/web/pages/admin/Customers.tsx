@@ -7,6 +7,7 @@ import {
   EmptyState,
   Input,
   LoadingState,
+  MetricCard,
   Modal,
   PageHeader,
   Select,
@@ -437,9 +438,9 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
               {detailTab === "summary" && (
                 <>
                   <div className="summary-grid">
-                    <Card><small>Unidades disponibles</small><strong>{detail.balance.availableUnits}</strong></Card>
-                    <Card><small>Unidades pendientes</small><strong>{detail.balance.pendingUnits}</strong></Card>
-                    <Card><small>Total acumulado</small><strong>{detail.balance.lifetimeUnits}</strong></Card>
+                    <MetricCard label="Unidades disponibles" value={detail.balance.availableUnits} />
+                    <MetricCard label="Unidades pendientes" value={detail.balance.pendingUnits} />
+                    <MetricCard label="Total acumulado" value={detail.balance.lifetimeUnits} />
                   </div>
                   <Card>
                     <h3>Contacto</h3>

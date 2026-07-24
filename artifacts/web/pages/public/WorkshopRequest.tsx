@@ -35,9 +35,9 @@ export function WorkshopRequest() {
     }
   }
   return (
-    <main>
+    <main className="workshop-request-page">
       <h1>Solicitar servicio de taller</h1>
-      <form onSubmit={submit}>
+      <form className="workshop-request-form" onSubmit={submit}>
         {(
           [
             "customerName",

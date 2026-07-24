@@ -15,6 +15,52 @@ export function Card({
   return <article className={`ui-card ${className}`.trim()} {...props} />;
 }
 
+export function PageContent({
+  className = "",
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return <div className={`page-content ${className}`.trim()} {...props} />;
+}
+
+export function PageSection({
+  className = "",
+  ...props
+}: HTMLAttributes<HTMLElement>) {
+  return <section className={`page-section ${className}`.trim()} {...props} />;
+}
+
+export function ResponsiveGrid({
+  className = "",
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return <div className={`responsive-grid ${className}`.trim()} {...props} />;
+}
+
+export function ActionBar({
+  className = "",
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return <div className={`action-bar ${className}`.trim()} {...props} />;
+}
+
+export function MetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: ReactNode;
+  detail?: ReactNode;
+}) {
+  return (
+    <Card className="metric-card">
+      <small>{label}</small>
+      <strong>{value}</strong>
+      {detail && <span>{detail}</span>}
+    </Card>
+  );
+}
+
 export function Button({
   variant = "primary",
   className = "",
@@ -125,7 +171,19 @@ export function Tabs({
           type="button"
           role="tab"
           aria-selected={active === item.id}
+          tabIndex={active === item.id ? 0 : -1}
           onClick={() => onChange(item.id)}
+          onKeyDown={(event) => {
+            if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+            event.preventDefault();
+            const current = items.findIndex(({ id }) => id === active);
+            const direction = event.key === "ArrowRight" ? 1 : -1;
+            const next = (current + direction + items.length) % items.length;
+            onChange(items[next]!.id);
+            const buttons =
+              event.currentTarget.parentElement?.querySelectorAll("button");
+            buttons?.[next]?.focus();
+          }}
         >
           {item.label}
         </button>

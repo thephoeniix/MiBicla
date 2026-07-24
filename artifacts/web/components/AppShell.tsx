@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { CustomerScanFlow } from "./scanner/CustomerScanFlow";
 import { canShowCustomerScanner } from "./scanner/scanner-utils";
+import { ThemeSelector } from "./ThemeSelector";
 
 interface User {
   name: string;
@@ -46,7 +47,24 @@ const NAV_ITEMS = [
   },
 ] as const;
 
-type NavItem = (typeof NAV_ITEMS)[number];
+export const MOBILE_NAV = [
+  NAV_ITEMS[0],
+  NAV_ITEMS[1],
+  NAV_ITEMS[2],
+  NAV_ITEMS[4],
+] as const;
+
+export function isMobileNavigationActive(pathname: string, href: string) {
+  if (href === "/admin/settings/deposits")
+    return (
+      pathname.startsWith("/admin/settings/") &&
+      pathname !== "/admin/settings/general"
+    );
+  return (
+    pathname === href ||
+    (href === "/admin/settings/general" && pathname === "/admin")
+  );
+}
 
 function MobileHeader({ user }: { user: User }) {
   return (
@@ -55,30 +73,34 @@ function MobileHeader({ user }: { user: User }) {
         <img src="/pink-simple.png" alt="" />
         <strong>Mi Bicla</strong>
       </a>
-      <span>{user.name.slice(0, 1).toUpperCase()}</span>
+      <div>
+        <ThemeSelector compact />
+        <span>{user.name.slice(0, 1).toUpperCase()}</span>
+      </div>
     </header>
   );
 }
 
 function BottomNavigation({
-  items,
   pathname,
 }: {
-  items: readonly NavItem[];
   pathname: string;
 }) {
   return (
     <nav className="bottom-navigation" aria-label="Navegación móvil">
-      {items.map((item) => (
+      {MOBILE_NAV.map((item) => {
+        const active = isMobileNavigationActive(pathname, item.href);
+        return (
         <a
           href={item.href}
           key={item.href}
-          aria-current={pathname === item.href ? "page" : undefined}
+          aria-current={active ? "page" : undefined}
         >
           <i aria-hidden="true">{item.icon}</i>
           <span>{item.short}</span>
         </a>
-      ))}
+        );
+      })}
     </nav>
   );
 }
@@ -145,13 +167,16 @@ export function AppShell({
             <span>Mi Bicla Querétaro</span>
             <strong>Hola, {user.name.split(" ")[0]}</strong>
           </p>
-          <button type="button" onClick={onLogout}>
-            Cerrar sesión
-          </button>
+          <div>
+            <ThemeSelector compact />
+            <button type="button" onClick={onLogout}>
+              Cerrar sesión
+            </button>
+          </div>
         </div>
         <main className="app-content">{children}</main>
       </div>
-      <BottomNavigation items={available} pathname={pathname} />
+      <BottomNavigation pathname={pathname} />
       {canScan && (
         <button
           type="button"

@@ -397,11 +397,14 @@ export function Deposits({
                     <Button type="button" variant="secondary" onClick={() => edit(item)}>
                       Editar
                     </Button>
-                    <div>
-                      <button type="button" onClick={() => void move(index, -1)} disabled={index === 0} aria-label={`Subir ${item.displayName}`}>↑</button>
-                      <button type="button" onClick={() => void move(index, 1)} disabled={index === items.length - 1} aria-label={`Bajar ${item.displayName}`}>↓</button>
-                      <button type="button" onClick={() => void remove(item)} aria-label={`Eliminar ${item.displayName}`}>×</button>
-                    </div>
+                    <details className="deposit-actions-menu">
+                      <summary>Acciones</summary>
+                      <div>
+                        <button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>↑ Subir método</button>
+                        <button type="button" onClick={() => void move(index, 1)} disabled={index === items.length - 1}>↓ Bajar método</button>
+                        <button type="button" onClick={() => void remove(item)}>Eliminar método</button>
+                      </div>
+                    </details>
                   </footer>
                 </>
               )}

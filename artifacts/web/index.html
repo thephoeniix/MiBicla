@@ -1,2 +1,34 @@
-<div id="root"></div>
-<script type="module" src="/src.tsx"></script>
+<!doctype html>
+<html lang="es" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f7f6f7" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem("mb_theme");
+          const preference = ["light", "dark"].includes(saved) ? saved : "system";
+          const dark = preference === "dark" ||
+            (preference === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+          document.documentElement.dataset.themePreference = preference;
+          document.querySelector('meta[name="theme-color"]')
+            ?.setAttribute("content", dark ? "#110f10" : "#f7f6f7");
+        } catch {
+          document.documentElement.dataset.theme =
+            matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.dataset.themePreference = "system";
+        }
+      })();
+    </script>
+    <title>Mi Bicla Querétaro</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src.tsx"></script>
+  </body>
+</html>

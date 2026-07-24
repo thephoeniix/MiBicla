@@ -29,7 +29,7 @@ type LoadState = "loading" | "ready" | "error";
 function BrandMark() {
   return (
     <div className="loyalty-brand">
-      <img src="/white-simple.png" alt="" />
+      <img src="/pink-simple.png" alt="" />
       <div>
         <strong>Mi Bicla</strong>
         <span>Querétaro</span>
@@ -211,7 +211,7 @@ export function CustomerCard({ token }: { token: string }) {
 
   return (
     <main className="loyalty-page">
-      <div className="loyalty-shell">
+      <div className="public-page-container loyalty-shell">
         <header className="loyalty-header">
           <BrandMark />
           <div className="loyalty-header-actions">

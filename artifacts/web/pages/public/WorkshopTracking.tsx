@@ -87,7 +87,7 @@ export function WorkshopTracking({ token }: { token: string }) {
   return (
     <main className="tracking-page">
       <meta name="robots" content="noindex,nofollow" />
-      <div className="tracking-shell">
+      <div className="public-page-container tracking-shell">
         <header className="tracking-header">
           <a href="/" aria-label="Mi Bicla Querétaro">
             <img src="/pink-simple.png" alt="" />
