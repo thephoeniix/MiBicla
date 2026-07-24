@@ -6,7 +6,9 @@ import type {
   ReactNode,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
+  Ref,
 } from "react";
+import { useEffect, useRef } from "react";
 
 export function Card({
   className = "",
@@ -88,11 +90,60 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea className="ui-input ui-textarea" {...props} />;
 }
 
-export function Modal({
+export function Dialog({
   className = "",
+  open,
+  onCancel,
+  ref: forwardedRef,
   ...props
-}: DialogHTMLAttributes<HTMLDialogElement>) {
-  return <dialog className={`ui-modal ${className}`.trim()} {...props} />;
+}: DialogHTMLAttributes<HTMLDialogElement> & {
+  ref?: Ref<HTMLDialogElement>;
+}) {
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !dialog) return;
+    const previous = document.activeElement as HTMLElement | null;
+    if (!dialog.open) dialog.showModal();
+    document.body.style.overflow = "hidden";
+    return () => {
+      if (dialog.open) dialog.close();
+      document.body.style.overflow = "";
+      previous?.focus();
+    };
+  }, [open]);
+  return (
+    <dialog
+      ref={(node) => {
+        dialogRef.current = node;
+        if (typeof forwardedRef === "function") forwardedRef(node);
+        else if (forwardedRef) forwardedRef.current = node;
+      }}
+      className={className}
+      onCancel={(event) => {
+        if (onCancel) {
+          onCancel(event);
+          return;
+        }
+        event.preventDefault();
+        dialogRef.current
+          ?.querySelector<HTMLButtonElement>(
+            'button[aria-label="Cerrar"], button[aria-label^="Cerrar "]',
+          )
+          ?.click();
+      }}
+      {...props}
+    />
+  );
+}
+
+export function Modal(props: DialogHTMLAttributes<HTMLDialogElement>) {
+  return (
+    <Dialog
+      {...props}
+      className={`ui-modal ${props.className ?? ""}`.trim()}
+    />
+  );
 }
 
 export function PageHeader({

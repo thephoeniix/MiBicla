@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, Card, StatusBadge } from "./ui";
+import { Button, Card, Dialog, StatusBadge } from "./ui";
 
 export function LoyaltyCard({
   current,
@@ -82,7 +82,7 @@ export function Drawer({
 }) {
   if (!open) return null;
   return (
-    <dialog open className="ui-drawer" aria-labelledby="drawer-title">
+    <Dialog open className="ui-drawer" aria-labelledby="drawer-title">
       <section>
         <header className="modal-header">
           <h2 id="drawer-title">{title}</h2>
@@ -91,7 +91,7 @@ export function Drawer({
         {children}
         <Button type="button" onClick={onClose}>Ver resultados</Button>
       </section>
-    </dialog>
+    </Dialog>
   );
 }
 

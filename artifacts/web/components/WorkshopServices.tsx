@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch } from "../lib/api-client";
 import { SearchableCombobox } from "./SearchableCombobox";
+import { Dialog } from "./ui";
 
 interface CatalogService {
   id: string;
@@ -330,7 +331,7 @@ export function WorkshopServices({
         ))}
       </div>
       {showNew && (
-        <dialog open aria-labelledby="catalog-service-title">
+        <Dialog open aria-labelledby="catalog-service-title">
           <form onSubmit={saveCatalog}>
             <h3 id="catalog-service-title">
               {editingCatalog ? "Editar servicio" : "Agregar servicio"}
@@ -395,16 +396,17 @@ export function WorkshopServices({
               <button
                 type="button"
                 className="secondary"
+                aria-label="Cerrar formulario de servicio"
                 onClick={() => setShowNew(false)}
               >
                 Cancelar
               </button>
             </div>
           </form>
-        </dialog>
+        </Dialog>
       )}
       {editingLine && (
-        <dialog open aria-labelledby="order-service-title">
+        <Dialog open aria-labelledby="order-service-title">
           <form onSubmit={saveLine}>
             <h3 id="order-service-title">Editar {editingLine.serviceName}</h3>
             <label>
@@ -483,13 +485,14 @@ export function WorkshopServices({
               <button
                 type="button"
                 className="secondary"
+                aria-label="Cerrar edición de servicio"
                 onClick={() => setEditingLine(null)}
               >
                 Cancelar
               </button>
             </div>
           </form>
-        </dialog>
+        </Dialog>
       )}
     </section>
   );

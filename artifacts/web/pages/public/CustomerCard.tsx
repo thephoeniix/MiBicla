@@ -76,9 +76,11 @@ export function CustomerCard({ token }: { token: string }) {
   const [data, setData] = useState<Card | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [qr, setQr] = useState("");
+  const [qrOpen, setQrOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [celebrate, setCelebrate] = useState(false);
   const previousPoints = useRef<number | null>(null);
+  const qrDialogRef = useRef<HTMLDialogElement>(null);
 
   const loadCard = useCallback(
     async (signal?: AbortSignal) => {
@@ -114,15 +116,6 @@ export function CustomerCard({ token }: { token: string }) {
   useEffect(() => {
     const controller = new AbortController();
     void loadCard(controller.signal);
-    QRCode.toDataURL(window.location.href, {
-      width: 360,
-      margin: 1,
-      color: { dark: "#0b0b0d", light: "#ffffff" },
-      errorCorrectionLevel: "M",
-    })
-      .then(setQr)
-      .catch(() => setQr(""));
-
     const refresh = () => void loadCard();
     const timer = window.setInterval(refresh, 30_000);
     window.addEventListener("focus", refresh);
@@ -138,6 +131,32 @@ export function CustomerCard({ token }: { token: string }) {
     const timer = window.setTimeout(() => setNotice(""), 3200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    if (!qrOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    qrDialogRef.current?.showModal();
+    return () => {
+      document.body.style.overflow = "";
+      previous?.focus();
+    };
+  }, [qrOpen]);
+
+  async function openQr() {
+    setQrOpen(true);
+    if (qr) return;
+    try {
+      setQr(await QRCode.toDataURL(window.location.href, {
+        width: 360,
+        margin: 2,
+        color: { dark: "#0b0b0d", light: "#ffffff" },
+        errorCorrectionLevel: "M",
+      }));
+    } catch {
+      setNotice("No fue posible generar el código");
+    }
+  }
 
   async function shareCard() {
     try {
@@ -234,6 +253,7 @@ export function CustomerCard({ token }: { token: string }) {
           </div>
         </header>
 
+        <section className="loyalty-wallet-primary" aria-label="Resumen de membresía">
         <section className="loyalty-member-card" aria-labelledby="member-name">
           <div>
             <p className="loyalty-eyebrow">Miembro Mi Bicla</p>
@@ -310,24 +330,11 @@ export function CustomerCard({ token }: { token: string }) {
             </div>
           </section>
         )}
+        </section>
 
-        <section className="loyalty-qr-section" aria-labelledby="qr-title">
-          <div className="loyalty-section-heading loyalty-section-heading--qr">
-            <div>
-              <p className="loyalty-eyebrow">Identificación rápida</p>
-              <h2 id="qr-title">Tu código Mi Bicla</h2>
-            </div>
-          </div>
-          <div className="loyalty-qr-wrap">
-            <div className="loyalty-qr">
-              {qr ? (
-                <img src={qr} alt="Código QR de la tarjeta de cliente" />
-              ) : (
-                <span role="status">Generando código…</span>
-              )}
-            </div>
-            <p>Muestra este código al registrar tu compra</p>
-          </div>
+        <section className="loyalty-qr-action" aria-labelledby="qr-title">
+          <div><p className="loyalty-eyebrow">Identificación rápida</p><h2 id="qr-title">Tu código Mi Bicla</h2></div>
+          <button type="button" onClick={() => void openQr()}>Ver mi QR</button>
         </section>
 
         {loyaltyEnabled && goal !== null && (
@@ -390,6 +397,27 @@ export function CustomerCard({ token }: { token: string }) {
           <img src="/pink-simple.png" alt="" />
           {notice}
         </div>
+      )}
+      {qrOpen && (
+        <dialog
+          ref={qrDialogRef}
+          className="loyalty-qr-dialog"
+          aria-modal="true"
+          aria-labelledby="loyalty-qr-dialog-title"
+          onCancel={(event) => { event.preventDefault(); setQrOpen(false); }}
+        >
+          <section>
+            <h2 id="loyalty-qr-dialog-title">Tu código Mi Bicla</h2>
+            <div className="loyalty-qr">
+              {qr ? <img src={qr} alt="Código QR de la tarjeta de cliente" /> : <span role="status">Generando código…</span>}
+            </div>
+            <p>Presenta este código en Mi Bicla</p>
+            <div>
+              <button type="button" onClick={() => void shareCard()}>Compartir enlace</button>
+              <button type="button" onClick={() => setQrOpen(false)}>Cerrar</button>
+            </div>
+          </section>
+        </dialog>
       )}
     </main>
   );

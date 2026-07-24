@@ -8,6 +8,7 @@ import {
 } from "../../lib/deposits";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui";
 import "./deposits.css";
+import { PublicShell } from "../../components/public/PublicShell";
 
 export interface PublicDepositOption {
   id: string;
@@ -92,6 +93,7 @@ function DepositMethodDetail({
   option: PublicDepositOption;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [copied, setCopied] = useState("");
   const [feedback, setFeedback] = useState("");
   const [copyError, setCopyError] = useState("");
@@ -110,6 +112,15 @@ function DepositMethodDetail({
     },
     [],
   );
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.showModal();
+    return () => {
+      document.body.style.overflow = "";
+      previous?.focus();
+    };
+  }, []);
 
   async function copy(label: string, value: string) {
     try {
@@ -139,10 +150,14 @@ function DepositMethodDetail({
 
   return (
     <dialog
-      open
+      ref={dialogRef}
       className="public-deposit-detail"
       aria-modal="true"
       aria-labelledby="deposit-detail-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
     >
       <header>
         <button type="button" onClick={onClose} aria-label="Volver a métodos">
@@ -264,7 +279,7 @@ export function Depositos() {
   useEffect(load, []);
 
   return (
-    <main className="public-deposits-page">
+    <PublicShell><div className="public-deposits-page">
       <div className="public-page-container public-deposits-shell">
         <header className="public-deposits-header">
           <img src="/pink-simple.png" alt="" />
@@ -310,6 +325,6 @@ export function Depositos() {
           onClose={() => setSelected(null)}
         />
       )}
-    </main>
+    </div></PublicShell>
   );
 }

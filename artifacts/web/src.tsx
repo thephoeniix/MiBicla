@@ -14,6 +14,17 @@ import { WorkshopTracking } from "./pages/public/WorkshopTracking";
 import { apiFetch, ApiError } from "./lib/api-client";
 import { AppShell } from "./components/AppShell";
 import { Button, Input, LoadingState } from "./components/ui";
+import { Brands, Landing, LoyaltyInfo, WorkshopInfo } from "./pages/public/PublicPages";
+import { resolvePublicRoute } from "./lib/public-routes";
+import {
+  CustomerAuthPreview,
+  CustomerBikesPreview,
+  CustomerCardPreview,
+  CustomerHomePreview,
+  CustomerProfilePreview,
+  CustomerWorkshopPreview,
+  CustomerVerifyPreview,
+} from "./pages/customer/CustomerPreview";
 interface Administrator {
   id: string;
   name: string;
@@ -160,17 +171,50 @@ function AdminApp() {
   );
 }
 function App() {
-  if (window.location.pathname === "/taller/solicitud")
-    return <WorkshopRequest />;
-  const workshopToken =
-    window.location.pathname.match(/^\/taller\/([^/]+)$/)?.[1];
-  if (workshopToken) return <WorkshopTracking token={workshopToken} />;
-  const customerToken = window.location.pathname.match(/^\/c\/([^/]+)$/)?.[1];
-  if (customerToken) return <CustomerCard token={customerToken} />;
-  return window.location.pathname === "/depositos" ? (
-    <Depositos />
-  ) : (
-    <AdminApp />
-  );
+  const match = resolvePublicRoute(window.location.pathname);
+  const meta: Record<string, [string, string, boolean?]> = {
+    home: ["Mi Bicla Querétaro | Taller, equipo y comunidad MTB", "Taller, equipo y beneficios para disfrutar cada rodada."],
+    workshop: ["Taller | Mi Bicla Querétaro", "Servicios de taller para mantener tu bicicleta lista para rodar."],
+    loyalty: ["Fidelidad | Mi Bicla Querétaro", "Conoce el programa de fidelidad Mi Bicla."],
+    brands: ["Marcas | Mi Bicla Querétaro", "Consulta las marcas disponibles en Mi Bicla Querétaro."],
+    deposits: ["Depósitos | Mi Bicla Querétaro", "Métodos de depósito activos de Mi Bicla Querétaro."],
+    "customer-card": ["Mi tarjeta | Mi Bicla Querétaro", "Tarjeta personal de fidelidad.", true],
+    "workshop-tracking": ["Seguimiento de taller | Mi Bicla Querétaro", "Seguimiento privado de servicio.", true],
+    "customer-register": ["Crear cuenta | Mi Bicla Querétaro", "Vista previa del registro de clientes de Mi Bicla."],
+    "customer-login": ["Iniciar sesión | Mi Bicla Querétaro", "Vista previa del acceso de clientes de Mi Bicla."],
+    "customer-recovery": ["Recuperar acceso | Mi Bicla Querétaro", "Vista previa de recuperación por teléfono."],
+    "customer-home": ["Mi espacio | Mi Bicla Querétaro", "Vista demostrativa del portal de clientes."],
+    "customer-loyalty": ["Mi tarjeta | Mi Bicla Querétaro", "Vista demostrativa de la tarjeta del cliente."],
+    "customer-workshop": ["Mi taller | Mi Bicla Querétaro", "Vista demostrativa del taller del cliente."],
+    "customer-bikes": ["Mis bicicletas | Mi Bicla Querétaro", "Vista demostrativa de bicicletas del cliente."],
+    "customer-profile": ["Mi perfil | Mi Bicla Querétaro", "Vista demostrativa del perfil del cliente."],
+  };
+  const routeMeta = meta[match.route] ?? ["Mi Bicla Querétaro", "Taller, equipo y comunidad MTB."];
+  document.title = routeMeta[0];
+  document.querySelector('meta[name="description"]')?.setAttribute("content", routeMeta[1]);
+  let robots = document.querySelector('meta[name="robots"]');
+  if (!robots) { robots = document.createElement("meta"); robots.setAttribute("name", "robots"); document.head.append(robots); }
+  robots.setAttribute("content", routeMeta[2] ? "noindex, nofollow" : "index, follow");
+  switch (match.route) {
+    case "home": return <Landing />;
+    case "workshop": return <WorkshopInfo />;
+    case "loyalty": return <LoyaltyInfo />;
+    case "brands": return <Brands />;
+    case "workshop-request": return <WorkshopRequest />;
+    case "workshop-tracking": return <WorkshopTracking token={match.token!} />;
+    case "customer-card": return <CustomerCard token={match.token!} />;
+    case "deposits": return <Depositos />;
+    case "customer-register": return <CustomerAuthPreview mode="register" />;
+    case "customer-verify": return <CustomerVerifyPreview />;
+    case "customer-login": return <CustomerAuthPreview mode="login" />;
+    case "customer-recovery": return <CustomerAuthPreview mode="recovery" />;
+    case "customer-home": return <CustomerHomePreview />;
+    case "customer-loyalty": return <CustomerCardPreview />;
+    case "customer-workshop": return <CustomerWorkshopPreview />;
+    case "customer-bikes": return <CustomerBikesPreview />;
+    case "customer-profile": return <CustomerProfilePreview />;
+    case "admin": return <AdminApp />;
+    default: return <main className="login-page"><section className="login-card"><h1>Página no encontrada</h1><a href="/">Volver al inicio</a></section></main>;
+  }
 }
 createRoot(document.getElementById("root")!).render(<App />);

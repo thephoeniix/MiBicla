@@ -498,7 +498,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
         </label>
       </Drawer>
       {detail && (
-        <dialog open className="ui-modal workshop-detail" aria-labelledby="workshop-detail-title">
+        <Modal open className="workshop-detail" aria-labelledby="workshop-detail-title">
           <article>
           <header className="modal-header">
             <div>
@@ -621,7 +621,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             </button>
           </div>
         </article>
-        </dialog>
+        </Modal>
       )}
       {status && <Toast>{status}</Toast>}
     </section>

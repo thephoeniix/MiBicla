@@ -26,7 +26,7 @@
   text-align: left;
 }
 .public-deposit-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-card); }
-.deposit-method-icon { display: grid; width: 50px; height: 50px; place-items: center; color: #fff; background: #e6007e; border-radius: 15px; font-size: 22px; }
+.deposit-method-icon { display: grid; width: 50px; height: 50px; place-items: center; color: #fff; background: var(--mb-color-brand-500); border-radius: 15px; font-size: 22px; }
 .public-deposit-card > span:nth-child(2) { display: grid; min-width: 0; gap: 3px; }
 .public-deposit-card small { color: var(--color-primary); font-size: 12px; font-weight: 700; }
 .public-deposit-card strong { font-size: 19px; }
@@ -52,25 +52,25 @@
   border: 0;
 }
 .public-deposit-detail > header { position: sticky; z-index: 2; top: 0; display: grid; min-height: 68px; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 8px 16px; background: color-mix(in srgb, var(--color-background) 90%, transparent); border-bottom: 1px solid var(--color-border); backdrop-filter: blur(16px); text-align: center; }
-.public-deposit-detail > header button { display: grid; width: 44px; height: 44px; place-items: center; color: #e6007e; background: transparent; border: 0; font-size: 30px; }
+.public-deposit-detail > header button { display: grid; width: 44px; height: 44px; place-items: center; color: var(--mb-color-brand-500); background: transparent; border: 0; font-size: 30px; }
 .deposit-detail-shell { width: min(100%, 680px); padding: 20px 16px max(40px, env(safe-area-inset-bottom)); margin: auto; }
 .deposit-wallet-card { position: relative; min-height: 280px; padding: 25px; overflow: hidden; background: radial-gradient(circle at 100% 100%, rgb(230 0 126 / .3), transparent 42%), #171719; border: 1px solid rgb(255 255 255 / .11); border-radius: 24px; box-shadow: 0 26px 55px rgb(0 0 0 / .3); }
 .deposit-wallet-card::after { position: absolute; right: -45px; bottom: -60px; width: 230px; height: 230px; content: ""; background: url("/black-simple.png") center / contain no-repeat; }
-.deposit-wallet-card > div { display: flex; align-items: center; gap: 10px; color: #ff55b2; font-size: 11px; font-weight: 700; }
+.deposit-wallet-card > div { display: flex; align-items: center; gap: 10px; color: var(--mb-color-brand-400); font-size: 11px; font-weight: 700; }
 .deposit-wallet-card img { width: 42px; height: 42px; object-fit: contain; }
 .deposit-wallet-card h1 { max-width: 70%; margin: 28px 0 36px; font-size: 30px; letter-spacing: -.04em; }
 .deposit-wallet-card p { position: relative; z-index: 1; display: grid; width: fit-content; gap: 3px; margin: 15px 0 0; }
-.deposit-wallet-card p small { color: #e6007e; }
+.deposit-wallet-card p small { color: var(--mb-color-brand-500); }
 .deposit-data-sheet { padding: 24px 16px; margin-top: 16px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 24px; box-shadow: var(--shadow-card); }
 .financial-field { display: flex; min-height: 88px; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
 .financial-field > span { display: grid; gap: 7px; min-width: 0; }
 .financial-field small, .deposit-reference small { color: var(--color-text-muted); }
-.financial-field strong { font-size: clamp(16px, 5vw, 21px); overflow-wrap: anywhere; }
-.financial-field button { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 13px; color: #fff; background: #e6007e; border: 0; border-radius: 13px; font-weight: 700; }
+.financial-field strong { min-width: 0; font-size: clamp(16px, 5vw, 21px); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.financial-field button { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 13px; color: #fff; background: var(--mb-color-brand-500); border: 0; border-radius: 13px; font-weight: 700; }
 .financial-field button i { font-style: normal; }
 .deposit-reference { display: grid; gap: 5px; padding: 18px 0; }
 .deposit-instructions { display: flex; align-items: flex-start; gap: 12px; padding: 15px; color: var(--color-primary); background: var(--mb-color-primary-soft); border-radius: 15px; }
-.deposit-instructions i { display: grid; flex: 0 0 24px; height: 24px; place-items: center; border: 1px solid #e6007e; border-radius: 50%; font-style: normal; }
+.deposit-instructions i { display: grid; flex: 0 0 24px; height: 24px; place-items: center; border: 1px solid var(--mb-color-brand-500); border-radius: 50%; font-style: normal; }
 .deposit-instructions p { margin: 0; line-height: 1.5; }
 .deposit-copy-feedback { min-height: 20px; margin: 12px 0 0; color: var(--color-success); font-size: 13px; text-align: center; }
 .receipt-share { padding: 18px; margin-top: 16px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 20px; }
@@ -84,4 +84,49 @@
   .deposit-method-list { grid-template-columns: 1fr 1fr; }
   .public-deposit-detail { inset: 4vh 50% auto auto; width: min(calc(100% - 40px), 720px); height: 92vh; border-radius: 26px; transform: translateX(50%); }
   .deposit-data-sheet { padding-inline: 26px; }
+}
+
+.public-deposits-header { padding-bottom: 18px; border-bottom: 3px solid var(--mb-color-brand-500); }
+.public-deposits-header h1,
+.deposit-wallet-card h1 { font-family: var(--mb-font-display); text-transform: uppercase; }
+.public-deposit-card,
+.deposit-data-sheet,
+.receipt-share { border-radius: 12px; box-shadow: var(--mb-shadow-xs); }
+.deposit-method-icon,
+.financial-field button,
+.receipt-share input,
+.receipt-share a { border-radius: 8px; }
+.deposit-wallet-card {
+  color: var(--mb-color-inverse-text);
+  background:
+    repeating-radial-gradient(ellipse at 110% -20%, transparent 0 30px, rgb(236 61 146 / .22) 31px 33px),
+    var(--mb-color-inverse-surface);
+  border-color: var(--mb-color-brand-800);
+  border-radius: 14px;
+}
+.deposit-wallet-card h1,
+.deposit-wallet-card p strong { color: var(--mb-color-inverse-text); }
+.deposit-wallet-card h1 {
+  max-width: min(100%, 34rem);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.deposit-wallet-card p { max-width: 100%; }
+.deposit-wallet-card p strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deposit-wallet-card p small { color: var(--mb-color-brand-300); font-size: 14px; }
+.financial-field { min-width: 0; }
+@media (max-width: 380px) {
+  .public-deposit-card {
+    grid-template-columns: 44px minmax(0, 1fr) 14px;
+    gap: 10px;
+    padding-inline: 13px;
+  }
+  .deposit-method-icon { width: 44px; height: 44px; }
+  .deposit-wallet-card { min-height: 240px; padding: 20px; }
+  .financial-field { align-items: stretch; flex-direction: column; }
+  .financial-field button { width: 100%; justify-content: center; }
 }

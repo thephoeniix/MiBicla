@@ -49,6 +49,9 @@
   --mb-color-primary-active: var(--mb-color-brand-800);
   --mb-color-primary-soft: var(--mb-color-brand-50);
   --mb-color-on-primary: var(--mb-color-white);
+  --mb-color-inverse-surface: var(--mb-color-black);
+  --mb-color-inverse-text: var(--mb-color-white);
+  --mb-color-inverse-muted: var(--mb-color-neutral-300);
   --mb-color-focus: var(--mb-color-brand-500);
   --mb-color-danger: var(--mb-color-red-600);
   --mb-color-danger-soft: var(--mb-color-red-50);
@@ -78,6 +81,8 @@
   /* Typography. */
   --mb-font-sans: Inter, "SF Pro Text", "SF Pro Display", -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mb-font-display: "Arial Narrow", "Roboto Condensed", Impact, Haettenschweiler,
+    sans-serif;
   --mb-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --mb-font-size-xs: 0.75rem;
   --mb-font-size-sm: 0.875rem;
