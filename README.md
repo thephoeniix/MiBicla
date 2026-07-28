@@ -41,6 +41,11 @@ lint, pruebas unitarias y build; además comprueba errores de whitespace en el
 rango de commits del pull request o push. No utiliza secretos, no ejecuta
 migraciones, no se conecta a Neon y no despliega.
 
+Un segundo job levanta PostgreSQL 16 desechable y ejecuta
+`npm run test:integration`. La suite exige `TEST_DATABASE_URL`, reconstruye la
+base desde todas las migraciones y rechaza hosts remotos o nombres que parezcan
+de producción. No usa `DATABASE_URL`, secretos de GitHub ni Neon.
+
 ## Variables de entorno
 
 La aplicación utiliza `DATABASE_URL`, `NODE_ENV`, `APP_BASE_URL`, `API_BASE_URL`, `SESSION_SECRET`, `APP_ENCRYPTION_KEY`, `TRUST_PROXY`, `ALLOWED_ORIGINS` y `PORT`. Los scripts del owner usan `OWNER_NAME`, `OWNER_EMAIL` y `OWNER_PASSWORD`; las pruebas de integración usan `TEST_DATABASE_URL`. El frontend acepta `VITE_API_BASE_URL`.
