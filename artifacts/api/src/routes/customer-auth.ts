@@ -264,17 +264,24 @@ export function createCustomerAuthRouter(
     }
   });
 
-  router.get("/session", requireCustomer, (_req, res) => {
-    const match = res.locals.customerAuth;
-    res.json({
-      authenticated: true,
-      customer: {
-        id: match.customer.id,
-        name: `${match.customer.firstName} ${match.customer.lastName}`,
-        phone: match.customer.phone,
-        accountStatus: "active",
-      },
-    });
+  router.get("/session", requireCustomer, async (_req, res, next) => {
+    try {
+      const match = res.locals.customerAuth;
+      const csrfToken = await service.rotateCsrf(match.session.id);
+      if (!csrfToken) return genericAuthError(res);
+      res.json({
+        authenticated: true,
+        csrfToken,
+        customer: {
+          id: match.customer.id,
+          name: `${match.customer.firstName} ${match.customer.lastName}`,
+          phone: match.customer.phone,
+          accountStatus: "active",
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   router.get("/me", requireCustomer, (_req, res) => {

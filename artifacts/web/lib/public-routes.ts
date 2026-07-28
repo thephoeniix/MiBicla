@@ -15,6 +15,7 @@ export type PublicRoute =
   | "customer-bikes"
   | "customer-profile"
   | "customer-recovery"
+  | "customer-activation"
   | "customer-verify"
   | "admin"
   | "not-found";
@@ -31,12 +32,15 @@ export function resolvePublicRoute(pathname: string): {
   if (pathname === "/registro") return { route: "customer-register" };
   if (pathname === "/registro/verificar") return { route: "customer-verify" };
   if (pathname === "/iniciar-sesion") return { route: "customer-login" };
-  if (pathname === "/recuperar-acceso") return { route: "customer-recovery" };
+  if (pathname === "/cuenta/activar") return { route: "customer-activation" };
+  if (pathname === "/cuenta/recuperar" || pathname === "/recuperar-acceso")
+    return { route: "customer-recovery" };
   if (pathname === "/mi") return { route: "customer-home" };
   if (pathname === "/mi/tarjeta") return { route: "customer-loyalty" };
   if (pathname === "/mi/taller") return { route: "customer-workshop" };
   if (pathname === "/mi/bicicletas") return { route: "customer-bikes" };
   if (pathname === "/mi/perfil") return { route: "customer-profile" };
+  if (pathname.startsWith("/mi/")) return { route: "customer-home" };
   if (pathname === "/taller/solicitud") return { route: "workshop-request" };
   const workshop = pathname.match(/^\/taller\/([^/]+)$/);
   if (workshop) return { route: "workshop-tracking", token: workshop[1] };

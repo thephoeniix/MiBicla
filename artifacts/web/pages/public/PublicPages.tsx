@@ -37,7 +37,7 @@ export function Landing() {
   const business = useBusiness();
   return <PublicShell business={business}><Container>
     <section className="public-hero">
-      <div className="public-hero-copy"><p className="page-eyebrow">QUERÉTARO · MTB · TALLER</p><h1>VIVE TU BICI</h1><p>Taller, comunidad y recompensas para seguir rodando.</p><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Agendar taller</a><a className="ui-button ui-button--outline" href="/registro">Crear mi cuenta</a></div></div>
+      <div className="public-hero-copy"><p className="page-eyebrow">QUERÉTARO · MTB · TALLER</p><h1>VIVE TU BICI</h1><p>Taller, comunidad y recompensas para seguir rodando.</p><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Agendar taller</a><a className="ui-button ui-button--outline" href="/registro">Activar mi cuenta</a></div></div>
       <div className="hero-status-card"><span aria-hidden="true">⚒</span><div><small>EJEMPLO · TU BICI ESTÁ</small><strong>LISTA</strong><p>Así puede verse tu seguimiento</p></div><i aria-hidden="true">✓</i></div>
       <ChainDivider className="hero-chain" />
     </section>
