@@ -20,7 +20,7 @@
     "test": "vitest run",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:generate": "npm run generate -w @mi-bicla/db",
     "db:migrate": "npm run migrate -w @mi-bicla/db",
     "db:seed": "npm run seed -w @mi-bicla/db",
