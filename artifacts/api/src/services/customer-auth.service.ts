@@ -482,4 +482,19 @@ export class CustomerAuthService {
       .set({ revokedAt: new Date(), revokeReason: "logout" })
       .where(eq(customerSessions.id, sessionId));
   }
+
+  async rotateCsrf(sessionId: string) {
+    const csrfToken = generateCsrfToken();
+    const [updated] = await this.db
+      .update(customerSessions)
+      .set({ csrfTokenHash: hashSessionToken(csrfToken) })
+      .where(
+        and(
+          eq(customerSessions.id, sessionId),
+          isNull(customerSessions.revokedAt),
+        ),
+      )
+      .returning({ id: customerSessions.id });
+    return updated ? csrfToken : null;
+  }
 }

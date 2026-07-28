@@ -31,12 +31,21 @@ describe("rutas públicas", () => {
     expect(resolvePublicRoute("/recuperar-acceso").route).toBe(
       "customer-recovery",
     );
+    expect(resolvePublicRoute("/cuenta/activar").route).toBe(
+      "customer-activation",
+    );
+    expect(resolvePublicRoute("/cuenta/recuperar").route).toBe(
+      "customer-recovery",
+    );
     expect(resolvePublicRoute("/mi").route).toBe("customer-home");
     expect(resolvePublicRoute("/mi/tarjeta").route).toBe("customer-loyalty");
     expect(resolvePublicRoute("/mi/taller").route).toBe("customer-workshop");
     expect(resolvePublicRoute("/mi/bicicletas").route).toBe("customer-bikes");
     expect(resolvePublicRoute("/mi/perfil").route).toBe("customer-profile");
     expect(resolvePublicRoute("/admin").route).toBe("admin");
+    expect(resolvePublicRoute("/mi/cualquier-ruta").route).toBe(
+      "customer-home",
+    );
   });
 });
 

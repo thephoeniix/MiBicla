@@ -1091,6 +1091,43 @@ describe("autenticación de clientes", () => {
     ).toBe(401);
   });
 
+  it("rota y restaura CSRF al consultar la sesión sin exponer cookie ni hashes", async () => {
+    const admin = await login();
+    const { customer } = await createCustomer(admin);
+    const { password } = await activateCustomer(admin, customer.id);
+    const customerSession = await customerLogin(customer.phone, password);
+    const restored = await request("/api/customer/session", {
+      session: customerSession,
+    });
+    expect(restored.status).toBe(200);
+    const body = (await restored.json()) as {
+      csrfToken: string;
+      customer: { id: string };
+    };
+    expect(body.csrfToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.csrfToken).not.toBe(customerSession.csrf);
+    expect(JSON.stringify(body)).not.toContain("tokenHash");
+    expect(JSON.stringify(body)).not.toContain("mb_customer_session");
+    expect(
+      (
+        await request("/api/customer/auth/logout", {
+          method: "POST",
+          session: customerSession,
+          csrf: customerSession.csrf,
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request("/api/customer/auth/logout", {
+          method: "POST",
+          session: customerSession,
+          csrf: body.csrfToken,
+        })
+      ).status,
+    ).toBe(204);
+  });
+
   it("usa respuesta genérica, bloquea intentos y aplica rate limit", async () => {
     const admin = await login();
     const { customer } = await createCustomer(admin);

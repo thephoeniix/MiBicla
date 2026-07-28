@@ -18,14 +18,13 @@ import { BrandLogo } from "./components/brand";
 import { Brands, Landing, LoyaltyInfo, WorkshopInfo } from "./pages/public/PublicPages";
 import { resolvePublicRoute } from "./lib/public-routes";
 import {
-  CustomerAuthPreview,
-  CustomerBikesPreview,
-  CustomerCardPreview,
-  CustomerHomePreview,
-  CustomerProfilePreview,
-  CustomerWorkshopPreview,
-  CustomerVerifyPreview,
-} from "./pages/customer/CustomerPreview";
+  CustomerActivation,
+  CustomerAuthProvider,
+  CustomerLogin,
+  CustomerPortal,
+  CustomerRecovery,
+  CustomerRegistrationInfo,
+} from "./pages/customer/CustomerAuth";
 interface Administrator {
   id: string;
   name: string;
@@ -180,10 +179,11 @@ function App() {
     deposits: ["Depósitos | Mi Bicla Querétaro", "Métodos de depósito activos de Mi Bicla Querétaro."],
     "customer-card": ["Mi tarjeta | Mi Bicla Querétaro", "Tarjeta personal de fidelidad.", true],
     "workshop-tracking": ["Seguimiento de taller | Mi Bicla Querétaro", "Seguimiento privado de servicio.", true],
-    "customer-register": ["Crear cuenta | Mi Bicla Querétaro", "Vista previa del registro de clientes de Mi Bicla."],
-    "customer-login": ["Iniciar sesión | Mi Bicla Querétaro", "Vista previa del acceso de clientes de Mi Bicla."],
-    "customer-recovery": ["Recuperar acceso | Mi Bicla Querétaro", "Vista previa de recuperación por teléfono."],
-    "customer-home": ["Mi espacio | Mi Bicla Querétaro", "Vista demostrativa del portal de clientes."],
+    "customer-register": ["Activar cuenta | Mi Bicla Querétaro", "Información para activar una cuenta de cliente."],
+    "customer-login": ["Iniciar sesión | Mi Bicla Querétaro", "Acceso de clientes de Mi Bicla."],
+    "customer-activation": ["Activar cuenta | Mi Bicla Querétaro", "Activación segura de cuenta.", true],
+    "customer-recovery": ["Recuperar acceso | Mi Bicla Querétaro", "Recuperación segura de acceso.", true],
+    "customer-home": ["Mi espacio | Mi Bicla Querétaro", "Portal privado de clientes.", true],
     "customer-loyalty": ["Mi tarjeta | Mi Bicla Querétaro", "Vista demostrativa de la tarjeta del cliente."],
     "customer-workshop": ["Mi taller | Mi Bicla Querétaro", "Vista demostrativa del taller del cliente."],
     "customer-bikes": ["Mis bicicletas | Mi Bicla Querétaro", "Vista demostrativa de bicicletas del cliente."],
@@ -204,15 +204,16 @@ function App() {
     case "workshop-tracking": return <WorkshopTracking token={match.token!} />;
     case "customer-card": return <CustomerCard token={match.token!} />;
     case "deposits": return <Depositos />;
-    case "customer-register": return <CustomerAuthPreview mode="register" />;
-    case "customer-verify": return <CustomerVerifyPreview />;
-    case "customer-login": return <CustomerAuthPreview mode="login" />;
-    case "customer-recovery": return <CustomerAuthPreview mode="recovery" />;
-    case "customer-home": return <CustomerHomePreview />;
-    case "customer-loyalty": return <CustomerCardPreview />;
-    case "customer-workshop": return <CustomerWorkshopPreview />;
-    case "customer-bikes": return <CustomerBikesPreview />;
-    case "customer-profile": return <CustomerProfilePreview />;
+    case "customer-register": return <CustomerRegistrationInfo />;
+    case "customer-login": return <CustomerAuthProvider><CustomerLogin /></CustomerAuthProvider>;
+    case "customer-activation": return <CustomerActivation />;
+    case "customer-recovery": return <CustomerRecovery />;
+    case "customer-home":
+    case "customer-loyalty":
+    case "customer-workshop":
+    case "customer-bikes":
+    case "customer-profile":
+      return <CustomerAuthProvider><CustomerPortal /></CustomerAuthProvider>;
     case "admin": return <AdminApp />;
     default: return <main className="login-page"><section className="login-card"><h1>Página no encontrada</h1><a href="/">Volver al inicio</a></section></main>;
   }

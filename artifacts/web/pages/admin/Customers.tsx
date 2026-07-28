@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import QRCode from "qrcode";
 import { apiFetch, ApiError } from "../../lib/api-client";
+import type { CustomerAuthLink } from "../../lib/customer-auth";
 import {
   Button,
   Card,
@@ -94,6 +95,14 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [authLink, setAuthLink] = useState<{
+    purpose: "activation" | "recovery";
+    value: CustomerAuthLink;
+  } | null>(null);
+  const [authLinkLoading, setAuthLinkLoading] = useState<
+    "activation" | "recovery" | null
+  >(null);
+  const [authLinkNotice, setAuthLinkNotice] = useState("");
 
   const canManage = permissions.includes("manage_customers");
   const canCreate =
@@ -208,6 +217,29 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
       birthDate: toIsoDateInput(customer.birthDate),
     });
     setShowForm(true);
+  }
+
+  async function prepareAuthLink(purpose: "activation" | "recovery") {
+    if (!detail) return;
+    setAuthLinkLoading(purpose);
+    try {
+      const value = await apiFetch<CustomerAuthLink>(
+        `/api/admin/customers/${detail.customer.id}/auth/${purpose}`,
+        { method: "POST" },
+      );
+      setAuthLinkNotice("");
+      setAuthLink({ purpose, value });
+    } catch (error) {
+      setStatus(
+        error instanceof ApiError && error.status === 409
+          ? "La cuenta requiere revisión o no está disponible."
+          : error instanceof ApiError
+            ? error.message
+            : "No fue posible preparar el enlace.",
+      );
+    } finally {
+      setAuthLinkLoading(null);
+    }
   }
 
   return (
@@ -448,6 +480,18 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
                     <p>{detail.customer.email || "Sin correo registrado"}</p>
                     {detail.customer.notes && <p>{detail.customer.notes}</p>}
                   </Card>
+                  {canManage && <Card className="customer-auth-actions">
+                    <h3>Acceso del cliente</h3>
+                    <p>Prepara un enlace temporal para compartirlo manualmente.</p>
+                    <div>
+                      <Button type="button" disabled={Boolean(authLinkLoading)} onClick={() => void prepareAuthLink("activation")}>
+                        {authLinkLoading === "activation" ? "Generando…" : "Generar activación"}
+                      </Button>
+                      <Button type="button" variant="secondary" disabled={Boolean(authLinkLoading)} onClick={() => void prepareAuthLink("recovery")}>
+                        {authLinkLoading === "recovery" ? "Generando…" : "Generar recuperación"}
+                      </Button>
+                    </div>
+                  </Card>}
                 </>
               )}
               {detailTab === "loyalty" && (
@@ -501,6 +545,35 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
                 <Button type="button" variant="danger" onClick={() => void remove(detail.customer.id)}>Dar de baja</Button>
               </footer>
             )}
+          </section>
+        </Modal>
+      )}
+      {authLink && (
+        <Modal open aria-labelledby="customer-auth-link-title">
+          <section>
+            <header className="modal-header">
+              <div>
+                <p className="page-eyebrow">Enlace temporal</p>
+                <h2 id="customer-auth-link-title">
+                  {authLink.purpose === "activation" ? "Activación" : "Recuperación"}
+                </h2>
+              </div>
+              <button type="button" aria-label="Cerrar enlace" onClick={() => {
+                setAuthLink(null);
+                setAuthLinkNotice("");
+              }}>×</button>
+            </header>
+            <p>Este enlace expira el {new Date(authLink.value.expiresAt).toLocaleString("es-MX")}.</p>
+            <div className="auth-link-value" aria-label="Enlace generado">{authLink.value.link}</div>
+            <footer className="modal-actions">
+              <Button type="button" variant="secondary" onClick={() => {
+                void navigator.clipboard.writeText(authLink.value.link)
+                  .then(() => setAuthLinkNotice("Enlace copiado."))
+                  .catch(() => setAuthLinkNotice("No fue posible copiar el enlace."));
+              }}>Copiar enlace</Button>
+              <a className="ui-button" href={authLink.value.whatsappUrl} target="_blank" rel="noreferrer">Abrir WhatsApp</a>
+            </footer>
+            <p className="mb-sr-only" role="status" aria-live="polite">{authLinkNotice}</p>
           </section>
         </Modal>
       )}
