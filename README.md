@@ -2,6 +2,12 @@
 
 Monorepo TypeScript para la administración de Mi Bicla Querétaro. Incluye una API Express, PostgreSQL con Drizzle y un frontend React funcional para configuración del negocio, clientes, fidelidad, bicicletas y taller.
 
+## Requisitos
+
+- Node.js `20.20.2`
+- npm `10.8.2`
+- PostgreSQL para ejecutar la aplicación y las tareas de base de datos
+
 ## Preparación
 
 1. Copia `.env.example` a `.env` y completa los valores. `SESSION_SECRET` requiere al menos 32 caracteres.
@@ -22,9 +28,18 @@ La contraseña del owner requiere entre 12 y 128 caracteres, minúscula, mayúsc
 - API: `npm run dev -w @mi-bicla/api-server`
 - Frontend: `npm run dev -w @mi-bicla/web`
 - Limpieza segura de límites vencidos: `npm run db:cleanup-rate-limits`
-- Verificación completa: `npm run typecheck && npm run lint && npm test && npm run build`
+- Verificación completa local: `npm run verify` ejecuta typecheck, lint, pruebas
+  y build.
 
 Las pruebas de integración requieren una base PostgreSQL desechable indicada por `TEST_DATABASE_URL`; nunca debe apuntar a producción.
+
+## Integración continua
+
+GitHub Actions ejecuta `npm ci` y `npm run verify` en cada pull request dirigido
+a `main` y en cada push a `main`. Esta primera capa de CI solo valida tipos,
+lint, pruebas unitarias y build; además comprueba errores de whitespace en el
+rango de commits del pull request o push. No utiliza secretos, no ejecuta
+migraciones, no se conecta a Neon y no despliega.
 
 ## Variables de entorno
 

@@ -3,6 +3,11 @@
   "private": true,
   "type": "module",
   "version": "0.1.0",
+  "engines": {
+    "node": "20.20.2",
+    "npm": "10.8.2"
+  },
+  "packageManager": "npm@10.8.2",
   "workspaces": [
     "artifacts/*",
     "packages/*"
@@ -13,6 +18,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "db:generate": "npm run generate -w @mi-bicla/db",
