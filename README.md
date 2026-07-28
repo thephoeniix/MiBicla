@@ -62,6 +62,7 @@ Las migraciones se aplican en orden y no se deben reescribir después de haber s
 - `0005_workshop.sql`: bicicletas, solicitudes, órdenes de taller, servicios, piezas, historial, seguimiento y configuración.
 - `0006_bicycle_details.sql`: frenos, suspensión, transmisión y estado general de las bicicletas.
 - `0007_workshop_service_catalog.sql`: catálogo configurable de servicios de taller y relación opcional con las líneas históricas de una orden.
+- `0008_customer_auth.sql`: credenciales, sesiones y tokens de activación o recuperación de clientes, separados de la autenticación administrativa.
 
 ## Seguridad y operación
 
@@ -127,6 +128,35 @@ Rutas:
 - `GET /api/public/customer/:token`
 
 La tarjeta pública se presenta en `/c/:token`. El UUID del cliente nunca funciona como credencial pública; los tokens públicos se almacenan únicamente como SHA-256.
+
+### Autenticación de clientes
+
+La activación y recuperación son asistidas por administración mediante enlaces
+temporales preparados para abrirse manualmente en WhatsApp. La aplicación no
+envía mensajes automáticamente. Las contraseñas usan Argon2id; los tokens y las
+sesiones se almacenan únicamente como hashes. La cookie de cliente
+`mb_customer_session` es independiente de `mb_session`.
+
+Si el teléfono operativo de un cliente cambia después de activar su cuenta, el
+número anterior deja de autenticar y sus sesiones dejan de ser válidas. La
+recuperación se bloquea y deshabilita la credencial hasta una revisión
+administrativa; el número nuevo nunca se vincula automáticamente sin
+verificación.
+
+Rutas administrativas:
+
+- `POST /api/admin/customers/:id/auth/activation`
+- `POST /api/admin/customers/:id/auth/recovery`
+
+Rutas de cliente:
+
+- `POST /api/customer/auth/activation/validate`
+- `POST /api/customer/auth/activate`
+- `POST /api/customer/auth/login`
+- `POST /api/customer/auth/recovery/reset`
+- `GET /api/customer/session`
+- `POST /api/customer/auth/logout`
+- `GET /api/customer/me`
 
 ## Bicicletas
 

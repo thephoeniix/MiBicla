@@ -50,6 +50,11 @@ import { createPublicCustomerRouter } from "./routes/public/customer.js";
 import { WorkshopService } from "./services/workshop.service.js";
 import { createWorkshopAdminRouter } from "./routes/admin/workshop.js";
 import { createWorkshopPublicRouter } from "./routes/public/workshop.js";
+import { CustomerAuthService } from "./services/customer-auth.service.js";
+import {
+  createCustomerAuthAdminRouter,
+  createCustomerAuthRouter,
+} from "./routes/customer-auth.js";
 type Database = ReturnType<typeof createDatabase>["db"];
 
 export function createApp(
@@ -384,6 +389,7 @@ const businessSettingsService = new BusinessSettingsService(db);
 const customersService = new CustomersService(db),
   loyaltyService = new LoyaltyService(db);
 const workshopService = new WorkshopService(db);
+const customerAuthService = new CustomerAuthService(db, env.APP_BASE_URL);
 app.use(
   "/api/admin/settings",
   createAdminBusinessSettingsRouter(
@@ -407,6 +413,19 @@ app.use(
   ),
 );
 app.use("/api/public", createPublicCustomerRouter(customersService));
+app.use(
+  "/api/admin",
+  createCustomerAuthAdminRouter(customerAuthService, requirePermission, audit),
+);
+app.use(
+  "/api/customer",
+  createCustomerAuthRouter(
+    customerAuthService,
+    limit,
+    audit,
+    env.NODE_ENV === "production",
+  ),
+);
 app.use(
   "/api/admin",
   createWorkshopAdminRouter(

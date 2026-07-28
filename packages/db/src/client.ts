@@ -4,6 +4,7 @@ import * as schema from "./schema.js";
 import * as businessSchema from "./schema/business-settings.js";
 import * as phase2Schema from "./schema/phase-2.js";
 import * as workshopSchema from "./schema/workshop.js";
+import * as customerAuthSchema from "./schema/customer-auth.js";
 export function createDatabase(url = process.env.DATABASE_URL) {
   if (!url) throw new Error("DATABASE_URL es obligatoria");
   const client = postgres(url, { max: 10 });
@@ -14,6 +15,7 @@ export function createDatabase(url = process.env.DATABASE_URL) {
         ...businessSchema,
         ...phase2Schema,
         ...workshopSchema,
+        ...customerAuthSchema,
       },
     }),
     client,
