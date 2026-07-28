@@ -3,3 +3,4 @@ export * from "./schema.js";
 export * from "./schema/business-settings.js";
 export * from "./schema/phase-2.js";
 export * from "./schema/workshop.js";
+export * from "./schema/customer-auth.js";
