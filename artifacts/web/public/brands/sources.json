@@ -1,0 +1,95 @@
+[
+  {
+    "name": "SRAM",
+    "file": "sram.png",
+    "source": "https://www.sram.com/globalassets/publicsites/logo-guidelines/brand-logo-art-files/sram-brand-logo-art-files_v05.zip",
+    "archiveMember": "SRAM-Brand-Logo-Art-Files/Digital/SMR_logo_Color_RGB.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "RockShox",
+    "file": "rockshox.png",
+    "source": "https://www.sram.com/globalassets/publicsites/logo-guidelines/brand-logo-art-files/rockshox-brand-logo-art-files_v04.zip",
+    "archiveMember": "RockShox Brand Logo Art Files_v04/Digital/R_logotype_Black.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "Maxxis",
+    "file": "maxxis.svg",
+    "source": "https://www.maxxis.com/us/wp-content/themes/maxxis/assets/images/logo.svg",
+    "retrievedAt": "2026-07-28",
+    "format": "svg"
+  },
+  {
+    "name": "Continental",
+    "file": "continental.jpg",
+    "source": "https://www.continental-tires.com/content/dam/conti-tires-cms/continental/market-content/ca/logos/logo-conti-black-on-white.png/_jcr_content/renditions/cq5dam.web.1280.1280.jpeg",
+    "retrievedAt": "2026-07-28",
+    "format": "jpeg"
+  },
+  {
+    "name": "Wahoo",
+    "file": "wahoo.png",
+    "source": "https://www.wahoofitness.com/media/logo/default/wahoo-fitness-logo-header.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "KMC",
+    "file": "kmc.png",
+    "source": "https://www.kmcchain.com/img/logo-top.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "Crankbrothers",
+    "file": "crankbrothers.svg",
+    "source": "https://www.crankbrothers.com/cdn/shop/t/135/assets/crankbrothers-logo.svg",
+    "retrievedAt": "2026-07-28",
+    "format": "svg"
+  },
+  {
+    "name": "Muc-Off",
+    "file": "muc-off.png",
+    "source": "https://muc-off.com/cdn/shop/files/Muc-off-logo-2026_1_493ccdc2-7e3c-4106-9ba9-e46da8165259_500x.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "Lezyne",
+    "file": "lezyne.png",
+    "source": "https://ride.lezyne.com/cdn/shop/files/LezyneLogo_R1.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "Jagwire",
+    "file": "jagwire.svg",
+    "source": "https://img.mcg-parts.de/jagwire/media-raw/brand/jagwire-logo-black.svg",
+    "retrievedAt": "2026-07-28",
+    "format": "svg"
+  },
+  {
+    "name": "Stan’s",
+    "file": "stans.png",
+    "source": "https://stans.com/cdn/shop/files/Stans-Logo-Tailless-Reg-RED.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "CushCore",
+    "file": "cushcore.png",
+    "source": "https://cushcore.com/cdn/shop/files/CushCore_Icon_Square_White_On_Green.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  },
+  {
+    "name": "ROCKBROS",
+    "file": "rockbros.png",
+    "source": "https://rockbrosbike.us/cdn/shop/files/logo_png.png",
+    "retrievedAt": "2026-07-28",
+    "format": "png"
+  }
+]

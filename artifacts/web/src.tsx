@@ -15,7 +15,7 @@ import { apiFetch, ApiError } from "./lib/api-client";
 import { AppShell } from "./components/AppShell";
 import { Button, Input, LoadingState } from "./components/ui";
 import { BrandLogo } from "./components/brand";
-import { Brands, Landing, LoyaltyInfo, WorkshopInfo } from "./pages/public/PublicPages";
+import { Landing, LegacyBrandsRedirect, LoyaltyInfo, WorkshopInfo } from "./pages/public/PublicPages";
 import { resolvePublicRoute } from "./lib/public-routes";
 import {
   CustomerActivation,
@@ -175,7 +175,7 @@ function App() {
     home: ["Mi Bicla Querétaro | Taller, equipo y comunidad MTB", "Taller, equipo y beneficios para disfrutar cada rodada."],
     workshop: ["Taller | Mi Bicla Querétaro", "Servicios de taller para mantener tu bicicleta lista para rodar."],
     loyalty: ["Fidelidad | Mi Bicla Querétaro", "Conoce el programa de fidelidad Mi Bicla."],
-    brands: ["Marcas | Mi Bicla Querétaro", "Consulta las marcas disponibles en Mi Bicla Querétaro."],
+    "brands-redirect": ["Marcas | Mi Bicla Querétaro", "Consulta las marcas disponibles en Mi Bicla Querétaro."],
     deposits: ["Depósitos | Mi Bicla Querétaro", "Métodos de depósito activos de Mi Bicla Querétaro."],
     "customer-card": ["Mi tarjeta | Mi Bicla Querétaro", "Tarjeta personal de fidelidad.", true],
     "workshop-tracking": ["Seguimiento de taller | Mi Bicla Querétaro", "Seguimiento privado de servicio.", true],
@@ -199,7 +199,7 @@ function App() {
     case "home": return <Landing />;
     case "workshop": return <WorkshopInfo />;
     case "loyalty": return <LoyaltyInfo />;
-    case "brands": return <Brands />;
+    case "brands-redirect": return <LegacyBrandsRedirect />;
     case "workshop-request": return <WorkshopRequest />;
     case "workshop-tracking": return <WorkshopTracking token={match.token!} />;
     case "customer-card": return <CustomerCard token={match.token!} />;

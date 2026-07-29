@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ThemeSelector } from "../ThemeSelector";
 import { TokenAccessDialog } from "./TokenAccessDialog";
-import { BrandLogo } from "../brand";
-import footerChain from "../../../../logo/footer.svg";
+import { BrandLogo, ChainDivider } from "../brand";
 
 export interface PublicBusiness {
   businessName?: string;
@@ -19,20 +18,11 @@ export interface PublicBusiness {
   logoUrl?: string;
 }
 
-const NAV = [
+export const PUBLIC_NAV = [
   ["/", "Inicio", "⌂"],
   ["/taller", "Taller", "◇"],
   ["/fidelidad", "Fidelidad", "♡"],
-  ["/marcas", "Marcas", "✦"],
 ] as const;
-
-function FooterChainDivider() {
-  return (
-    <div className="footer-chain-divider" aria-hidden="true">
-      <img src={footerChain} alt="" width={2048} height={65} />
-    </div>
-  );
-}
 
 function PublicFooter() {
   const year = new Date().getFullYear();
@@ -50,7 +40,7 @@ function PublicFooter() {
           <strong>QUERÉTARO · MÉXICO</strong>
           <p>Taller, comunidad y recompensas para seguir rodando.</p>
         </section>
-        <FooterChainDivider />
+        <ChainDivider className="footer-chain-divider" />
         <div className="footer-legal">
           <span>© {year} MI BICLA QUERÉTARO</span>
           <nav aria-label="Información legal"><a href="/aviso-de-privacidad">Aviso de privacidad</a><a href="/terminos">Términos</a></nav>
@@ -63,7 +53,6 @@ function PublicFooter() {
 
 export function PublicShell({
   children,
-  business,
 }: {
   children: ReactNode;
   business?: PublicBusiness | null;
@@ -118,11 +107,7 @@ export function PublicShell({
       <a className="mb-sr-only mb-sr-only-focusable" href="#public-content">Saltar al contenido</a>
       <header className="public-header">
         <a className="app-brand" href="/">
-          {business?.logoUrl ? (
-            <img src={business.logoUrl} alt={business.businessName || "Mi Bicla"} />
-          ) : (
-            <BrandLogo variant="full" color="white" />
-          )}
+          <BrandLogo variant="full" color="white" />
         </a>
         <button
           ref={menuButton}
@@ -136,13 +121,13 @@ export function PublicShell({
           <span /><span /><span />
         </button>
         <nav aria-label="Navegación pública">
-          {NAV.map(([href, label]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}>{label}</a>)}
+          {PUBLIC_NAV.map(([href, label]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}>{label}</a>)}
           <a href="/depositos">Depósitos</a>
           <a href="/#ubicacion">Ubicación</a>
         </nav>
         <div className="public-account-links">
           <a href="/iniciar-sesion">Iniciar sesión</a>
-          <a className="ui-button" href="/registro">Crear cuenta</a>
+          <a className="ui-button" href="/registro">Activar cuenta</a>
           <ThemeSelector compact />
         </div>
       </header>
@@ -156,10 +141,10 @@ export function PublicShell({
           aria-label="Menú principal"
         >
           <nav aria-label="Menú público">
-            {NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
+            {PUBLIC_NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
             <a href="/depositos">Depósitos</a>
             <a href="/iniciar-sesion">Iniciar sesión</a>
-            <a className="ui-button" href="/registro">Crear mi cuenta</a>
+            <a className="ui-button" href="/registro">Activar mi cuenta</a>
           </nav>
           <ThemeSelector />
         </div>
@@ -167,7 +152,7 @@ export function PublicShell({
       <main id="public-content">{children}</main>
       <PublicFooter />
       <nav className="public-bottom-nav" aria-label="Navegación pública móvil">
-        {NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}
+        {PUBLIC_NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}
         <button type="button" aria-expanded={more} onClick={() => setMore(!more)}><i aria-hidden="true">•••</i>Más</button>
       </nav>
       {more && <div className="public-more-menu">

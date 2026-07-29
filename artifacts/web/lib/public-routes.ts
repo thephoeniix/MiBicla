@@ -2,7 +2,7 @@ export type PublicRoute =
   | "home"
   | "workshop"
   | "loyalty"
-  | "brands"
+  | "brands-redirect"
   | "deposits"
   | "workshop-request"
   | "workshop-tracking"
@@ -27,7 +27,7 @@ export function resolvePublicRoute(pathname: string): {
   if (pathname === "/") return { route: "home" };
   if (pathname === "/taller") return { route: "workshop" };
   if (pathname === "/fidelidad") return { route: "loyalty" };
-  if (pathname === "/marcas") return { route: "brands" };
+  if (pathname === "/marcas") return { route: "brands-redirect" };
   if (pathname === "/depositos") return { route: "deposits" };
   if (pathname === "/registro") return { route: "customer-register" };
   if (pathname === "/registro/verificar") return { route: "customer-verify" };

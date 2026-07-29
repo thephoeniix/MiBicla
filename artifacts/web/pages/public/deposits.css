@@ -99,7 +99,8 @@
 .deposit-wallet-card {
   color: var(--mb-color-inverse-text);
   background:
-    repeating-radial-gradient(ellipse at 110% -20%, transparent 0 30px, rgb(236 61 146 / .22) 31px 33px),
+    linear-gradient(rgb(11 9 11 / .76), rgb(11 9 11 / .96)),
+    url("../../../../logo/cadena.png") right -120px top 14px / 760px auto no-repeat,
     var(--mb-color-inverse-surface);
   border-color: var(--mb-color-brand-800);
   border-radius: 14px;

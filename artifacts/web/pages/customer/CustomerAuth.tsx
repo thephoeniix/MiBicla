@@ -12,7 +12,8 @@ import { BrandLogo } from "../../components/brand";
 import { Container } from "../../components/primitives";
 import { ThemeSelector } from "../../components/ThemeSelector";
 import { Button, Card, Input, LoadingState } from "../../components/ui";
-import { ApiError } from "../../lib/api-client";
+import { apiFetch, ApiError } from "../../lib/api-client";
+import { resolveAccessContact, type PublicContact } from "../../lib/public-contact";
 import {
   activateCustomer,
   clearCustomerCsrf,
@@ -109,9 +110,10 @@ function useCustomerAuth() {
   return value;
 }
 
-function AuthFrame({ title, description, children }: {
+function AuthFrame({ title, description, eyebrow = "TU ESPACIO MI BICLA", children }: {
   title: string;
   description: string;
+  eyebrow?: string;
   children: ReactNode;
 }) {
   return <main className="customer-auth-page"><Container>
@@ -121,7 +123,7 @@ function AuthFrame({ title, description, children }: {
     </header>
     <div className="customer-auth-layout">
       <section className="customer-auth-intro">
-        <p className="page-eyebrow">TU ESPACIO MI BICLA</p>
+        <p className="page-eyebrow">{eyebrow}</p>
         <h1>{title}</h1><p>{description}</p>
         <div className="auth-art" aria-hidden="true"><span>QUERÉTARO · MTB</span></div>
       </section>
@@ -282,9 +284,28 @@ export function CustomerPortal() {
 }
 
 export function CustomerRegistrationInfo() {
-  return <AuthFrame title="ACTIVA TU CUENTA" description="La cuenta se vincula con un cliente que ya existe en Mi Bicla.">
-    <h2>No hay registro público</h2>
-    <p>Mi Bicla te proporciona un enlace de activación. Si ya activaste tu cuenta, puedes iniciar sesión.</p>
-    <a className="ui-button" href="/iniciar-sesion">Iniciar sesión</a>
+  const [contact, setContact] = useState<PublicContact | null>(null);
+  useEffect(() => {
+    apiFetch<PublicContact>("/api/public/business")
+      .then(setContact)
+      .catch(() => setContact(null));
+  }, []);
+  const accessHref = resolveAccessContact(contact) ?? "/#ubicacion";
+  const externalAccess = accessHref.startsWith("https://");
+  return <AuthFrame eyebrow="ACTIVACIÓN POR INVITACIÓN" title="ACTIVA TU CUENTA MI BICLA" description="Tu acceso a Mi Bicla se activa mediante un enlace personal que te enviamos por WhatsApp.">
+    <section className="registration-info" aria-labelledby="registration-info-title">
+      <h2 id="registration-info-title">Cómo activar tu acceso</h2>
+      <ol>
+        <li><span>1</span><div><strong>Solicita tu acceso</strong><p>Pídelo en Mi Bicla o comunícate con nosotros.</p></div></li>
+        <li><span>2</span><div><strong>Abre tu enlace</strong><p>Te enviaremos un enlace personal y temporal por WhatsApp.</p></div></li>
+        <li><span>3</span><div><strong>Crea tu contraseña</strong><p>Después podrás iniciar sesión y consultar tu información.</p></div></li>
+      </ol>
+      <p className="registration-note">Si ya recibiste tu enlace, ábrelo directamente desde el mensaje que te enviamos.</p>
+      <p className="registration-access-prompt">¿Todavía no tienes acceso? Solicítalo y te enviaremos un enlace personal de activación.</p>
+      <div className="registration-actions">
+        <a className="ui-button" href={accessHref} target={externalAccess ? "_blank" : undefined} rel={externalAccess ? "noreferrer" : undefined}>Solicitar acceso</a>
+        <a className="ui-button ui-button--secondary" href="/iniciar-sesion">Iniciar sesión</a>
+      </div>
+    </section>
   </AuthFrame>;
 }

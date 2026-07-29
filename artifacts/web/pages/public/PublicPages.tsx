@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Card, EmptyState } from "../../components/ui";
+import { Card } from "../../components/ui";
 import { Container } from "../../components/primitives";
 import { openTokenDialog, PublicShell, type PublicBusiness } from "../../components/public/PublicShell";
+import { BrandCarousel } from "../../components/public/BrandCarousel";
 import { apiFetch } from "../../lib/api-client";
-import { AUTHORIZED_BRANDS, WORKSHOP_SERVICES } from "../../lib/public-content";
+import { AUTHORIZED_BRANDS, WORKSHOP_SERVICES, workshopServiceHref } from "../../lib/public-content";
 import {
   BrandPageHero,
   BrandSectionHeading,
@@ -37,6 +38,7 @@ export function Landing() {
   const business = useBusiness();
   return <PublicShell business={business}><Container>
     <section className="public-hero">
+      <span className="hero-rings" aria-hidden="true" />
       <div className="public-hero-copy"><p className="page-eyebrow">QUERÉTARO · MTB · TALLER</p><h1>VIVE TU BICI</h1><p>Taller, comunidad y recompensas para seguir rodando.</p><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Agendar taller</a><a className="ui-button ui-button--outline" href="/registro">Activar mi cuenta</a></div></div>
       <div className="hero-status-card"><span aria-hidden="true">⚒</span><div><small>EJEMPLO · TU BICI ESTÁ</small><strong>LISTA</strong><p>Así puede verse tu seguimiento</p></div><i aria-hidden="true">✓</i></div>
       <ChainDivider className="hero-chain" />
@@ -51,14 +53,17 @@ export function Landing() {
     </section>
     <section className="quick-actions" aria-label="Acciones rápidas"><a href="/taller/solicitud">Agendar taller <i>↗</i></a><DialogButton kind="workshop">Consultar mi orden</DialogButton><DialogButton kind="card">Mi tarjeta</DialogButton><a href="/depositos">Ver depósitos <i>↗</i></a></section>
     <section className="public-section editorial" id="conocenos"><ChainDivider /><p className="page-eyebrow">COMUNIDAD MI BICLA</p><h2>MÁS QUE UNA TIENDA, SOMOS UNA COMUNIDAD SOBRE RUEDAS.</h2><p>Rodadas, competencias, eventos y taller: un punto de encuentro para la comunidad MTB de Querétaro.</p></section>
-    {AUTHORIZED_BRANDS.length > 0 && <section className="public-section"><h2>Marcas</h2></section>}
+    <section className="public-section home-brands" id="marcas" aria-labelledby="home-brands-title">
+      <div className="home-brands-heading"><p className="page-eyebrow">SELECCIÓN MI BICLA</p><h2 id="home-brands-title">MARCAS PARA SEGUIR RODANDO</h2><p>Conoce algunas de las marcas que puedes encontrar o solicitar en Mi Bicla. La disponibilidad puede variar.</p></div>
+      <BrandCarousel brands={AUTHORIZED_BRANDS} />
+    </section>
     <BusinessInfo business={business} />
   </Container></PublicShell>;
 }
 
 export function WorkshopInfo() {
   const business = useBusiness();
-  return <PublicShell business={business}><Container><BrandPageHero className="workshop-photo-hero" eyebrow="TALLER MI BICLA" title="TU BICI MERECE LA MEJOR RUTA" description="Servicio profesional para mantenerla segura, precisa y lista para rodar."><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Solicitar servicio</a><DialogButton kind="workshop">Consultar mi orden</DialogButton></div></BrandPageHero><section className="public-section"><BrandSectionHeading eyebrow="SERVICIO PROFESIONAL" title="TODO LO QUE TU BICI NECESITA" /><div className="service-grid">{WORKSHOP_SERVICES.map((service, i) => <Card key={service}><span>0{i + 1}</span><h3>{service}</h3></Card>)}</div><small>Este contenido comercial podrá conectarse a un catálogo público en una fase posterior.</small></section></Container></PublicShell>;
+  return <PublicShell business={business}><Container><BrandPageHero className="workshop-photo-hero" eyebrow="TALLER MI BICLA" title="TU BICI MERECE LA MEJOR RUTA" description="Servicio profesional para mantenerla segura, precisa y lista para rodar."><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Solicitar servicio</a><DialogButton kind="workshop">Consultar mi orden</DialogButton></div></BrandPageHero><section className="public-section"><BrandSectionHeading eyebrow="SERVICIO PROFESIONAL" title="TODO LO QUE TU BICI NECESITA" /><div className="service-grid">{WORKSHOP_SERVICES.map((service, i) => <a className="service-card" key={service} href={workshopServiceHref(service)} aria-label={`Solicitar servicio: ${service}`}><span>{String(i + 1).padStart(2, "0")}</span><h3>{service}</h3><small>Solicitar este servicio <span aria-hidden="true">→</span></small></a>)}</div><small>Selecciona un servicio para preparar tu solicitud. Podrás revisarla antes de enviarla.</small></section></Container></PublicShell>;
 }
 
 export function LoyaltyInfo() {
@@ -66,12 +71,10 @@ export function LoyaltyInfo() {
   return <PublicShell business={business}><Container><header className="public-page-hero"><p className="page-eyebrow">Fidelidad Mi Bicla</p><h1>Cada rodada cuenta</h1><p>Acumula bicicletas con tus compras y obtén recompensas.</p><DialogButton kind="card">Mi tarjeta</DialogButton></header><section className="demo-wallet"><div><small>MIEMBRO MI BICLA</small><h2>Tu próxima recompensa</h2><p>Una experiencia demostrativa del programa.</p></div><img src="/pink-simple.png" alt="" /><div className="demo-points">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < 6 ? "earned" : ""}><img src="/pink-simple.png" alt="" /></i>)}</div></section><section className="public-section"><h2>¿Cómo funciona?</h2><div className="public-card-grid"><Card><span>01</span><h3>Compra y acumula</h3><p>Tus compras participantes suman bicicletas a tu tarjeta.</p></Card><Card><span>02</span><h3>Sigue tu progreso</h3><p>Consulta tu enlace personal cuando quieras.</p></Card><Card><span>03</span><h3>Obtén recompensas</h3><p>Las condiciones dependen del programa vigente en tienda.</p></Card></div></section></Container></PublicShell>;
 }
 
-export function Brands() {
-  const business = useBusiness();
-  const action = business?.primaryWhatsapp
-    ? <a className="ui-button" href={`https://wa.me/${business.primaryWhatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Consultar por WhatsApp</a>
-    : business?.address
-      ? <a className="ui-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`} target="_blank" rel="noreferrer">Visitar tienda</a>
-      : null;
-  return <PublicShell business={business}><Container className="brands-page"><header className="public-page-hero"><p className="page-eyebrow">Selección Mi Bicla</p><h1>Marcas</h1></header><section className="public-section brands-empty">{AUTHORIZED_BRANDS.length === 0 ? <><EmptyState title="Consulta en tienda las marcas disponibles" description="Nuestro equipo puede ayudarte a encontrar equipo para tu próxima rodada." />{action}</> : null}</section></Container></PublicShell>;
+export function LegacyBrandsRedirect() {
+  useEffect(() => {
+    window.history.replaceState(null, "", "/#marcas");
+    requestAnimationFrame(() => document.getElementById("marcas")?.scrollIntoView());
+  }, []);
+  return <Landing />;
 }

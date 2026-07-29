@@ -4,6 +4,7 @@ import { PublicShell } from "../../components/public/PublicShell";
 import { Container } from "../../components/primitives";
 import { BrandPageHero } from "../../components/brand";
 import { Button, Input, Select, Textarea } from "../../components/ui";
+import { resolveRequestedWorkshopService } from "../../lib/public-content";
 const EMPTY = {
   customerName: "",
   customerPhone: "",
@@ -15,7 +16,9 @@ const EMPTY = {
   preferredContactMethod: "whatsapp",
 };
 export function WorkshopRequest() {
-  const [data, setData] = useState(EMPTY),
+  const [data, setData] = useState(() => {
+      return { ...EMPTY, problemDescription: resolveRequestedWorkshopService(window.location.search) };
+    }),
     [status, setStatus] = useState("");
   async function submit(e: FormEvent) {
     e.preventDefault();
