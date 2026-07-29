@@ -100,7 +100,7 @@ function AdminApp() {
       <AppShell user={user} onLogout={logout}>
         {window.location.pathname === "/admin/workshop" ? (
           <Workshop permissions={user.permissions} />
-        ) : window.location.pathname === "/admin/customers" ? (
+        ) : window.location.pathname.startsWith("/admin/customers") ? (
           <Customers permissions={user.permissions} />
         ) : window.location.pathname.endsWith("/loyalty") ? (
           <Loyalty permissions={user.permissions} />

@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mibicla_local_test
+      POSTGRES_USER: mibicla_local
+      POSTGRES_PASSWORD: local_disposable_password
+    ports:
+      - "127.0.0.1:55435:5432"
+    volumes:
+      - mibicla_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U mibicla_local -d mibicla_local_test
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mibicla_postgres_data:

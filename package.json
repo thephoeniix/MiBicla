@@ -13,7 +13,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w @mi-bicla/api-server\" \"npm run dev -w @mi-bicla/web\"",
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "DOTENV_CONFIG_PATH=../../.env.development.local npm run dev -w @mi-bicla/api-server",
+    "dev:web": "npm run dev -w @mi-bicla/web",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint . --max-warnings 0",
@@ -21,11 +23,14 @@
     "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:local:up": "docker compose -f compose.local.yml up -d --wait",
+    "db:local:down": "docker compose -f compose.local.yml down",
+    "db:local:migrate": "npm run db:local:up && DATABASE_URL=postgresql://mibicla_local:local_disposable_password@127.0.0.1:55435/mibicla_local_test npm run migrate -w @mi-bicla/db",
     "db:generate": "npm run generate -w @mi-bicla/db",
-    "db:migrate": "npm run migrate -w @mi-bicla/db",
-    "db:seed": "npm run seed -w @mi-bicla/db",
-    "db:create-owner": "npm run create-owner -w @mi-bicla/db",
-    "db:cleanup-rate-limits": "npm run cleanup-rate-limits -w @mi-bicla/db",
+    "db:migrate": "DOTENV_CONFIG_PATH=../../.env.development.local npm run migrate -w @mi-bicla/db",
+    "db:seed": "DOTENV_CONFIG_PATH=../../.env.development.local npm run seed -w @mi-bicla/db",
+    "db:create-owner": "DOTENV_CONFIG_PATH=../../.env.development.local npm run create-owner -w @mi-bicla/db",
+    "db:cleanup-rate-limits": "DOTENV_CONFIG_PATH=../../.env.development.local npm run cleanup-rate-limits -w @mi-bicla/db",
     "benchmark:argon2": "npm run benchmark:argon2 -w @mi-bicla/db"
   },
   "devDependencies": {

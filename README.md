@@ -6,13 +6,19 @@ Monorepo TypeScript para la administración de Mi Bicla Querétaro. Incluye una 
 
 - Node.js `20.20.2`
 - npm `10.8.2`
-- PostgreSQL para ejecutar la aplicación y las tareas de base de datos
+- Acceso a la rama Neon `development` para ejecutar la aplicación
+- Docker con Compose para las pruebas locales desechables
 
 ## Preparación
 
-1. Copia `.env.example` a `.env` y completa los valores. `SESSION_SECRET` requiere al menos 32 caracteres.
+1. Copia `.env.example` a `.env.development.local` y configura
+   `DATABASE_URL` exclusivamente con la connection string de la rama Neon
+   `development`. El archivo está ignorado por Git; `SESSION_SECRET` requiere
+   al menos 32 caracteres y `APP_ENCRYPTION_KEY` exactamente 64 caracteres
+   hexadecimales.
 2. Ejecuta `npm install`.
-3. Ejecuta `npm run db:migrate`.
+3. Ejecuta `npm run db:migrate`. Este comando carga explícitamente
+   `.env.development.local` y aplica las migraciones a la rama de desarrollo.
 4. Ejecuta `npm run db:seed`.
 5. Crea la cuenta propietaria:
 
@@ -25,13 +31,28 @@ La contraseña del owner requiere entre 12 y 128 caracteres, minúscula, mayúsc
 ## Ejecución y verificación
 
 - Proyecto completo: `npm run dev`
-- API: `npm run dev -w @mi-bicla/api-server`
-- Frontend: `npm run dev -w @mi-bicla/web`
+- API: `npm run dev:api`
+- Frontend: `npm run dev:web`
+- Iniciar PostgreSQL local: `npm run db:local:up`
+- Preparar la base local desechable: `npm run db:local:migrate`
+- Detener PostgreSQL local: `npm run db:local:down`
 - Limpieza segura de límites vencidos: `npm run db:cleanup-rate-limits`
 - Verificación completa local: `npm run verify` ejecuta typecheck, lint, pruebas
   y build.
 
 Las pruebas de integración requieren una base PostgreSQL desechable indicada por `TEST_DATABASE_URL`; nunca debe apuntar a producción.
+
+El servicio `postgres` de `compose.local.yml` escucha exclusivamente en
+`127.0.0.1:55435` y usa la base `mibicla_local_test`. Está reservado para
+pruebas automatizadas o destructivas: `npm run dev` y `npm run db:migrate`
+nunca lo seleccionan automáticamente. Conserva sus datos en el volumen nombrado
+`mibicla_postgres_data`; `npm run db:local:down` detiene el servicio pero no
+borra el volumen. Los valores de Compose son credenciales conocidas y
+exclusivamente locales, no aptas para ningún entorno remoto.
+
+Vite usa el puerto fijo `5173` con `strictPort`; si ya está ocupado, el proceso
+web falla explícitamente en vez de cambiar silenciosamente a `5174`. La API
+local usa `3000`.
 
 ## Integración continua
 
@@ -48,7 +69,18 @@ de producción. No usa `DATABASE_URL`, secretos de GitHub ni Neon.
 
 ## Variables de entorno
 
-La aplicación utiliza `DATABASE_URL`, `NODE_ENV`, `APP_BASE_URL`, `API_BASE_URL`, `SESSION_SECRET`, `APP_ENCRYPTION_KEY`, `TRUST_PROXY`, `ALLOWED_ORIGINS` y `PORT`. Los scripts del owner usan `OWNER_NAME`, `OWNER_EMAIL` y `OWNER_PASSWORD`; las pruebas de integración usan `TEST_DATABASE_URL`. El frontend acepta `VITE_API_BASE_URL`.
+Los scripts de desarrollo cargan explícitamente `.env.development.local` desde
+la raíz, incluso cuando npm ejecuta el workspace de API o base de datos desde
+su propio directorio. Ese archivo debe apuntar únicamente a la rama Neon
+`development`; `.env` queda reservado para producción y no es cargado por
+`npm run dev` ni `npm run db:migrate`. Las pruebas de integración exigen
+`TEST_DATABASE_URL`, rechazan hosts Neon y bases con marcadores de producción,
+y deben usar el PostgreSQL local o el servicio desechable del CI.
+
+La aplicación utiliza `DATABASE_URL`, `NODE_ENV`, `APP_BASE_URL`,
+`API_BASE_URL`, `SESSION_SECRET`, `APP_ENCRYPTION_KEY`, `TRUST_PROXY`,
+`ALLOWED_ORIGINS` y `PORT`. Los scripts del owner usan `OWNER_NAME`,
+`OWNER_EMAIL` y `OWNER_PASSWORD`. El frontend acepta `VITE_API_BASE_URL`.
 
 ## Migraciones
 
@@ -63,6 +95,7 @@ Las migraciones se aplican en orden y no se deben reescribir después de haber s
 - `0006_bicycle_details.sql`: frenos, suspensión, transmisión y estado general de las bicicletas.
 - `0007_workshop_service_catalog.sql`: catálogo configurable de servicios de taller y relación opcional con las líneas históricas de una orden.
 - `0008_customer_auth.sql`: credenciales, sesiones y tokens de activación o recuperación de clientes, separados de la autenticación administrativa.
+- `0009_customer_registration_requests.sql`: solicitudes públicas pendientes y revisión administrativa antes de activar credenciales.
 
 ## Seguridad y operación
 

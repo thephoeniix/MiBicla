@@ -12,7 +12,7 @@ import { BrandLogo } from "../../components/brand";
 import { Container } from "../../components/primitives";
 import { ThemeSelector } from "../../components/ThemeSelector";
 import { Button, Card, Input, LoadingState } from "../../components/ui";
-import { ApiError } from "../../lib/api-client";
+import { apiFetch, ApiError } from "../../lib/api-client";
 import {
   activateCustomer,
   clearCustomerCsrf,
@@ -27,6 +27,7 @@ import {
   validateActivation,
   type CustomerIdentity,
 } from "../../lib/customer-auth";
+import { buildRegistrationWhatsappUrl } from "../../lib/customer-registration";
 
 type AuthState = "loading" | "anonymous" | "authenticated" | "error";
 const AuthContext = createContext<{
@@ -282,9 +283,77 @@ export function CustomerPortal() {
 }
 
 export function CustomerRegistrationInfo() {
-  return <AuthFrame title="ACTIVA TU CUENTA" description="La cuenta se vincula con un cliente que ya existe en Mi Bicla.">
-    <h2>No hay registro público</h2>
-    <p>Mi Bicla te proporciona un enlace de activación. Si ya activaste tu cuenta, puedes iniciar sesión.</p>
-    <a className="ui-button" href="/iniciar-sesion">Iniciar sesión</a>
+  const [step, setStep] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    firstName: "", lastName: "", phone: "", email: "", password: "", confirmation: "",
+  });
+  const [result, setResult] = useState<null | {
+    reference: string; adminReviewUrl: string; expiresAt: string; name: string;
+  }>(null);
+  const [whatsapp, setWhatsapp] = useState("");
+  useEffect(() => {
+    apiFetch<{ primaryWhatsapp?: string }>("/api/public/business")
+      .then((business) => setWhatsapp(business.primaryWhatsapp?.replace(/\D/g, "") ?? ""))
+      .catch(() => setWhatsapp(""));
+  }, []);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (step === 1) { setStep(2); return; }
+    if (busy) return;
+    if (form.password !== form.confirmation) {
+      setMessage("Las contraseñas no coinciden."); return;
+    }
+    setBusy(true); setMessage("");
+    try {
+      const created = await apiFetch<{ reference: string; adminReviewUrl: string; expiresAt: string }>(
+        "/api/public/customer-registration",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            firstName: form.firstName, lastName: form.lastName,
+            phone: form.phone, email: form.email, password: form.password,
+          }),
+        },
+      );
+      setResult({ ...created, name: `${form.firstName} ${form.lastName}`.trim() });
+      setForm({ firstName: "", lastName: "", phone: "", email: "", password: "", confirmation: "" });
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : "No fue posible enviar la solicitud.");
+    } finally { setBusy(false); }
+  }
+  if (result) {
+    const whatsappUrl = buildRegistrationWhatsappUrl(whatsapp, result);
+    return <AuthFrame title="SOLICITUD RECIBIDA" description="Tu cuenta todavía no está activa. El equipo de Mi Bicla debe revisarla.">
+      <section className="registration-result">
+        <p className="page-eyebrow">Estado pendiente</p>
+        <h2>Referencia {result.reference}</h2>
+        <p>Envía la solicitud por WhatsApp para que el equipo pueda revisarla. Abrir el enlace no aprueba la cuenta.</p>
+        {whatsappUrl && <a className="ui-button" href={whatsappUrl} target="_blank" rel="noreferrer">Enviar solicitud por WhatsApp</a>}
+        {!whatsappUrl && <p>Comunícate directamente con Mi Bicla e indica tu referencia.</p>}
+        <a className="ui-button ui-button--secondary" href="/iniciar-sesion">Iniciar sesión</a>
+      </section>
+    </AuthFrame>;
+  }
+  return <AuthFrame title="SOLICITA TU ACCESO" description="Completa tus datos. Tu cuenta permanecerá pendiente hasta que Mi Bicla la apruebe.">
+    <form className="registration-form" onSubmit={submit}>
+      <p className="page-eyebrow">Paso {step} de 2</p>
+      {step === 1 ? <>
+        <label>Nombre<Input required maxLength={100} autoComplete="given-name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></label>
+        <label>Apellidos<Input required maxLength={100} autoComplete="family-name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></label>
+        <label>Teléfono<Input required type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+        <label>Correo opcional<Input type="email" inputMode="email" autoComplete="email" maxLength={254} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+        <Button>Continuar</Button>
+      </> : <>
+        <label>Contraseña<Input required type="password" autoComplete="new-password" minLength={12} maxLength={128} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+        <label>Confirmar contraseña<Input required type="password" autoComplete="new-password" minLength={12} maxLength={128} value={form.confirmation} onChange={(e) => setForm({ ...form, confirmation: e.target.value })} /></label>
+        <label className="privacy-check"><input required type="checkbox" /> Confirmo que estos datos son míos y solicito que Mi Bicla los revise.</label>
+        {message && <p className="form-error" role="alert">{message}</p>}
+        <div className="register-step-actions"><Button type="button" variant="secondary" onClick={() => setStep(1)}>Atrás</Button><Button disabled={busy}>{busy ? "Enviando…" : "Enviar solicitud"}</Button></div>
+      </>}
+      <footer><a href="/iniciar-sesion">Iniciar sesión</a></footer>
+    </form>
   </AuthFrame>;
 }

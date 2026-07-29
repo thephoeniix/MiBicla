@@ -78,3 +78,4 @@ export * from "./phone.schema.js";
 export * from "./phase-2.schema.js";
 export * from "./workshop.schema.js";
 export * from "./customer-auth.schema.js";
+export * from "./customer-registration.schema.js";

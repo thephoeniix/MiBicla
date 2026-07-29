@@ -55,6 +55,11 @@ import {
   createCustomerAuthAdminRouter,
   createCustomerAuthRouter,
 } from "./routes/customer-auth.js";
+import { CustomerRegistrationService } from "./services/customer-registration.service.js";
+import {
+  createCustomerRegistrationAdminRouter,
+  createCustomerRegistrationPublicRouter,
+} from "./routes/customer-registration.js";
 type Database = ReturnType<typeof createDatabase>["db"];
 
 export function createApp(
@@ -390,6 +395,7 @@ const customersService = new CustomersService(db),
   loyaltyService = new LoyaltyService(db);
 const workshopService = new WorkshopService(db);
 const customerAuthService = new CustomerAuthService(db, env.APP_BASE_URL);
+const customerRegistrationService = new CustomerRegistrationService(db, env.APP_BASE_URL);
 app.use(
   "/api/admin/settings",
   createAdminBusinessSettingsRouter(
@@ -418,6 +424,14 @@ app.use(
   createCustomerAuthAdminRouter(customerAuthService, requirePermission, audit),
 );
 app.use(
+  "/api/public",
+  createCustomerRegistrationPublicRouter(customerRegistrationService, limit, audit),
+);
+app.use(
+  "/api/admin",
+  createCustomerRegistrationAdminRouter(customerRegistrationService, requirePermission, audit),
+);
+app.use(
   "/api/customer",
   createCustomerAuthRouter(
     customerAuthService,
@@ -436,7 +450,7 @@ app.use(
   ),
 );
 app.use("/api/public", createWorkshopPublicRouter(workshopService));
-app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
   void next;
   if (err instanceof ZodError) {
     const fieldErrors = Object.fromEntries(
@@ -454,11 +468,23 @@ app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
       },
     });
   }
-  console.error(err);
-  res.status(400).json({
+  const internalCode =
+    err && typeof err === "object" && "code" in err && typeof err.code === "string"
+      ? err.code.slice(0, 32)
+      : "UNEXPECTED_ERROR";
+  if (env.NODE_ENV === "development")
+    console.error({
+      event: "request_failed",
+      requestId: res.locals.requestId,
+      method: req.method,
+      route: req.route?.path ?? "unmatched",
+      errorType: err instanceof Error ? err.name : typeof err,
+      internalCode,
+    });
+  res.status(500).json({
     error: {
-      code: "BAD_REQUEST",
-      message: "Solicitud inválida",
+      code: "INTERNAL_ERROR",
+      message: "No fue posible completar la solicitud",
       requestId: res.locals.requestId,
     },
   });
