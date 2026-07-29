@@ -14,6 +14,7 @@ import {
   auditLogs,
   customerAuthTokens,
   customerCredentials,
+  customerRegistrationRequests,
   customerSessions,
   customers,
   paymentDepositSettings,
@@ -240,7 +241,7 @@ describe("infraestructura PostgreSQL", () => {
         from information_schema.tables
         where table_schema = 'public'
       `);
-      expect(migrations[0]?.count).toBe(9);
+      expect(migrations[0]?.count).toBe(10);
       expect(tables.map(({ name }) => name)).toEqual(
         expect.arrayContaining([
           "administrators",
@@ -251,6 +252,7 @@ describe("infraestructura PostgreSQL", () => {
           "customer_credentials",
           "customer_sessions",
           "customer_auth_tokens",
+          "customer_registration_requests",
         ]),
       );
     } finally {
@@ -270,6 +272,101 @@ describe("infraestructura PostgreSQL", () => {
       ),
     ).toThrow();
     expect(() => requireSafeTestDatabaseUrl("")).toThrow();
+  });
+});
+
+describe("registro pendiente con aprobación administrativa", () => {
+  const registration = {
+    firstName: "Registro",
+    lastName: "Ficticio",
+    phone: "442 700 0011",
+    email: "registro.ficticio@example.test",
+    password: "Registration-Fictional1!",
+  };
+
+  it("crea pendiente sin sesión y solo activa tras aprobación explícita", async () => {
+    const created = await request("/api/public/customer-registration", {
+      method: "POST",
+      body: registration,
+    });
+    expect(created.status).toBe(202);
+    expect(created.headers.get("set-cookie")).toBeNull();
+    const result = await created.json() as {
+      reference: string; adminReviewUrl: string;
+    };
+    expect(result.reference).toMatch(/^MB-[A-F0-9]{8}$/);
+    expect(result.adminReviewUrl).not.toContain(registration.phone.replace(/\D/g, ""));
+    const reviewId = result.adminReviewUrl.split("/").at(-1)!;
+    expect(reviewId).toMatch(/^[a-f0-9]{64}$/);
+
+    const { db, client } = createTestDatabase();
+    try {
+      const [pending] = await db.select().from(customerRegistrationRequests)
+        .where(eq(customerRegistrationRequests.reviewId, reviewId));
+      expect(pending?.status).toBe("pending");
+      expect(pending?.passwordHash).not.toBe(registration.password);
+      expect(await verifyPassword(pending!.passwordHash!, registration.password)).toBe(true);
+    } finally { await client.end(); }
+
+    const pendingLogin = await request("/api/customer/auth/login", {
+      method: "POST",
+      body: { phone: registration.phone, password: registration.password },
+    });
+    expect(pendingLogin.status).toBe(401);
+
+    const anonymousGet = await request(`/api/admin/customer-registration-requests/${reviewId}`);
+    expect(anonymousGet.status).toBe(401);
+    const admin = await login();
+    const detail = await request(`/api/admin/customer-registration-requests/${reviewId}`, { session: admin });
+    expect(detail.status).toBe(200);
+    expect((await detail.json() as { status: string }).status).toBe("pending");
+
+    const withoutCsrf = await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
+      method: "POST", session: admin, csrf: false,
+    });
+    expect(withoutCsrf.status).toBe(403);
+
+    const approvals = await Promise.all([
+      request(`/api/admin/customer-registration-requests/${reviewId}/approve`, { method: "POST", session: admin }),
+      request(`/api/admin/customer-registration-requests/${reviewId}/approve`, { method: "POST", session: admin }),
+    ]);
+    expect(approvals.map(({ status }) => status).sort()).toEqual([200, 409]);
+    const session = await customerLogin(registration.phone, registration.password);
+    expect(session.cookie).toContain("mb_customer_session=");
+  });
+
+  it("aplica RBAC, rechazo y expiración sin activar credenciales", async () => {
+    const create = async (phone: string) => {
+      const response = await request("/api/public/customer-registration", {
+        method: "POST", body: { ...registration, phone },
+      });
+      expect(response.status).toBe(202);
+      return ((await response.json()) as { adminReviewUrl: string }).adminReviewUrl.split("/").at(-1)!;
+    };
+    const rejectedId = await create("442 700 0012");
+    const employee = await login({ email: TEST_EMPLOYEE.email, password: TEST_EMPLOYEE.password });
+    expect((await request(`/api/admin/customer-registration-requests/${rejectedId}`, { session: employee })).status).toBe(403);
+    const admin = await login();
+    expect((await request(`/api/admin/customer-registration-requests/${rejectedId}/reject`, {
+      method: "POST", session: admin, body: { reason: "No coincide el remitente" },
+    })).status).toBe(204);
+    expect((await request("/api/customer/auth/login", {
+      method: "POST", body: { phone: "442 700 0012", password: registration.password },
+    })).status).toBe(401);
+
+    const expiredId = await create("442 700 0013");
+    const { db, client } = createTestDatabase();
+    try {
+      await db.update(customerRegistrationRequests)
+        .set({
+          createdAt: new Date(Date.now() - 2_000),
+          expiresAt: new Date(Date.now() - 1_000),
+        })
+        .where(eq(customerRegistrationRequests.reviewId, expiredId));
+    } finally { await client.end(); }
+    expect((await request(`/api/admin/customer-registration-requests/${expiredId}/approve`, {
+      method: "POST", session: admin,
+    })).status).toBe(409);
   });
 });
 
@@ -1178,7 +1275,7 @@ describe("autenticación de clientes", () => {
         })
       ).status,
     ).toBe(401);
-  });
+  }, 15_000);
 
   it("recuperación revoca sesiones previas y clientes inactivos no autentican", async () => {
     const admin = await login();

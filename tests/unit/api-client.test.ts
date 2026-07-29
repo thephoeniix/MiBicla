@@ -17,6 +17,20 @@ describe("cliente API autenticado", () => {
     storage.clear();
     vi.restoreAllMocks();
   });
+  it("clasifica un fallo de red sin exponer detalles del transporte", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED secret-host")),
+    );
+    const { apiFetch } = await import("../../artifacts/web/lib/api-client");
+    await expect(
+      apiFetch("/api/public/customer-registration", { method: "POST" }),
+    ).rejects.toMatchObject({
+      status: 0,
+      code: "API_UNREACHABLE",
+      message: "No fue posible conectar con el servicio.",
+    });
+  });
   it("envía cookie y CSRF en PUT", async () => {
     sessionStorage.setItem("mb_csrf", "csrf-test");
     const fetchMock = vi.fn().mockResolvedValue(

@@ -31,12 +31,22 @@ export async function apiFetch<T>(
     const csrf = sessionStorage.getItem("mb_csrf");
     if (csrf) headers.set("X-CSRF-Token", csrf);
   }
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    method,
-    headers,
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      method,
+      headers,
+      credentials: "include",
+    });
+  } catch {
+    throw new ApiError(
+      0,
+      "No fue posible conectar con el servicio.",
+      {},
+      "API_UNREACHABLE",
+    );
+  }
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
       error?: {

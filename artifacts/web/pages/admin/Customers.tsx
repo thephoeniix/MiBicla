@@ -52,6 +52,17 @@ interface BicycleSummary {
   model: string | null;
   status: string;
 }
+interface RegistrationRequest {
+  reviewId: string;
+  reference: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  email?: string | null;
+  status: string;
+  createdAt: string;
+  expiresAt: string;
+}
 
 const EMPTY = {
   firstName: "",
@@ -103,6 +114,8 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
     "activation" | "recovery" | null
   >(null);
   const [authLinkNotice, setAuthLinkNotice] = useState("");
+  const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>([]);
+  const [registrationDetail, setRegistrationDetail] = useState<RegistrationRequest | null>(null);
 
   const canManage = permissions.includes("manage_customers");
   const canCreate =
@@ -123,7 +136,40 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
 
   useEffect(() => {
     void load();
+    if (canManage) {
+      void apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests")
+        .then(setRegistrationRequests)
+        .catch(() => setRegistrationRequests([]));
+      const reviewId = location.pathname.match(/^\/admin\/customers\/requests\/([a-f0-9]{64})$/)?.[1];
+      if (reviewId) void openRegistration(reviewId);
+    }
   }, []);
+
+  async function openRegistration(reviewId: string) {
+    const request = await apiFetch<RegistrationRequest>(
+      `/api/admin/customer-registration-requests/${reviewId}`,
+    );
+    setRegistrationDetail(request);
+  }
+
+  async function decideRegistration(action: "approve" | "reject") {
+    if (!registrationDetail) return;
+    if (!confirm(action === "approve"
+      ? "¿Confirmas que verificaste el número y deseas aprobar esta cuenta?"
+      : "¿Confirmas que deseas rechazar esta solicitud?")) return;
+    await apiFetch(
+      `/api/admin/customer-registration-requests/${registrationDetail.reviewId}/${action}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: action === "reject" ? JSON.stringify({}) : undefined,
+      },
+    );
+    setRegistrationDetail(null);
+    const requests = await apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests");
+    setRegistrationRequests(requests);
+    setStatus(action === "approve" ? "Cuenta aprobada" : "Solicitud rechazada");
+  }
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -263,6 +309,18 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
           ) : undefined
         }
       />
+
+      {canManage && <section className="registration-review-list">
+        <h2>Solicitudes de acceso</h2>
+        {registrationRequests.filter((request) => request.status === "pending").length ? (
+          registrationRequests.filter((request) => request.status === "pending").map((request) => (
+            <Card key={request.reviewId} className="list-row">
+              <div><strong>{request.firstName} {request.lastName}</strong><small>{request.reference} · {new Date(request.createdAt).toLocaleDateString("es-MX")}</small></div>
+              <Button type="button" variant="secondary" onClick={() => void openRegistration(request.reviewId)}>Revisar</Button>
+            </Card>
+          ))
+        ) : <p>No hay solicitudes pendientes.</p>}
+      </section>}
 
       <form
         className="search-bar"
@@ -428,6 +486,23 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
               </Button>
             </footer>
           </form>
+        </Modal>
+      )}
+
+      {registrationDetail && (
+        <Modal open aria-labelledby="registration-review-title">
+          <section>
+            <header className="modal-header">
+              <div><p className="page-eyebrow">Solicitud {registrationDetail.reference}</p><h2 id="registration-review-title">{registrationDetail.firstName} {registrationDetail.lastName}</h2></div>
+              <button type="button" aria-label="Cerrar" onClick={() => setRegistrationDetail(null)}>×</button>
+            </header>
+            <p className="form-notice">Antes de aprobar, confirma que el número registrado coincide con el remitente del mensaje de WhatsApp.</p>
+            <dl><div><dt>Teléfono</dt><dd>{registrationDetail.phone}</dd></div><div><dt>Correo</dt><dd>{registrationDetail.email || "Sin correo"}</dd></div><div><dt>Estado</dt><dd>{registrationDetail.status}</dd></div></dl>
+            {registrationDetail.status === "pending" && <footer className="modal-actions">
+              <Button type="button" variant="secondary" onClick={() => void decideRegistration("reject")}>Rechazar solicitud</Button>
+              <Button type="button" onClick={() => void decideRegistration("approve")}>Aprobar cuenta</Button>
+            </footer>}
+          </section>
         </Modal>
       )}
 
