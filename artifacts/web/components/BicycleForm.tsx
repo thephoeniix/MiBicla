@@ -26,6 +26,11 @@ export interface Bicycle {
   suspensionType: string | null;
   drivetrain: string | null;
   generalCondition: string | null;
+  year?: number | null;
+  serialNumber?: string | null;
+  frameNumber?: string | null;
+  notes?: string | null;
+  status: string;
 }
 
 const EMPTY = {
@@ -46,6 +51,26 @@ const EMPTY = {
 };
 type Field = keyof typeof EMPTY;
 
+function formFromBicycle(bicycle?: Bicycle | null): typeof EMPTY {
+  if (!bicycle) return EMPTY;
+  return {
+    nickname: bicycle.nickname ?? "",
+    brand: bicycle.brand ?? "",
+    model: bicycle.model ?? "",
+    bikeType: bicycle.bikeType ?? "",
+    color: bicycle.color ?? "",
+    wheelSize: bicycle.wheelSize ?? "",
+    year: bicycle.year?.toString() ?? "",
+    brakeType: bicycle.brakeType ?? "",
+    suspensionType: bicycle.suspensionType ?? "",
+    drivetrain: bicycle.drivetrain ?? "",
+    serialNumber: bicycle.serialNumber ?? "",
+    frameNumber: bicycle.frameNumber ?? "",
+    generalCondition: bicycle.generalCondition ?? "",
+    notes: bicycle.notes ?? "",
+  };
+}
+
 function CatalogField({
   label,
   field,
@@ -59,7 +84,9 @@ function CatalogField({
   form: typeof EMPTY;
   setForm: (form: typeof EMPTY) => void;
 }) {
-  const [isOther, setIsOther] = useState(false);
+  const [isOther, setIsOther] = useState(
+    () => Boolean(form[field]) && !options.includes(form[field]),
+  );
   return (
     <>
       <SearchableCombobox
@@ -91,29 +118,36 @@ function CatalogField({
 export function BicycleForm({
   customerId,
   onCreated,
+  bicycle,
+  onSaved,
   onCancel,
 }: {
   customerId: string;
   onCreated: (bicycle: Bicycle) => void;
+  bicycle?: Bicycle | null;
+  onSaved?: (bicycle: Bicycle) => void;
   onCancel: () => void;
 }) {
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState(() => formFromBicycle(bicycle));
   const [error, setError] = useState("");
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
     try {
-      const bicycle = await apiFetch<Bicycle>("/api/admin/bicycles", {
-        method: "POST",
+      const saved = await apiFetch<Bicycle>(
+        bicycle ? `/api/admin/bicycles/${bicycle.id}` : "/api/admin/bicycles",
+        {
+        method: bicycle ? "PUT" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          customerId,
+          ...(bicycle ? {} : { customerId }),
           ...form,
           year: form.year ? Number(form.year) : null,
-          status: "active",
+          status: bicycle?.status ?? "active",
         }),
       });
-      onCreated(bicycle);
+      if (bicycle) onSaved?.(saved);
+      else onCreated(saved);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "No se pudo guardar.",
@@ -123,7 +157,7 @@ export function BicycleForm({
   return (
     <Dialog open aria-labelledby="bicycle-title">
       <form onSubmit={submit} className="bicycle-form">
-        <h3 id="bicycle-title">Registrar bicicleta</h3>
+        <h3 id="bicycle-title">{bicycle ? "Editar bicicleta" : "Registrar bicicleta"}</h3>
         <fieldset>
           <legend>Información general</legend>
           <label>
@@ -261,7 +295,7 @@ export function BicycleForm({
         </fieldset>
         {error && <p role="alert">{error}</p>}
         <div className="actions">
-          <button type="submit">Guardar bicicleta</button>
+          <button type="submit">{bicycle ? "Guardar cambios" : "Guardar bicicleta"}</button>
           <button type="button" className="secondary" aria-label="Cerrar formulario de bicicleta" onClick={onCancel}>
             Cancelar
           </button>

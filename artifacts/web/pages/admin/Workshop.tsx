@@ -297,6 +297,9 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
   const visibleOrders = orders.filter(
     (order) => orderFilter === "all" || order.status === orderFilter,
   );
+  const detailCustomer = detail
+    ? customers.find((customer) => customer.id === detail.order.customerId)
+    : undefined;
   return (
     <section className="admin-page workshop-page">
       <PageHeader
@@ -531,11 +534,21 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
         <Modal open className="workshop-detail" aria-labelledby="workshop-detail-title">
           <article className="workshop-detail-shell">
           <header className="modal-header workshop-detail-header">
-            <div>
+            <div className="workshop-detail-identity">
               <p className="page-eyebrow">Orden de taller</p>
-              <h2 id="workshop-detail-title">{detail.order.orderNumber}</h2>
-              <p>{detail.order.problemDescription || "Bicicleta registrada"}</p>
-              <StatusBadge status={detail.order.status} />
+              <div>
+                <h2 id="workshop-detail-title">{detail.order.orderNumber}</h2>
+                <StatusBadge status={detail.order.status} />
+              </div>
+              <p>
+                <strong>
+                  {detailCustomer
+                    ? `${detailCustomer.firstName} ${detailCustomer.lastName}`
+                    : "Cliente registrado"}
+                </strong>
+                <span aria-hidden="true"> · </span>
+                {detail.order.problemDescription || "Bicicleta registrada"}
+              </p>
             </div>
             <div className="workshop-detail-header-actions">
               <details className="service-actions-menu"><summary aria-label="Más acciones">•••</summary><div><button type="button" onClick={token}>Generar seguimiento</button><button type="button" onClick={whatsapp}>Preparar WhatsApp</button></div></details>
@@ -552,12 +565,12 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           <div className="workshop-detail-content">
           {detailTab === "summary" && <section className="order-summary">
             <div className="order-summary-grid">
-              <Card><small>Cliente</small><strong>{customers.find((customer) => customer.id === detail.order.customerId)?.firstName ?? "Cliente registrado"} {customers.find((customer) => customer.id === detail.order.customerId)?.lastName ?? ""}</strong></Card>
+              <Card><small>Cliente</small><strong>{detailCustomer?.firstName ?? "Cliente registrado"} {detailCustomer?.lastName ?? ""}</strong></Card>
               <Card><small>Bicicleta</small><strong>Bicicleta registrada</strong></Card>
               <Card className="order-summary-problem"><small>Problema reportado</small><strong>{detail.order.problemDescription}</strong></Card>
               <Card><small>Estado actual</small><strong>{statusLabel(detail.order.status)}</strong></Card>
               <Card><small>Total estimado</small><strong>{detail.order.totalCents === undefined ? "Restringido" : `$${(detail.order.totalCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN`}</strong></Card>
-              <Card><small>Próxima acción</small><strong>{PRIMARY_TRANSITION[detail.order.status] ? TRANSITION_LABEL[PRIMARY_TRANSITION[detail.order.status]!] : "Sin acciones pendientes"}</strong></Card>
+              <Card className="order-summary-next"><small>Próxima acción</small><strong>{PRIMARY_TRANSITION[detail.order.status] ? TRANSITION_LABEL[PRIMARY_TRANSITION[detail.order.status]!] : "Sin acciones pendientes"}</strong></Card>
             </div>
           </section>}
           {detailTab === "status" && <section className="order-status-panel">
@@ -614,7 +627,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           </Card>
           </section>}
           {detailTab === "customer" && <section className="order-customer-panel">
-            <Card><small>Cliente</small><h3>{customers.find((customer) => customer.id === detail.order.customerId)?.firstName ?? "Cliente registrado"} {customers.find((customer) => customer.id === detail.order.customerId)?.lastName ?? ""}</h3><p>{customers.find((customer) => customer.id === detail.order.customerId)?.phone ?? "Teléfono no disponible en esta vista"}</p></Card>
+            <Card><small>Cliente</small><h3>{detailCustomer?.firstName ?? "Cliente registrado"} {detailCustomer?.lastName ?? ""}</h3><p>{detailCustomer?.phone ?? "Teléfono no disponible en esta vista"}</p></Card>
             <div className="order-customer-actions"><Button type="button" variant="secondary" onClick={token}>Generar seguimiento</Button><Button type="button" onClick={whatsapp}>Preparar WhatsApp</Button></div>
           </section>}
           {detailTab === "status" && <Card className="detail-section"><h3>Publicar avance</h3>

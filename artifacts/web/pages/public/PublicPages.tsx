@@ -2,8 +2,18 @@ import { useEffect, useState } from "react";
 import { Card, EmptyState } from "../../components/ui";
 import { Container } from "../../components/primitives";
 import { openTokenDialog, PublicShell, type PublicBusiness } from "../../components/public/PublicShell";
+import { BrandCarousel } from "../../components/public/BrandCarousel";
 import { apiFetch } from "../../lib/api-client";
-import { AUTHORIZED_BRANDS, WORKSHOP_SERVICES } from "../../lib/public-content";
+import {
+  AUTHORIZED_BRANDS,
+  WORKSHOP_SERVICES,
+  workshopServiceHref,
+} from "../../lib/public-content";
+import {
+  configuredWhatsappUrl,
+  MI_BICLA_MAPS_URL,
+  openingHoursEntries,
+} from "../../lib/public-links";
 import {
   BrandPageHero,
   BrandSectionHeading,
@@ -20,15 +30,30 @@ function useBusiness() {
 const DialogButton = ({ kind, children }: { kind: "workshop" | "card"; children: string }) =>
   <button className="ui-button ui-button--secondary" type="button" onClick={() => openTokenDialog(kind)}>{children}</button>;
 
+function WhatsappIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.7a8 8 0 0 1-11.8 7L4 20l1.3-4.1A8 8 0 1 1 20 11.7Z" /><path d="M9 8.2c.2-.4.4-.4.7-.4h.3l.8 1.9c.1.2.1.4-.1.6l-.6.8c-.1.2 0 .4.1.6.7 1.2 1.6 2 2.8 2.6.3.1.5.1.7-.1l.8-1c.2-.2.4-.3.7-.2l1.8.9c.3.1.4.3.4.5 0 .4-.2 1.3-.8 1.8-.6.5-1.4.8-2.4.5-1.1-.3-2.5-.8-4.2-2.3-1.4-1.3-2.4-2.9-2.7-4-.3-1 .1-1.8.5-2.2.4-.4.8-.5 1.2-.5Z" /></svg>;
+}
+
+function InstagramIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.7" r=".8" className="social-icon-fill" /></svg>;
+}
+
+function LocationIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.3 6-12a6 6 0 1 0-12 0c0 6.7 6 12 6 12Z" /><circle cx="12" cy="9" r="2.2" /></svg>;
+}
+
 function BusinessInfo({ business }: { business: PublicBusiness | null }) {
-  const socials = [["Instagram", business?.instagram], ["Facebook", business?.facebook], ["TikTok", business?.tiktok], ["Sitio web", business?.website]].filter((x): x is string[] => Boolean(x[1]));
+  const whatsapp = configuredWhatsappUrl(business?.primaryWhatsapp);
+  const instagram = business?.social?.instagram;
+  const socials = [["Facebook", business?.social?.facebook], ["TikTok", business?.social?.tiktok], ["Sitio web", business?.social?.website]].filter((x): x is string[] => Boolean(x[1]));
+  const openingHours = openingHoursEntries(business?.openingHours);
   return <section className="public-section public-business" id="ubicacion">
     <div><p className="page-eyebrow">Visítanos</p><h2>Horarios y ubicación</h2></div>
     <div className="public-business-grid">
-      {business?.address && <Card><h3>Ubicación</h3><p>{business.address}</p><a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`} target="_blank" rel="noreferrer">Cómo llegar</a></Card>}
-      {business?.openingHours && Object.keys(business.openingHours).length > 0 && <Card id="horarios"><h3>Horarios</h3><dl>{Object.entries(business.openingHours).map(([day, hours]) => <div key={day}><dt>{day}</dt><dd>{hours}</dd></div>)}</dl></Card>}
-      {(business?.phone || business?.primaryWhatsapp) && <Card><h3>Contacto</h3>{business.phone && <a href={`tel:${business.phone}`}>{business.phone}</a>}{business.primaryWhatsapp && <a href={`https://wa.me/${business.primaryWhatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Abrir WhatsApp</a>}</Card>}
-      {socials.length > 0 && <Card id="redes"><h3>Redes</h3>{socials.map(([label, href]) => <a key={label} href={href} target="_blank" rel="noreferrer">{label}</a>)}</Card>}
+      <Card><h3>Ubicación</h3>{business?.address && <p>{business.address}</p>}<div className="public-contact-actions"><a href={MI_BICLA_MAPS_URL} target="_blank" rel="noopener noreferrer" aria-label="Cómo llegar a la ubicación de Mi Bicla en Google Maps (abre en una pestaña nueva)"><LocationIcon /><span>Cómo llegar</span></a></div></Card>
+      <Card id="horarios"><h3>Horarios</h3>{openingHours.length ? <dl>{openingHours.map(([day, hours]) => <div key={day}><dt>{day}</dt><dd>{hours}</dd></div>)}</dl> : <p>Horario no disponible.</p>}</Card>
+      <Card id="redes" className="public-contact-card"><h3>Contacto</h3><div className="public-contact-actions">{whatsapp && <a href={whatsapp} target="_blank" rel="noopener noreferrer" aria-label="Contactar a Mi Bicla por WhatsApp (abre en una pestaña nueva)"><WhatsappIcon /><span>WhatsApp</span></a>}{instagram && <a href={instagram} target="_blank" rel="noopener noreferrer" aria-label="Visitar Instagram de Mi Bicla (abre en una pestaña nueva)"><InstagramIcon /><span>Instagram</span></a>}</div></Card>
+      {socials.length > 0 && <Card><h3>Más información</h3>{socials.map(([label, href]) => <a key={label} href={href} target="_blank" rel="noopener noreferrer">{label}</a>)}</Card>}
     </div>
   </section>;
 }
@@ -38,11 +63,14 @@ export function Landing() {
   return <PublicShell business={business}><Container>
     <section className="public-hero">
       <div className="public-hero-copy"><p className="page-eyebrow">QUERÉTARO · MTB · TALLER</p><h1>VIVE TU BICI</h1><p>Taller, comunidad y recompensas para seguir rodando.</p><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Agendar taller</a><a className="ui-button ui-button--outline" href="/registro">Activar mi cuenta</a></div></div>
-      <div className="hero-status-card"><span aria-hidden="true">⚒</span><div><small>EJEMPLO · TU BICI ESTÁ</small><strong>LISTA</strong><p>Así puede verse tu seguimiento</p></div><i aria-hidden="true">✓</i></div>
       <ChainDivider className="hero-chain" />
     </section>
     <section className="public-section brand-features">
       <BrandSectionHeading title="TODO PARA SEGUIR RODANDO" />
+      <div className="home-brands" id="marcas">
+        <p>Conoce algunas de las marcas que puedes encontrar o solicitar en Mi Bicla. La disponibilidad puede variar.</p>
+        <BrandCarousel brands={AUTHORIZED_BRANDS} />
+      </div>
       <div className="brand-feature-grid">
         <FeatureCard className="feature-workshop-photo" tone="photo" icon="⚒" title="TALLER MECÁNICO" description="Servicio preventivo, reparaciones y mantenimiento profesional." href="/taller" />
         <FeatureCard tone="pink" icon="☆" title="MI TARJETA" description="Acumula puntos, consigue beneficios y recompensas." href="/fidelidad" />
@@ -51,14 +79,13 @@ export function Landing() {
     </section>
     <section className="quick-actions" aria-label="Acciones rápidas"><a href="/taller/solicitud">Agendar taller <i>↗</i></a><DialogButton kind="workshop">Consultar mi orden</DialogButton><DialogButton kind="card">Mi tarjeta</DialogButton><a href="/depositos">Ver depósitos <i>↗</i></a></section>
     <section className="public-section editorial" id="conocenos"><ChainDivider /><p className="page-eyebrow">COMUNIDAD MI BICLA</p><h2>MÁS QUE UNA TIENDA, SOMOS UNA COMUNIDAD SOBRE RUEDAS.</h2><p>Rodadas, competencias, eventos y taller: un punto de encuentro para la comunidad MTB de Querétaro.</p></section>
-    {AUTHORIZED_BRANDS.length > 0 && <section className="public-section"><h2>Marcas</h2></section>}
     <BusinessInfo business={business} />
   </Container></PublicShell>;
 }
 
 export function WorkshopInfo() {
   const business = useBusiness();
-  return <PublicShell business={business}><Container><BrandPageHero className="workshop-photo-hero" eyebrow="TALLER MI BICLA" title="TU BICI MERECE LA MEJOR RUTA" description="Servicio profesional para mantenerla segura, precisa y lista para rodar."><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Solicitar servicio</a><DialogButton kind="workshop">Consultar mi orden</DialogButton></div></BrandPageHero><section className="public-section"><BrandSectionHeading eyebrow="SERVICIO PROFESIONAL" title="TODO LO QUE TU BICI NECESITA" /><div className="service-grid">{WORKSHOP_SERVICES.map((service, i) => <Card key={service}><span>0{i + 1}</span><h3>{service}</h3></Card>)}</div><small>Este contenido comercial podrá conectarse a un catálogo público en una fase posterior.</small></section></Container></PublicShell>;
+  return <PublicShell business={business}><Container><BrandPageHero className="workshop-photo-hero" eyebrow="TALLER MI BICLA" title="TU BICI MERECE LA MEJOR RUTA" description="Servicio profesional para mantenerla segura, precisa y lista para rodar."><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Solicitar servicio</a><DialogButton kind="workshop">Consultar mi orden</DialogButton></div></BrandPageHero><section className="public-section"><BrandSectionHeading eyebrow="SERVICIO PROFESIONAL" title="TODO LO QUE TU BICI NECESITA" /><div className="service-grid">{WORKSHOP_SERVICES.map((service, i) => <a className="service-card" key={service} href={workshopServiceHref(service)} aria-label={`Solicitar servicio: ${service}`}><span>{String(i + 1).padStart(2, "0")}</span><h3>{service}</h3><small>Solicitar este servicio <span aria-hidden="true">→</span></small></a>)}</div><small>Selecciona un servicio para preparar tu solicitud. Podrás revisarla antes de enviarla.</small></section></Container></PublicShell>;
 }
 
 export function LoyaltyInfo() {
@@ -68,10 +95,11 @@ export function LoyaltyInfo() {
 
 export function Brands() {
   const business = useBusiness();
-  const action = business?.primaryWhatsapp
-    ? <a className="ui-button" href={`https://wa.me/${business.primaryWhatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Consultar por WhatsApp</a>
+  const whatsapp = configuredWhatsappUrl(business?.primaryWhatsapp);
+  const action = whatsapp
+    ? <a className="ui-button" href={whatsapp} target="_blank" rel="noopener noreferrer">Consultar por WhatsApp</a>
     : business?.address
-      ? <a className="ui-button" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address)}`} target="_blank" rel="noreferrer">Visitar tienda</a>
+      ? <a className="ui-button" href={MI_BICLA_MAPS_URL} target="_blank" rel="noopener noreferrer">Visitar tienda</a>
       : null;
-  return <PublicShell business={business}><Container className="brands-page"><header className="public-page-hero"><p className="page-eyebrow">Selección Mi Bicla</p><h1>Marcas</h1></header><section className="public-section brands-empty">{AUTHORIZED_BRANDS.length === 0 ? <><EmptyState title="Consulta en tienda las marcas disponibles" description="Nuestro equipo puede ayudarte a encontrar equipo para tu próxima rodada." />{action}</> : null}</section></Container></PublicShell>;
+  return <PublicShell business={business}><Container className="brands-page"><header className="public-page-hero"><p className="page-eyebrow">Selección Mi Bicla</p><h1>Marcas</h1></header><section className="public-section brands-empty"><EmptyState title="Consulta en tienda las marcas disponibles" description="Nuestro equipo puede ayudarte a encontrar equipo para tu próxima rodada." />{action}</section></Container></PublicShell>;
 }

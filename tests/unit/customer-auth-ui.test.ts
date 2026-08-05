@@ -1,4 +1,10 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const customerAuthComponentSource = readFileSync(
+  "artifacts/web/pages/customer/CustomerAuth.tsx",
+  "utf8",
+);
 
 const storage = new Map<string, string>();
 Object.defineProperty(globalThis, "sessionStorage", {
@@ -169,5 +175,66 @@ describe("cliente HTTP de autenticación", () => {
     expect(safeInternalDestination("/mievil")).toBe("/mi");
     expect(safeInternalDestination("\\\\evil.example\\mi")).toBe("/mi");
     expect(safeInternalDestination("/%2f%2fevil.example")).toBe("/mi");
+  });
+
+  it("rechaza esquemas (javascript:, data:) y variantes codificadas o nulas", async () => {
+    const { safeInternalDestination } =
+      await import("../../artifacts/web/lib/customer-auth");
+    expect(safeInternalDestination(null)).toBe("/mi");
+    expect(safeInternalDestination("")).toBe("/mi");
+    expect(safeInternalDestination("javascript:alert(1)")).toBe("/mi");
+    expect(safeInternalDestination("data:text/html,<script>alert(1)</script>")).toBe("/mi");
+    expect(safeInternalDestination("http://evil.example/mi")).toBe("/mi");
+    expect(safeInternalDestination("ftp://evil.example/mi")).toBe("/mi");
+    // "/" + esquema no es un escape real: se resuelve como ruta bajo el
+    // origen interno, así que se acepta la forma /mi/... y se descarta el
+    // resto — no ejecuta nada como esquema.
+    expect(safeInternalDestination("/\tjavascript:alert(1)")).toBe("/mi");
+    expect(safeInternalDestination("/mi/../../../evil")).toBe("/mi");
+  });
+
+  it("restoreCustomerSession rechaza cuando el servidor ya no reconoce la sesión (401)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: "CUSTOMER_UNAUTHORIZED" },
+    }), { status: 401 })));
+    const { restoreCustomerSession, getCustomerCsrfForTest } =
+      await import("../../artifacts/web/lib/customer-auth");
+    await expect(restoreCustomerSession()).rejects.toMatchObject({ status: 401 });
+    expect(getCustomerCsrfForTest()).toBe("");
+  });
+});
+
+describe("restauración de sesión tras bfcache (navegación atrás/adelante)", () => {
+  it("CustomerAuthProvider vuelve a validar la sesión cuando pageshow llega con persisted, sin recargar la página", () => {
+    const providerBody = customerAuthComponentSource.slice(
+      customerAuthComponentSource.indexOf("export function CustomerAuthProvider"),
+      customerAuthComponentSource.indexOf("function useCustomerAuth"),
+    );
+    expect(providerBody).toContain('window.addEventListener("pageshow", onPageShow)');
+    expect(providerBody).toContain("if (event.persisted) void restore();");
+    expect(providerBody).toContain('window.removeEventListener("pageshow", onPageShow)');
+    // No debe existir una recarga forzada indiscriminada.
+    expect(providerBody).not.toContain("location.reload");
+  });
+
+  it("restore() pasa primero por 'loading' (invalida la vista privada) antes de resolver autenticado o anónimo", () => {
+    const restoreBody = customerAuthComponentSource.slice(
+      customerAuthComponentSource.indexOf("const restore = useCallback"),
+      customerAuthComponentSource.indexOf("useEffect(() => {\n    syncRef.current"),
+    );
+    expect(restoreBody).toContain('setState("loading");');
+    expect(restoreBody.indexOf('setState("loading");')).toBeLessThan(
+      restoreBody.indexOf("restoreCustomerSession()"),
+    );
+  });
+
+  it("CustomerPortal redirige con replace (no push) cuando la sesión resulta anónima tras revalidar", () => {
+    const portalBody = customerAuthComponentSource.slice(
+      customerAuthComponentSource.indexOf("export function CustomerPortal"),
+      customerAuthComponentSource.indexOf("export function CustomerRegistrationInfo"),
+    );
+    expect(portalBody).toContain('if (auth.state === "anonymous")');
+    expect(portalBody).toContain("location.replace(`/iniciar-sesion?next=");
+    expect(portalBody).not.toMatch(/if \(auth\.state === "anonymous"\)[\s\S]{0,120}location\.href/);
   });
 });

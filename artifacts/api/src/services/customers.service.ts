@@ -1,5 +1,7 @@
-import { and, asc, count, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, isNull, or } from "drizzle-orm";
 import {
+  customerAuthTokens,
+  customerCredentials,
   customerLoyaltyBalance,
   customerPublicTokens,
   customerRewards,
@@ -88,7 +90,30 @@ export class CustomersService {
         .select()
         .from(customerRewards)
         .where(eq(customerRewards.customerId, id))
-        .orderBy(asc(customerRewards.createdAt));
+        .orderBy(asc(customerRewards.createdAt)),
+      [credential] = await this.db
+        .select({ id: customerCredentials.id, status: customerCredentials.status })
+        .from(customerCredentials)
+        .where(eq(customerCredentials.customerId, id))
+        .limit(1);
+    // Únicamente lo necesario para que el panel decida qué botón mostrar —
+    // nunca passwordHash, tokenHash ni el token crudo.
+    let activationExpiresAt: Date | null = null;
+    if (credential) {
+      const [activeActivation] = await this.db
+        .select({ expiresAt: customerAuthTokens.expiresAt })
+        .from(customerAuthTokens)
+        .where(and(
+          eq(customerAuthTokens.credentialId, credential.id),
+          eq(customerAuthTokens.purpose, "activation"),
+          isNull(customerAuthTokens.consumedAt),
+          isNull(customerAuthTokens.revokedAt),
+          gt(customerAuthTokens.expiresAt, new Date()),
+        ))
+        .orderBy(desc(customerAuthTokens.expiresAt))
+        .limit(1);
+      activationExpiresAt = activeActivation?.expiresAt ?? null;
+    }
     return {
       customer,
       balance: balance ?? {
@@ -98,6 +123,9 @@ export class CustomersService {
         updatedAt: customer.updatedAt,
       },
       rewards,
+      credentialStatus: credential?.status ?? null,
+      activationExpiresAt,
+      hasActiveActivation: activationExpiresAt !== null,
     };
   }
   async update(

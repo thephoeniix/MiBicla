@@ -3,6 +3,12 @@ import { CustomerScanFlow } from "./scanner/CustomerScanFlow";
 import { canShowCustomerScanner } from "./scanner/scanner-utils";
 import { ThemeSelector } from "./ThemeSelector";
 import { BrandLogo } from "./brand";
+import {
+  ClientsIcon,
+  DepositsIcon,
+  FidelityIcon,
+  TallerIcon,
+} from "./nav-icons";
 
 interface User {
   name: string;
@@ -22,28 +28,28 @@ const NAV_ITEMS = [
     href: "/admin/customers",
     label: "Clientes",
     short: "Clientes",
-    icon: "♙",
+    icon: <ClientsIcon />,
     permissions: ["view_customers"],
   },
   {
     href: "/admin/workshop",
     label: "Taller",
     short: "Taller",
-    icon: "◇",
+    icon: <TallerIcon />,
     permissions: ["view_workshop_orders", "view_workshop_requests"],
   },
   {
     href: "/admin/settings/loyalty",
     label: "Fidelidad",
     short: "Fidelidad",
-    icon: "♡",
+    icon: <FidelityIcon />,
     permissions: ["view_loyalty"],
   },
   {
     href: "/admin/settings/deposits",
-    label: "Más",
-    short: "Más",
-    icon: "•••",
+    label: "Depósitos",
+    short: "Depósitos",
+    icon: <DepositsIcon />,
     permissions: ["view_deposit_settings", "view_business_settings"],
   },
 ] as const;
@@ -57,10 +63,7 @@ export const MOBILE_NAV = [
 
 export function isMobileNavigationActive(pathname: string, href: string) {
   if (href === "/admin/settings/deposits")
-    return (
-      pathname.startsWith("/admin/settings/") &&
-      pathname !== "/admin/settings/general"
-    );
+    return pathname === href || pathname.startsWith(`${href}/`);
   return (
     pathname === href ||
     (href === "/admin/settings/general" && pathname === "/admin")
@@ -94,6 +97,7 @@ function BottomNavigation({
         <a
           href={item.href}
           key={item.href}
+          title={item.label}
           aria-current={active ? "page" : undefined}
         >
           <i aria-hidden="true">{item.icon}</i>
@@ -138,7 +142,8 @@ export function AppShell({
             <a
               href={item.href}
               key={item.href}
-              aria-current={pathname === item.href ? "page" : undefined}
+              title={item.label}
+              aria-current={isMobileNavigationActive(pathname, item.href) ? "page" : undefined}
             >
               <i aria-hidden="true">{item.icon}</i>
               {item.label}

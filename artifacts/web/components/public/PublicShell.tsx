@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ThemeSelector } from "../ThemeSelector";
 import { TokenAccessDialog } from "./TokenAccessDialog";
 import { BrandLogo } from "../brand";
+import { FidelityIcon, MoreIcon, TallerIcon } from "../nav-icons";
 import footerChain from "../../../../logo/footer.svg";
 
 export interface PublicBusiness {
@@ -11,19 +12,24 @@ export interface PublicBusiness {
   email?: string;
   primaryWhatsapp?: string;
   secondaryWhatsapp?: string;
-  facebook?: string;
-  instagram?: string;
-  tiktok?: string;
-  website?: string;
+  // El endpoint público (BusinessSettingsService.getPublicBusiness) anida los
+  // enlaces sociales bajo "social", a diferencia del esquema plano usado en
+  // administración. No aplanar aquí: hacerlo desincroniza este tipo de la
+  // forma real de la respuesta.
+  social?: {
+    facebook?: string;
+    instagram?: string;
+    tiktok?: string;
+    website?: string;
+  };
   openingHours?: Record<string, string>;
   logoUrl?: string;
 }
 
 const NAV = [
   ["/", "Inicio", "⌂"],
-  ["/taller", "Taller", "◇"],
-  ["/fidelidad", "Fidelidad", "♡"],
-  ["/marcas", "Marcas", "✦"],
+  ["/taller", "Taller", <TallerIcon key="taller" />],
+  ["/fidelidad", "Fidelidad", <FidelityIcon key="fidelidad" />],
 ] as const;
 
 function FooterChainDivider() {
@@ -168,7 +174,7 @@ export function PublicShell({
       <PublicFooter />
       <nav className="public-bottom-nav" aria-label="Navegación pública móvil">
         {NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}
-        <button type="button" aria-expanded={more} onClick={() => setMore(!more)}><i aria-hidden="true">•••</i>Más</button>
+        <button type="button" aria-expanded={more} onClick={() => setMore(!more)}><i aria-hidden="true"><MoreIcon /></i>Más</button>
       </nav>
       {more && <div className="public-more-menu">
         <a href="/depositos">Depósitos</a><a href="/#horarios">Horarios</a><a href="/#ubicacion">Ubicación</a><a href="/#redes">Redes sociales</a>

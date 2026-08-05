@@ -11,6 +11,7 @@ import {
   isMobileNavigationActive,
   MOBILE_NAV,
 } from "../../artifacts/web/components/AppShell";
+import { DepositsIcon } from "../../artifacts/web/components/nav-icons";
 
 describe("tema global", () => {
   it("usa Sistema cuando no existe una preferencia persistida", () => {
@@ -56,23 +57,45 @@ describe("navegación móvil autenticada", () => {
       "Inicio",
       "Clientes",
       "Taller",
-      "Más",
+      "Depósitos",
     ]);
   });
 
-  it("agrupa Fidelidad y Configuración dentro de Más", () => {
+  it("muestra Depósitos para su ruta y activa también vistas hijas", () => {
+    expect(MOBILE_NAV.at(-1)).toMatchObject({
+      href: "/admin/settings/deposits",
+      short: "Depósitos",
+      label: "Depósitos",
+    });
+    expect(MOBILE_NAV.at(-1)?.icon.type).toBe(DepositsIcon);
     expect(
       isMobileNavigationActive(
-        "/admin/settings/loyalty",
+        "/admin/settings/deposits/detail",
         "/admin/settings/deposits",
       ),
     ).toBe(true);
     expect(
       isMobileNavigationActive(
+        "/admin/settings/loyalty",
+        "/admin/settings/deposits",
+      ),
+    ).toBe(false);
+    expect(
+      isMobileNavigationActive(
         "/admin/settings/general",
         "/admin/settings/general",
       ),
     ).toBe(true);
+  });
+
+  it("no presenta la ruta de depósitos como un menú Más", () => {
+    const source = readFileSync(
+      new URL("../../artifacts/web/components/AppShell.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain('label: "Depósitos"');
+    expect(source).not.toContain('label: "Más"');
+    expect(source).not.toContain('icon: "•••"');
   });
 });
 

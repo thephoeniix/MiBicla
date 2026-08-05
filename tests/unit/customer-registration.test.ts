@@ -1,27 +1,71 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   customerRegistrationSchema,
   registrationReviewIdSchema,
 } from "../../packages/api-contract/src/customer-registration.schema";
 import { sanitizeAuditMetadata, sha256 } from "@mi-bicla/shared";
 import { buildRegistrationWhatsappUrl } from "../../artifacts/web/lib/customer-registration";
+import {
+  isRegistrationPasswordValid,
+  registrationPasswordStatus,
+} from "../../artifacts/web/lib/registration-password";
 
 describe("solicitudes públicas de acceso", () => {
   const valid = {
     firstName: "Ana",
     lastName: "Prueba",
     phone: "442 123 4567",
-    email: "ana@example.test",
-    password: "Fictional-Password1!",
   };
 
-  it("normaliza datos y aplica las reglas existentes de contraseña", () => {
-    expect(customerRegistrationSchema.parse(valid)).toMatchObject({
+  it("acepta exclusivamente nombre, apellidos y teléfono, y normaliza el teléfono", () => {
+    expect(customerRegistrationSchema.parse(valid)).toEqual({
+      firstName: "Ana",
+      lastName: "Prueba",
       phone: "+524421234567",
-      email: "ana@example.test",
     });
-    expect(() => customerRegistrationSchema.parse({ ...valid, password: "weak" })).toThrow();
-    expect(() => customerRegistrationSchema.parse({ ...valid, unexpected: true })).toThrow();
+  });
+
+  it("rechaza password, email y cualquier campo adicional (.strict())", () => {
+    expect(() =>
+      customerRegistrationSchema.parse({ ...valid, password: "Fictional-Password1!" }),
+    ).toThrow();
+    expect(() =>
+      customerRegistrationSchema.parse({ ...valid, email: "ana@example.test" }),
+    ).toThrow();
+    expect(() =>
+      customerRegistrationSchema.parse({ ...valid, unexpected: true }),
+    ).toThrow();
+  });
+
+  it("no ofrece campos de contraseña en la vista de registro — la contraseña se crea al activar", () => {
+    const component = readFileSync(
+      new URL("../../artifacts/web/pages/customer/CustomerAuth.tsx", import.meta.url),
+      "utf8",
+    );
+    const registrationInfoBody = component.slice(
+      component.indexOf("export function CustomerRegistrationInfo"),
+      component.length,
+    );
+    expect(registrationInfoBody).not.toContain('type="password"');
+    expect(registrationInfoBody).not.toContain('type="email"');
+    expect(registrationInfoBody).not.toContain("Paso");
+    expect(registrationInfoBody).toContain("Solicitar cuenta");
+  });
+
+  it("las reglas de contraseña (usadas ahora en la activación) siguen expresadas en español, sin jerga interna", () => {
+    expect(isRegistrationPasswordValid("Fictional-Password1!")).toBe(true);
+    expect(registrationPasswordStatus("débil")).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "length", met: false }),
+        expect.objectContaining({ id: "uppercase", met: false }),
+        expect.objectContaining({ id: "number", met: false }),
+      ]),
+    );
+    const visibleRequirementText = registrationPasswordStatus("")
+      .map(({ label }) => label)
+      .join(" ");
+    expect(visibleRequirementText).not.toMatch(/password|invalid/i);
   });
 
   it("exige reviewId opaco y no secuencial", () => {
@@ -37,12 +81,12 @@ describe("solicitudes públicas de acceso", () => {
     expect(key).toMatch(/[a-f0-9]{64}$/);
   });
 
-  it("elimina contraseña, hash, teléfono y correo de auditoría", () => {
+  it("elimina contraseña, hash, teléfono y correo de auditoría (sigue vigente aunque el registro ya no los pida)", () => {
     expect(sanitizeAuditMetadata({
-      password: valid.password,
+      password: "Fictional-Password1!",
       passwordHash: "argon",
       phone: valid.phone,
-      email: valid.email,
+      email: "ana@example.test",
       reference: "MB-TEST",
     })).toEqual({ reference: "MB-TEST" });
   });

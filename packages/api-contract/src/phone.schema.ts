@@ -18,5 +18,5 @@ export const mexicanPhoneSchema = z
   .transform(normalizeMexicanPhone)
   .refine(
     (value) => /^\+52\d{10}$/.test(value),
-    "Ingresa un teléfono mexicano de 10 dígitos, por ejemplo 446 258 0377",
+    "Ingresa un teléfono mexicano de 10 dígitos, por ejemplo 442 000 0000",
   );

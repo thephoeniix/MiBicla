@@ -3,6 +3,7 @@ import { Button, Card, Input } from "../../components/ui";
 import { Container } from "../../components/primitives";
 import { ThemeSelector } from "../../components/ThemeSelector";
 import { BrandLogo } from "../../components/brand";
+import { FidelityIcon, MoreIcon, TallerIcon } from "../../components/nav-icons";
 
 function DemoNotice({ compact = false }: { compact?: boolean }) {
   return <div className={`customer-demo-notice${compact ? " is-compact" : ""}`} role="note"><strong>DEMO</strong>{!compact && <span>La cuenta y autenticación de clientes todavía no está habilitada.</span>}</div>;
@@ -39,9 +40,9 @@ export function CustomerVerifyPreview() {
 
 const CLIENT_NAV = [
   ["/mi", "Inicio", "⌂"],
-  ["/mi/tarjeta", "Tarjeta", "♡"],
-  ["/mi/taller", "Taller", "◇"],
-  ["/mi/perfil", "Más", "•••"],
+  ["/mi/tarjeta", "Tarjeta", <FidelityIcon key="tarjeta" />],
+  ["/mi/taller", "Taller", <TallerIcon key="taller" />],
+  ["/mi/perfil", "Más", <MoreIcon key="mas" />],
 ] as const;
 
 function CustomerShell({ title, children }: { title: string; children: ReactNode }) {
