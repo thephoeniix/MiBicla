@@ -7,10 +7,15 @@ import {
   LoadingState,
   Modal,
   PageHeader,
-  StatusBadge,
   Toast,
 } from "../../../components/ui";
-import { maskedFinancialSummary } from "../../../lib/deposits";
+import {
+  canonicalFinancialValue,
+  formatFinancialInput,
+  maskedFinancialSummary,
+  validateFinancialFields,
+  type FinancialFieldErrors,
+} from "../../../lib/deposits";
 
 export interface DepositAdminOption {
   id: string;
@@ -63,16 +68,25 @@ const EMPTY = {
 type DepositForm = typeof EMPTY;
 
 export function buildDepositPayload(form: DepositForm) {
-  return { ...form };
+  return {
+    ...form,
+    accountNumber: canonicalFinancialValue(form.accountNumber),
+    clabe: canonicalFinancialValue(form.clabe),
+    cardNumber: canonicalFinancialValue(form.cardNumber),
+  };
 }
 
-function protectedSummary(item: DepositAdminOption) {
-  return (
-    item.maskedCardNumber ||
-    item.maskedClabe ||
-    item.maskedAccountNumber ||
-    "Sin datos protegidos"
-  );
+export function depositConfigurationLabel(item: DepositAdminOption) {
+  return item.hasAccountNumber || item.hasClabe || item.hasCardNumber
+    ? "Listo para publicar"
+    : "Faltan datos";
+}
+
+export function depositPaymentSummary(item: DepositAdminOption) {
+  return item.maskedCardNumber || item.maskedClabe || item.maskedAccountNumber ||
+    (depositConfigurationLabel(item) === "Listo para publicar"
+      ? "Datos de pago configurados"
+      : "Faltan datos de pago");
 }
 
 function DepositMethodPreview({
@@ -149,6 +163,7 @@ function ProtectedDepositField({
   clear,
   onValue,
   onClear,
+  error,
 }: {
   label: string;
   name: string;
@@ -158,7 +173,9 @@ function ProtectedDepositField({
   clear: boolean;
   onValue: (value: string) => void;
   onClear: (value: boolean) => void;
+  error?: string;
 }) {
+  const errorId = `${name}-error`;
   return (
     <fieldset className="protected-field">
       <legend>{label}</legend>
@@ -177,11 +194,14 @@ function ProtectedDepositField({
           autoComplete="off"
           value={value}
           disabled={clear}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           onChange={(event) => onValue(event.target.value)}
         />
         {hasValue && (
           <small>Déjalo vacío para conservar el valor actual.</small>
         )}
+        {error && <small className="field-error" id={errorId}>{error}</small>}
       </label>
       {hasValue && (
         <Button
@@ -216,8 +236,17 @@ export function Deposits({
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [requestId, setRequestId] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FinancialFieldErrors>({});
   const canManage = permissions.includes("manage_deposit_settings");
   const current = items.find((item) => item.id === editing) ?? null;
+
+  function clearFinancialError(field: keyof FinancialFieldErrors) {
+    setFieldErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  }
 
   function showError(error: unknown) {
     const apiError = error instanceof ApiError ? error : null;
@@ -244,6 +273,7 @@ export function Deposits({
     setStatus("");
     setRequestId("");
     setEditing(null);
+    setFieldErrors({});
     setForm({ ...EMPTY, sortOrder: items.length });
     setShowForm(true);
   }
@@ -252,6 +282,7 @@ export function Deposits({
     setStatus("");
     setRequestId("");
     setEditing(item.id);
+    setFieldErrors({});
     setForm({
       ...EMPTY,
       displayName: item.displayName,
@@ -274,6 +305,12 @@ export function Deposits({
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    const financialErrors = validateFinancialFields(form);
+    if (Object.keys(financialErrors).length) {
+      setFieldErrors(financialErrors);
+      setStatus("");
+      return;
+    }
     setSaving(true);
     setRequestId("");
     try {
@@ -290,10 +327,23 @@ export function Deposits({
       setStatus("Método guardado");
       setShowForm(false);
       setEditing(null);
+      setFieldErrors({});
       setForm(EMPTY);
       await load();
     } catch (error) {
-      showError(error);
+      const apiError = error instanceof ApiError ? error : null;
+      const nextErrors: FinancialFieldErrors = {};
+      if (apiError?.fieldErrors.accountNumber)
+        nextErrors.accountNumber = "Ingresa únicamente dígitos, hasta 30.";
+      if (apiError?.fieldErrors.clabe)
+        nextErrors.clabe = "Ingresa una CLABE válida de 18 dígitos.";
+      if (apiError?.fieldErrors.cardNumber)
+        nextErrors.cardNumber = "Ingresa entre 13 y 19 dígitos.";
+      if (Object.keys(nextErrors).length) {
+        setFieldErrors(nextErrors);
+        setStatus("");
+        setRequestId(apiError?.requestId ?? "");
+      } else showError(error);
     } finally {
       setSaving(false);
     }
@@ -374,39 +424,44 @@ export function Deposits({
           {items.map((item, index) => (
             <article className="deposit-admin-card" key={item.id}>
               <header>
-                <span aria-hidden="true">▤</span>
-                <div>
+                <div className="deposit-card-heading">
                   <small>Orden {index + 1}</small>
                   <h2>{item.displayName}</h2>
-                  <p>{item.bankName || "Sin institución"} · {protectedSummary(item)}</p>
+                  <p>{item.bankName || "Sin institución"}</p>
                 </div>
-                <StatusBadge status={item.isActive ? "active" : "inactive"} />
+                <span className={`deposit-publication-status ${item.isActive ? "is-published" : "is-hidden"}`}>
+                  {item.isActive ? "Publicado" : "No publicado"}
+                </span>
               </header>
+              <div className="deposit-card-meta">
+                <span>
+                  <small>Configuración</small>
+                  <strong>{depositConfigurationLabel(item)}</strong>
+                </span>
+                <span>
+                  <small>Datos de pago</small>
+                  <strong>{depositPaymentSummary(item)}</strong>
+                </span>
+              </div>
               {canManage && (
-                <>
-                  <label className="deposit-status-toggle">
-                    <input
-                      type="checkbox"
-                      checked={item.isActive}
-                      onChange={() => void toggle(item)}
-                    />
-                    <span aria-hidden="true" />
-                    Publicar este método
-                  </label>
-                  <footer>
-                    <Button type="button" variant="secondary" onClick={() => edit(item)}>
-                      Editar
-                    </Button>
-                    <details className="deposit-actions-menu">
-                      <summary>Acciones</summary>
-                      <div>
-                        <button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>↑ Subir método</button>
-                        <button type="button" onClick={() => void move(index, 1)} disabled={index === items.length - 1}>↓ Bajar método</button>
-                        <button type="button" onClick={() => void remove(item)}>Eliminar método</button>
-                      </div>
-                    </details>
-                  </footer>
-                </>
+                <footer>
+                  <Button type="button" onClick={() => edit(item)}>
+                    Editar
+                  </Button>
+                  <details className="deposit-actions-menu">
+                    <summary aria-label={`Más acciones para ${item.displayName}`}>
+                      <span aria-hidden="true">•••</span>
+                    </summary>
+                    <div>
+                      <button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>Mover arriba</button>
+                      <button type="button" onClick={() => void move(index, 1)} disabled={index === items.length - 1}>Mover abajo</button>
+                      <button type="button" onClick={() => void toggle(item)}>
+                        {item.isActive ? "Ocultar método" : "Publicar método"}
+                      </button>
+                      <button type="button" onClick={() => void remove(item)}>Eliminar método</button>
+                    </div>
+                  </details>
+                </footer>
               )}
             </article>
           ))}
@@ -452,8 +507,17 @@ export function Deposits({
                     masked={current?.maskedAccountNumber}
                     hasValue={Boolean(current?.hasAccountNumber)}
                     clear={form.clearAccountNumber}
-                    onValue={(value) => setForm({ ...form, accountNumber: value, clearAccountNumber: false })}
-                    onClear={(value) => setForm({ ...form, accountNumber: "", clearAccountNumber: value })}
+                    error={fieldErrors.accountNumber}
+                    onValue={(value) => {
+                      const accountNumber = formatFinancialInput(value);
+                      setForm({ ...form, accountNumber, clearAccountNumber: false });
+                      if (!validateFinancialFields({ ...form, accountNumber }).accountNumber)
+                        clearFinancialError("accountNumber");
+                    }}
+                    onClear={(value) => {
+                      setForm({ ...form, accountNumber: "", clearAccountNumber: value });
+                      clearFinancialError("accountNumber");
+                    }}
                   />
                   <ProtectedDepositField
                     label="Número de tarjeta"
@@ -462,8 +526,17 @@ export function Deposits({
                     masked={current?.maskedCardNumber}
                     hasValue={Boolean(current?.hasCardNumber)}
                     clear={form.clearCardNumber}
-                    onValue={(value) => setForm({ ...form, cardNumber: value, clearCardNumber: false })}
-                    onClear={(value) => setForm({ ...form, cardNumber: "", clearCardNumber: value })}
+                    error={fieldErrors.cardNumber}
+                    onValue={(value) => {
+                      const cardNumber = formatFinancialInput(value);
+                      setForm({ ...form, cardNumber, clearCardNumber: false });
+                      if (!validateFinancialFields({ ...form, cardNumber }).cardNumber)
+                        clearFinancialError("cardNumber");
+                    }}
+                    onClear={(value) => {
+                      setForm({ ...form, cardNumber: "", clearCardNumber: value });
+                      clearFinancialError("cardNumber");
+                    }}
                   />
                   <ProtectedDepositField
                     label="CLABE"
@@ -472,8 +545,17 @@ export function Deposits({
                     masked={current?.maskedClabe}
                     hasValue={Boolean(current?.hasClabe)}
                     clear={form.clearClabe}
-                    onValue={(value) => setForm({ ...form, clabe: value, clearClabe: false })}
-                    onClear={(value) => setForm({ ...form, clabe: "", clearClabe: value })}
+                    error={fieldErrors.clabe}
+                    onValue={(value) => {
+                      const clabe = formatFinancialInput(value);
+                      setForm({ ...form, clabe, clearClabe: false });
+                      if (!validateFinancialFields({ ...form, clabe }).clabe)
+                        clearFinancialError("clabe");
+                    }}
+                    onClear={(value) => {
+                      setForm({ ...form, clabe: "", clearClabe: value });
+                      clearFinancialError("clabe");
+                    }}
                   />
                 </section>
                 <section className="deposit-form-section">
@@ -505,9 +587,9 @@ export function Deposits({
             {status && (
               <div className="form-error" role="alert">
                 {status}
-                {requestId && <small>Solicitud: {requestId}</small>}
               </div>
             )}
+            {requestId && <small className="support-reference">Referencia para soporte: {requestId}</small>}
             <footer className="modal-actions">
               <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
               <Button disabled={saving}>{saving ? "Guardando…" : "Guardar método"}</Button>

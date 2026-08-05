@@ -42,6 +42,19 @@ const whatsapp = z.union([
   z.literal(""),
   z.string().regex(/^\+[1-9]\d{7,14}$/),
 ]);
+export function isValidClabe(value: string) {
+  if (!/^\d{18}$/.test(value)) return false;
+  const weights = [3, 7, 1] as const;
+  const sum = value
+    .slice(0, 17)
+    .split("")
+    .reduce(
+      (total, digit, index) =>
+        total + ((digit.charCodeAt(0) - 48) * weights[index % weights.length]!) % 10,
+      0,
+    );
+  return (10 - (sum % 10)) % 10 === value.charCodeAt(17) - 48;
+}
 const editableBusinessFields = {
   businessName: plain(150),
   address: plain(500),
@@ -83,7 +96,10 @@ export const depositSettingsSchema = z
     bankName: plain(100),
     accountHolder: plain(150),
     accountNumber: z.union([z.literal(""), z.string().regex(/^\d+$/).max(30)]),
-    clabe: z.union([z.literal(""), z.string().regex(/^\d{18}$/)]),
+    clabe: z.union([
+      z.literal(""),
+      z.string().regex(/^\d{18}$/).refine(isValidClabe),
+    ]),
     cardNumber: z.union([z.literal(""), z.string().regex(/^\d{13,19}$/)]),
     referenceText: plain(200),
     instructions: plain(2000),

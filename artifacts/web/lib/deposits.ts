@@ -1,8 +1,75 @@
 export const digitsOnly = (value: string) => value.replace(/\D/g, "");
 
+export function canonicalFinancialValue(value: string) {
+  if (!/^[\d\s]*$/.test(value))
+    throw new Error("FINANCIAL_VALUE_NON_NUMERIC");
+  return value.replace(/\s/g, "");
+}
+
 export function formatFinancialNumber(value: string, groupSize = 4) {
   const digits = digitsOnly(value);
   return digits.match(new RegExp(`.{1,${groupSize}}`, "g"))?.join(" ") ?? "";
+}
+
+export function formatFinancialInput(value: string, groupSize = 4) {
+  return /^[\d\s]*$/.test(value)
+    ? formatFinancialNumber(value, groupSize)
+    : value;
+}
+
+export function isValidClabe(value: string) {
+  if (!/^\d{18}$/.test(value)) return false;
+  const weights = [3, 7, 1] as const;
+  const sum = value
+    .slice(0, 17)
+    .split("")
+    .reduce(
+      (total, digit, index) =>
+        total + ((digit.charCodeAt(0) - 48) * weights[index % weights.length]!) % 10,
+      0,
+    );
+  return (10 - (sum % 10)) % 10 === value.charCodeAt(17) - 48;
+}
+
+export type FinancialFieldErrors = Partial<
+  Record<"accountNumber" | "clabe" | "cardNumber", string>
+>;
+
+export function validateFinancialFields(input: {
+  accountNumber: string;
+  clabe: string;
+  cardNumber: string;
+}): FinancialFieldErrors {
+  const errors: FinancialFieldErrors = {};
+  let accountNumber = "";
+  let clabe = "";
+  let cardNumber = "";
+  try {
+    accountNumber = canonicalFinancialValue(input.accountNumber);
+  } catch {
+    errors.accountNumber = "Ingresa únicamente dígitos.";
+  }
+  try {
+    clabe = canonicalFinancialValue(input.clabe);
+  } catch {
+    errors.clabe = "Ingresa una CLABE válida de 18 dígitos.";
+  }
+  try {
+    cardNumber = canonicalFinancialValue(input.cardNumber);
+  } catch {
+    errors.cardNumber = "Ingresa únicamente dígitos.";
+  }
+  if (!errors.accountNumber && accountNumber && accountNumber.length > 30)
+    errors.accountNumber = "Ingresa hasta 30 dígitos.";
+  if (!errors.clabe && clabe && !isValidClabe(clabe))
+    errors.clabe = "Ingresa una CLABE válida de 18 dígitos.";
+  if (
+    !errors.cardNumber &&
+    cardNumber &&
+    (cardNumber.length < 13 || cardNumber.length > 19)
+  )
+    errors.cardNumber = "Ingresa entre 13 y 19 dígitos.";
+  return errors;
 }
 
 export function maskedFinancialSummary(value?: string) {
