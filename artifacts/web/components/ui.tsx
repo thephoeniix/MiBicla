@@ -189,6 +189,8 @@ const STATUS_LABELS: Record<string, string> = {
   planned: "Planeada",
   available: "Disponible",
   redeemed: "Canjeada",
+  rejected: "Rechazada",
+  expired: "Expirada",
 };
 
 export function statusLabel(status: string) {

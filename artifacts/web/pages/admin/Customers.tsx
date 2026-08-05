@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import QRCode from "qrcode";
 import { apiFetch, ApiError } from "../../lib/api-client";
 import type { CustomerAuthLink } from "../../lib/customer-auth";
+import { BicycleForm, type Bicycle } from "../../components/BicycleForm";
 import {
   Button,
   Card,
@@ -43,16 +44,13 @@ interface CustomerDetail {
     status: string;
     createdAt: string;
   }>;
+  credentialStatus: string | null;
+  activationExpiresAt: string | null;
+  hasActiveActivation: boolean;
 }
 
-interface BicycleSummary {
-  id: string;
-  nickname: string | null;
-  brand: string | null;
-  model: string | null;
-  status: string;
-}
-interface RegistrationRequest {
+type BicycleSummary = Bicycle;
+export interface RegistrationRequest {
   reviewId: string;
   reference: string;
   firstName: string;
@@ -62,6 +60,24 @@ interface RegistrationRequest {
   status: string;
   createdAt: string;
   expiresAt: string;
+}
+
+export const REGISTRATION_STATUS_TABS: Array<{ id: string; label: string }> = [
+  { id: "pending", label: "Pendientes" },
+  { id: "approved", label: "Aprobadas" },
+  { id: "rejected", label: "Rechazadas" },
+  { id: "expired", label: "Expiradas" },
+];
+
+export function countPendingRegistrations(requests: RegistrationRequest[]) {
+  return requests.filter((request) => request.status === "pending").length;
+}
+
+export function filterRegistrationsByStatus(
+  requests: RegistrationRequest[],
+  status: string,
+) {
+  return requests.filter((request) => request.status === status);
 }
 
 const EMPTY = {
@@ -85,12 +101,24 @@ export function toIsoDateInput(value: unknown): string {
 
 export function buildCustomerPayload(form: typeof EMPTY) {
   return {
-    ...form,
+    firstName: form.firstName.trim(),
+    lastName: form.lastName.trim(),
+    phone: form.phone.trim(),
     email: form.email.trim() || null,
     birthDate: form.birthDate || null,
     notes: form.notes.trim() || null,
+    status: form.status,
   };
 }
+
+type CustomerField = keyof typeof EMPTY;
+const CUSTOMER_FIELD_MESSAGES: Partial<Record<CustomerField, string>> = {
+  firstName: "Escribe un nombre válido.",
+  lastName: "Escribe los apellidos.",
+  phone: "Ingresa un teléfono mexicano válido de 10 dígitos.",
+  email: "Ingresa un correo válido.",
+  birthDate: "Ingresa una fecha de nacimiento válida.",
+};
 
 export function Customers({ permissions = [] }: { permissions?: string[] }) {
   const [items, setItems] = useState<Customer[]>([]);
@@ -106,8 +134,12 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<CustomerField, string>>>({});
+  const fieldRefs = useRef<Partial<Record<CustomerField, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>>({});
+  const [editingBicycle, setEditingBicycle] = useState<Bicycle | null>(null);
   const [authLink, setAuthLink] = useState<{
     purpose: "activation" | "recovery";
+    customerId: string;
     value: CustomerAuthLink;
   } | null>(null);
   const [authLinkLoading, setAuthLinkLoading] = useState<
@@ -116,8 +148,12 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
   const [authLinkNotice, setAuthLinkNotice] = useState("");
   const [registrationRequests, setRegistrationRequests] = useState<RegistrationRequest[]>([]);
   const [registrationDetail, setRegistrationDetail] = useState<RegistrationRequest | null>(null);
+  const [registrationTab, setRegistrationTab] = useState("pending");
+  const [deciding, setDeciding] = useState(false);
+  const registrationSectionRef = useRef<HTMLElement | null>(null);
 
   const canManage = permissions.includes("manage_customers");
+  const canManageBicycles = permissions.includes("manage_bicycles");
   const canCreate =
     canManage || permissions.includes("create_customers");
   const canAdjust = permissions.includes("adjust_loyalty");
@@ -153,29 +189,50 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
   }
 
   async function decideRegistration(action: "approve" | "reject") {
-    if (!registrationDetail) return;
+    if (!registrationDetail || deciding) return;
     if (!confirm(action === "approve"
-      ? "¿Confirmas que verificaste el número y deseas aprobar esta cuenta?"
+      ? "Confirmo que verifiqué manualmente este número y deseo preparar el enlace de activación."
       : "¿Confirmas que deseas rechazar esta solicitud?")) return;
-    await apiFetch(
-      `/api/admin/customer-registration-requests/${registrationDetail.reviewId}/${action}`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: action === "reject" ? JSON.stringify({}) : undefined,
-      },
-    );
-    setRegistrationDetail(null);
-    const requests = await apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests");
-    setRegistrationRequests(requests);
-    setStatus(action === "approve" ? "Cuenta aprobada" : "Solicitud rechazada");
+    setDeciding(true);
+    try {
+      const result = await apiFetch<
+        { customerId: string; expiresAt: string; link: string; whatsappUrl: string } | undefined
+      >(
+        `/api/admin/customer-registration-requests/${registrationDetail.reviewId}/${action}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: action === "reject" ? JSON.stringify({}) : undefined,
+        },
+      );
+      setRegistrationDetail(null);
+      const requests = await apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests");
+      setRegistrationRequests(requests);
+      if (action === "approve") {
+        await load();
+        if (result) {
+          setAuthLinkNotice("");
+          setAuthLink({ purpose: "activation", customerId: result.customerId, value: result });
+        }
+      }
+      setStatus(action === "approve" ? "Cuenta aprobada" : "Solicitud rechazada");
+    } catch (error) {
+      setStatus(
+        error instanceof ApiError
+          ? error.message
+          : "No fue posible completar la acción. Inténtalo nuevamente.",
+      );
+    } finally {
+      setDeciding(false);
+    }
   }
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    setFieldErrors({});
     setSaving(true);
     try {
-      const result = await apiFetch<{ publicToken?: string }>(
+      const result = await apiFetch<Customer & { publicToken?: string }>(
         editing ? `/api/admin/customers/${editing}` : "/api/admin/customers",
         {
           method: editing ? "PUT" : "POST",
@@ -184,13 +241,27 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
         },
       );
       if (result.publicToken) await showQr(result.publicToken);
+      const editedId = editing;
       setForm(EMPTY);
       setEditing(null);
       setShowForm(false);
-      setStatus("Cliente guardado");
+      setStatus(editing ? "Cambios del cliente guardados." : "Cliente guardado.");
       await load();
+      if (editedId && detail?.customer.id === editedId) await view(editedId);
     } catch (error) {
-      setStatus(error instanceof ApiError ? error.message : "Error");
+      if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
+        const next = Object.fromEntries(
+          Object.keys(error.fieldErrors)
+            .filter((field): field is CustomerField => field in EMPTY)
+            .map((field) => [field, CUSTOMER_FIELD_MESSAGES[field] ?? "Revisa este campo."]),
+        );
+        setFieldErrors(next);
+        const first = Object.keys(next)[0] as CustomerField | undefined;
+        if (first) requestAnimationFrame(() => fieldRefs.current[first]?.focus());
+        setStatus("Revisa los campos indicados.");
+      } else {
+        setStatus(error instanceof ApiError ? "No fue posible guardar el cliente. Inténtalo nuevamente." : "No fue posible guardar el cliente.");
+      }
     } finally {
       setSaving(false);
     }
@@ -263,18 +334,24 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
       birthDate: toIsoDateInput(customer.birthDate),
     });
     setShowForm(true);
+    setFieldErrors({});
   }
 
-  async function prepareAuthLink(purpose: "activation" | "recovery") {
-    if (!detail) return;
+  function clearFieldError(field: CustomerField) {
+    if (!fieldErrors[field]) return;
+    setFieldErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  async function prepareAuthLink(customerId: string, purpose: "activation" | "recovery") {
     setAuthLinkLoading(purpose);
     try {
       const value = await apiFetch<CustomerAuthLink>(
-        `/api/admin/customers/${detail.customer.id}/auth/${purpose}`,
+        `/api/admin/customers/${customerId}/auth/${purpose}`,
         { method: "POST" },
       );
       setAuthLinkNotice("");
-      setAuthLink({ purpose, value });
+      setAuthLink({ purpose, customerId, value });
+      if (detail?.customer.id === customerId) await view(customerId);
     } catch (error) {
       setStatus(
         error instanceof ApiError && error.status === 409
@@ -295,33 +372,89 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
         title="Clientes"
         description="Consulta perfiles, bicicletas y recompensas desde un solo lugar."
         action={
-          canCreate ? (
-            <Button
-              type="button"
-              onClick={() => {
-                setEditing(null);
-                setForm(EMPTY);
-                setShowForm(true);
-              }}
-            >
-              + Nuevo cliente
-            </Button>
+          canManage || canCreate ? (
+            <div className="page-header-actions">
+              {canManage && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    const section = registrationSectionRef.current;
+                    if (!section) return;
+                    section.scrollIntoView({ behavior: "smooth", block: "start" });
+                    section.focus({ preventScroll: true });
+                  }}
+                >
+                  Revisar solicitudes
+                  {countPendingRegistrations(registrationRequests) > 0 && (
+                    <span className="registration-pending-badge" aria-hidden="true">
+                      {countPendingRegistrations(registrationRequests)}
+                    </span>
+                  )}
+                </Button>
+              )}
+              {canCreate && (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setEditing(null);
+                    setForm(EMPTY);
+                    setShowForm(true);
+                  }}
+                >
+                  + Nuevo cliente
+                </Button>
+              )}
+            </div>
           ) : undefined
         }
       />
 
-      {canManage && <section className="registration-review-list">
-        <h2>Solicitudes de acceso</h2>
-        {registrationRequests.filter((request) => request.status === "pending").length ? (
-          registrationRequests.filter((request) => request.status === "pending").map((request) => (
-            <Card key={request.reviewId} className="list-row">
-              <div><strong>{request.firstName} {request.lastName}</strong><small>{request.reference} · {new Date(request.createdAt).toLocaleDateString("es-MX")}</small></div>
-              <Button type="button" variant="secondary" onClick={() => void openRegistration(request.reviewId)}>Revisar</Button>
+      {canManage && <section
+        ref={registrationSectionRef}
+        tabIndex={-1}
+        aria-label="Solicitudes de acceso"
+        className={`registration-review-list${countPendingRegistrations(registrationRequests) > 0 ? " registration-review-list--attention" : ""}`}
+      >
+        <header className="registration-review-header">
+          <h2>Solicitudes de acceso</h2>
+          {countPendingRegistrations(registrationRequests) > 0 && (
+            <span className="registration-pending-badge" role="status">
+              {countPendingRegistrations(registrationRequests)} pendiente
+              {countPendingRegistrations(registrationRequests) === 1 ? "" : "s"}
+            </span>
+          )}
+        </header>
+        <Tabs
+          label="Estado de solicitudes"
+          active={registrationTab}
+          onChange={setRegistrationTab}
+          items={REGISTRATION_STATUS_TABS}
+        />
+        {filterRegistrationsByStatus(registrationRequests, registrationTab).length ? (
+          filterRegistrationsByStatus(registrationRequests, registrationTab).map((request) => (
+            <Card key={request.reviewId} className="list-row registration-row">
+              <div>
+                <strong>{request.firstName} {request.lastName}</strong>
+                <small>{request.reference} · {new Date(request.createdAt).toLocaleDateString("es-MX")}</small>
+              </div>
+              <div className="registration-row-actions">
+                <StatusBadge status={request.status} />
+                <Button type="button" variant="secondary" onClick={() => void openRegistration(request.reviewId)}>
+                  Revisar
+                </Button>
+              </div>
             </Card>
           ))
-        ) : <p>No hay solicitudes pendientes.</p>}
+        ) : (
+          <EmptyState
+            title={`Sin solicitudes ${(REGISTRATION_STATUS_TABS.find((tab) => tab.id === registrationTab)?.label ?? "").toLowerCase()}`}
+            description="Cuando haya solicitudes en este estado, aparecerán aquí."
+          />
+        )}
       </section>}
 
+      <h2 className="customers-list-heading">Clientes</h2>
       <form
         className="search-bar"
         onSubmit={(event) => {
@@ -394,61 +527,81 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
               <label>
                 Nombre
                 <Input
+                  ref={(node) => { fieldRefs.current.firstName = node; }}
                   required
+                  aria-invalid={Boolean(fieldErrors.firstName)}
+                  aria-describedby={fieldErrors.firstName ? "customer-first-name-error" : undefined}
                   autoComplete="given-name"
                   value={form.firstName}
                   onChange={(event) =>
-                    setForm({ ...form, firstName: event.target.value })
+                    (clearFieldError("firstName"), setForm({ ...form, firstName: event.target.value }))
                   }
                 />
+                {fieldErrors.firstName && <small className="field-error" id="customer-first-name-error">{fieldErrors.firstName}</small>}
               </label>
               <label>
                 Apellidos
                 <Input
+                  ref={(node) => { fieldRefs.current.lastName = node; }}
                   required
+                  aria-invalid={Boolean(fieldErrors.lastName)}
+                  aria-describedby={fieldErrors.lastName ? "customer-last-name-error" : undefined}
                   autoComplete="family-name"
                   value={form.lastName}
                   onChange={(event) =>
-                    setForm({ ...form, lastName: event.target.value })
+                    (clearFieldError("lastName"), setForm({ ...form, lastName: event.target.value }))
                   }
                 />
+                {fieldErrors.lastName && <small className="field-error" id="customer-last-name-error">{fieldErrors.lastName}</small>}
               </label>
               <label>
                 Teléfono
                 <Input
+                  ref={(node) => { fieldRefs.current.phone = node; }}
                   required
                   type="tel"
                   inputMode="tel"
                   autoComplete="tel"
-                  placeholder="446 258 0377"
+                  placeholder="442 000 0000"
+                  aria-invalid={Boolean(fieldErrors.phone)}
+                  aria-describedby={fieldErrors.phone ? "customer-phone-error" : undefined}
                   value={form.phone}
                   onChange={(event) =>
-                    setForm({ ...form, phone: event.target.value })
+                    (clearFieldError("phone"), setForm({ ...form, phone: event.target.value }))
                   }
                 />
+                {fieldErrors.phone && <small className="field-error" id="customer-phone-error">{fieldErrors.phone}</small>}
               </label>
               <label>
                 Correo
                 <Input
+                  ref={(node) => { fieldRefs.current.email = node; }}
                   type="email"
                   inputMode="email"
                   autoComplete="email"
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  aria-describedby={fieldErrors.email ? "customer-email-error" : undefined}
                   value={form.email}
                   onChange={(event) =>
-                    setForm({ ...form, email: event.target.value })
+                    (clearFieldError("email"), setForm({ ...form, email: event.target.value }))
                   }
                 />
+                {fieldErrors.email && <small className="field-error" id="customer-email-error">{fieldErrors.email}</small>}
               </label>
               <label>
                 Fecha de nacimiento
                 <Input
+                  ref={(node) => { fieldRefs.current.birthDate = node; }}
                   type="date"
                   max={new Date().toISOString().slice(0, 10)}
+                  aria-invalid={Boolean(fieldErrors.birthDate)}
+                  aria-describedby={fieldErrors.birthDate ? "customer-birth-date-error" : undefined}
                   value={form.birthDate}
                   onChange={(event) =>
-                    setForm({ ...form, birthDate: event.target.value })
+                    (clearFieldError("birthDate"), setForm({ ...form, birthDate: event.target.value }))
                   }
                 />
+                {fieldErrors.birthDate && <small className="field-error" id="customer-birth-date-error">{fieldErrors.birthDate}</small>}
               </label>
               <label>
                 Estado
@@ -497,10 +650,36 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
               <button type="button" aria-label="Cerrar" onClick={() => setRegistrationDetail(null)}>×</button>
             </header>
             <p className="form-notice">Antes de aprobar, confirma que el número registrado coincide con el remitente del mensaje de WhatsApp.</p>
-            <dl><div><dt>Teléfono</dt><dd>{registrationDetail.phone}</dd></div><div><dt>Correo</dt><dd>{registrationDetail.email || "Sin correo"}</dd></div><div><dt>Estado</dt><dd>{registrationDetail.status}</dd></div></dl>
+            <dl>
+              <div>
+                <dt>Teléfono</dt>
+                <dd>
+                  {registrationDetail.phone || "Sin teléfono"}
+                  {registrationDetail.phone && (
+                    <>
+                      {" "}
+                      <a
+                        className="registration-contact-link"
+                        href={`tel:${registrationDetail.phone}`}
+                        aria-label={`Llamar a ${registrationDetail.firstName} ${registrationDetail.lastName}`}
+                      >
+                        Llamar
+                      </a>
+                    </>
+                  )}
+                </dd>
+              </div>
+              <div><dt>Correo</dt><dd>{registrationDetail.email || "Sin correo"}</dd></div>
+              <div><dt>Fecha de solicitud</dt><dd>{new Date(registrationDetail.createdAt).toLocaleDateString("es-MX")}</dd></div>
+              <div><dt>Estado</dt><dd><StatusBadge status={registrationDetail.status} /></dd></div>
+            </dl>
             {registrationDetail.status === "pending" && <footer className="modal-actions">
-              <Button type="button" variant="secondary" onClick={() => void decideRegistration("reject")}>Rechazar solicitud</Button>
-              <Button type="button" onClick={() => void decideRegistration("approve")}>Aprobar cuenta</Button>
+              <Button type="button" variant="secondary" disabled={deciding} onClick={() => void decideRegistration("reject")}>
+                {deciding ? "Procesando…" : "Rechazar solicitud"}
+              </Button>
+              <Button type="button" disabled={deciding} onClick={() => void decideRegistration("approve")}>
+                {deciding ? "Procesando…" : "Verificar y generar activación"}
+              </Button>
             </footer>}
           </section>
         </Modal>
@@ -558,13 +737,39 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
                   {canManage && <Card className="customer-auth-actions">
                     <h3>Acceso del cliente</h3>
                     <p>Prepara un enlace temporal para compartirlo manualmente.</p>
+                    {detail.hasActiveActivation && detail.activationExpiresAt && (
+                      <p className="form-notice">
+                        Activación vigente hasta{" "}
+                        {new Date(detail.activationExpiresAt).toLocaleString("es-MX", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}.
+                      </p>
+                    )}
                     <div>
-                      <Button type="button" disabled={Boolean(authLinkLoading)} onClick={() => void prepareAuthLink("activation")}>
-                        {authLinkLoading === "activation" ? "Generando…" : "Generar activación"}
-                      </Button>
-                      <Button type="button" variant="secondary" disabled={Boolean(authLinkLoading)} onClick={() => void prepareAuthLink("recovery")}>
-                        {authLinkLoading === "recovery" ? "Generando…" : "Generar recuperación"}
-                      </Button>
+                      {detail.credentialStatus !== "active" && (
+                        <Button
+                          type="button"
+                          disabled={Boolean(authLinkLoading)}
+                          onClick={() => void prepareAuthLink(detail.customer.id, "activation")}
+                        >
+                          {authLinkLoading === "activation"
+                            ? "Generando…"
+                            : detail.credentialStatus === "pending"
+                              ? "Generar nuevo enlace"
+                              : "Generar activación"}
+                        </Button>
+                      )}
+                      {detail.credentialStatus === "active" && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={Boolean(authLinkLoading)}
+                          onClick={() => void prepareAuthLink(detail.customer.id, "recovery")}
+                        >
+                          {authLinkLoading === "recovery" ? "Generando…" : "Generar recuperación"}
+                        </Button>
+                      )}
                     </div>
                   </Card>}
                 </>
@@ -589,9 +794,14 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
               )}
               {detailTab === "bikes" && (
                 bicycles.length ? bicycles.map((bicycle) => (
-                  <Card key={bicycle.id} className="list-row">
-                    <div><strong>{bicycle.nickname || [bicycle.brand, bicycle.model].filter(Boolean).join(" ") || "Bicicleta"}</strong><small>{[bicycle.brand, bicycle.model].filter(Boolean).join(" ")}</small></div>
-                    <StatusBadge status={bicycle.status} />
+                  <Card key={bicycle.id} className="customer-bicycle-card">
+                    <header><strong>{bicycle.nickname || [bicycle.brand, bicycle.model].filter(Boolean).join(" ") || "Bicicleta"}</strong><StatusBadge status={bicycle.status} /></header>
+                    <dl>
+                      <div><dt>Marca</dt><dd>{bicycle.brand || "Sin especificar"}</dd></div>
+                      <div><dt>Modelo</dt><dd>{bicycle.model || "Sin especificar"}</dd></div>
+                      <div><dt>Tipo</dt><dd>{bicycle.bikeType || "Sin especificar"}</dd></div>
+                    </dl>
+                    {canManageBicycles && <Button type="button" variant="secondary" onClick={() => setEditingBicycle(bicycle)}>Editar bicicleta</Button>}
                   </Card>
                 )) : <EmptyState title="Sin bicicletas" description="Este cliente todavía no tiene bicicletas registradas." />
               )}
@@ -623,6 +833,19 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
           </section>
         </Modal>
       )}
+      {editingBicycle && detail && (
+        <BicycleForm
+          customerId={detail.customer.id}
+          bicycle={editingBicycle}
+          onCreated={() => undefined}
+          onCancel={() => setEditingBicycle(null)}
+          onSaved={(saved) => {
+            setBicycles((current) => current.map((item) => item.id === saved.id ? saved : item));
+            setEditingBicycle(null);
+            setStatus("Información de la bicicleta actualizada.");
+          }}
+        />
+      )}
       {authLink && (
         <Modal open aria-labelledby="customer-auth-link-title">
           <section>
@@ -630,7 +853,7 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
               <div>
                 <p className="page-eyebrow">Enlace temporal</p>
                 <h2 id="customer-auth-link-title">
-                  {authLink.purpose === "activation" ? "Activación" : "Recuperación"}
+                  {authLink.purpose === "activation" ? "Activación generada" : "Recuperación generada"}
                 </h2>
               </div>
               <button type="button" aria-label="Cerrar enlace" onClick={() => {
@@ -640,6 +863,7 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
             </header>
             <p>Este enlace expira el {new Date(authLink.value.expiresAt).toLocaleString("es-MX")}.</p>
             <div className="auth-link-value" aria-label="Enlace generado">{authLink.value.link}</div>
+            <p className="form-notice">Confirma directamente en WhatsApp que el mensaje fue enviado.</p>
             <footer className="modal-actions">
               <Button type="button" variant="secondary" onClick={() => {
                 void navigator.clipboard.writeText(authLink.value.link)
@@ -647,6 +871,14 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
                   .catch(() => setAuthLinkNotice("No fue posible copiar el enlace."));
               }}>Copiar enlace</Button>
               <a className="ui-button" href={authLink.value.whatsappUrl} target="_blank" rel="noreferrer">Abrir WhatsApp</a>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={Boolean(authLinkLoading)}
+                onClick={() => void prepareAuthLink(authLink.customerId, authLink.purpose)}
+              >
+                {authLinkLoading ? "Generando…" : "Generar nuevo enlace"}
+              </Button>
             </footer>
             <p className="mb-sr-only" role="status" aria-live="polite">{authLinkNotice}</p>
           </section>

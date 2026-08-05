@@ -28,6 +28,13 @@ import {
   type CustomerIdentity,
 } from "../../lib/customer-auth";
 import { buildRegistrationWhatsappUrl } from "../../lib/customer-registration";
+import { isValidMexicanPhone } from "../../lib/mexican-phone";
+import {
+  isRegistrationPasswordValid,
+  registrationPasswordStatus,
+} from "../../lib/registration-password";
+
+const PHONE_ERROR = "Ingresa un teléfono mexicano válido de 10 dígitos.";
 
 type AuthState = "loading" | "anonymous" | "authenticated" | "error";
 const AuthContext = createContext<{
@@ -66,10 +73,20 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       setState("anonymous");
     });
     void restore();
+    // Una página restaurada desde bfcache (navegación atrás/adelante) puede
+    // seguir mostrando en el DOM datos privados de una sesión ya cerrada.
+    // restore() invalida esa vista de inmediato (pasa a "loading") y vuelve a
+    // preguntar al servidor si la sesión sigue siendo válida — sin recargar
+    // la página completa.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) void restore();
+    };
+    window.addEventListener("pageshow", onPageShow);
     return () => {
       requestVersion.current += 1;
       syncRef.current?.close();
       syncRef.current = null;
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, [restore]);
   const signIn = useCallback(async (phone: string, password: string) => {
@@ -135,7 +152,9 @@ export function CustomerLogin() {
   const auth = useCustomerAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const busyRef = useRef(false);
+  const phoneRef = useRef<HTMLInputElement>(null);
   const result = new URLSearchParams(location.search).get("result");
   useEffect(() => {
     if (auth.state === "authenticated")
@@ -144,14 +163,19 @@ export function CustomerLogin() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busyRef.current) return;
-    busyRef.current = true;
     const form = new FormData(event.currentTarget);
+    const phone = String(form.get("phone"));
+    if (!isValidMexicanPhone(phone)) {
+      setPhoneError(PHONE_ERROR);
+      setError("");
+      requestAnimationFrame(() => phoneRef.current?.focus());
+      return;
+    }
+    setPhoneError("");
+    busyRef.current = true;
     setBusy(true); setError("");
     try {
-      await auth.signIn(
-        String(form.get("phone")),
-        String(form.get("password")),
-      );
+      await auth.signIn(phone, String(form.get("password")));
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "No fue posible iniciar sesión.");
     } finally {
@@ -163,19 +187,37 @@ export function CustomerLogin() {
     return <main className="customer-auth-page"><LoadingState label="Comprobando tu sesión…" /></main>;
   return <AuthFrame title="INICIA TU RUTA" description="Ingresa para consultar los datos disponibles de tu cuenta.">
     <form onSubmit={submit} aria-describedby={error ? "customer-login-error" : undefined}>
-      <label>Teléfono<Input name="phone" type="tel" inputMode="tel" autoComplete="tel" required /></label>
+      <label>
+        Teléfono
+        <Input
+          ref={phoneRef}
+          name="phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="442 000 0000"
+          aria-invalid={Boolean(phoneError)}
+          aria-describedby={phoneError ? "customer-login-phone-error" : undefined}
+          onChange={() => { if (phoneError) setPhoneError(""); }}
+          required
+        />
+        {phoneError && <small id="customer-login-phone-error" className="field-error">{phoneError}</small>}
+      </label>
       <label>Contraseña<Input name="password" type="password" autoComplete="current-password" required /></label>
       {(result === "activation" || result === "recovery") && (
         <p className="form-notice" role="status">
           {result === "activation"
-            ? "Tu cuenta quedó activada. Ya puedes iniciar sesión."
+            ? "Tu cuenta está lista. Ya puedes iniciar sesión."
             : "Tu contraseña fue actualizada y las sesiones anteriores se cerraron."}
         </p>
       )}
       {error && <p id="customer-login-error" className="form-error" role="alert">{error}</p>}
       <Button disabled={busy}>{busy ? "Iniciando sesión…" : "Iniciar sesión"}</Button>
     </form>
-    <footer><a href="/registro">¿Cómo activo mi cuenta?</a></footer>
+    <footer>
+      <p>¿Aún no tienes cuenta? Solicítala y verificaremos tu número.</p>
+      <a href="/registro">Crear cuenta</a>
+    </footer>
   </AuthFrame>;
 }
 
@@ -186,6 +228,14 @@ function PasswordTokenForm({ purpose }: { purpose: "activation" | "recovery" }) 
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [message, setMessage] = useState(token ? "" : "El enlace no es válido o ya no está disponible.");
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmationError, setConfirmationError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmationRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (purpose !== "activation" || !token) return;
     const controller = new AbortController();
@@ -204,13 +254,19 @@ function PasswordTokenForm({ purpose }: { purpose: "activation" | "recovery" }) 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || busyRef.current) return;
-    busyRef.current = true;
-    const form = new FormData(event.currentTarget);
-    const password = String(form.get("password"));
-    if (password !== String(form.get("confirmation"))) {
-      busyRef.current = false;
-      setMessage("Las contraseñas no coinciden."); return;
+    const validPassword = isRegistrationPasswordValid(password);
+    const matches = password === confirmation;
+    setPasswordError(validPassword ? "" : "Completa todos los requisitos de seguridad.");
+    setConfirmationError(matches ? "" : "Las contraseñas no coinciden.");
+    if (!validPassword) {
+      passwordRef.current?.focus();
+      return;
     }
+    if (!matches) {
+      confirmationRef.current?.focus();
+      return;
+    }
+    busyRef.current = true;
     setBusy(true); setMessage("");
     try {
       if (purpose === "activation") await activateCustomer(token, password);
@@ -224,12 +280,70 @@ function PasswordTokenForm({ purpose }: { purpose: "activation" | "recovery" }) 
     }
   }
   const title = purpose === "activation" ? "ACTIVA TU CUENTA" : "RECUPERA TU ACCESO";
+  const passwordRequirements = registrationPasswordStatus(password);
   return <AuthFrame title={title} description="Elige una contraseña segura para continuar.">
     {checking ? <LoadingState label="Validando enlace…" /> : valid ? <form onSubmit={submit} aria-describedby={message ? "token-form-message" : undefined}>
-      <label>Nueva contraseña<Input name="password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
-      <label>Confirmar contraseña<Input name="confirmation" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label>
+      <label className="registration-password-control">
+        <span>Nueva contraseña</span>
+        <span className="password-field">
+          <Input
+            ref={passwordRef}
+            required
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            minLength={12}
+            maxLength={128}
+            value={password}
+            aria-invalid={Boolean(passwordError)}
+            aria-describedby={`token-password-help${passwordError ? " token-password-error" : ""}`}
+            onChange={(event) => {
+              const next = event.target.value;
+              setPassword(next);
+              if (isRegistrationPasswordValid(next)) setPasswordError("");
+              if (!confirmation || next === confirmation) setConfirmationError("");
+            }}
+          />
+          <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+            {showPassword ? "Ocultar" : "Ver"}
+          </button>
+        </span>
+        <ul id="token-password-help" className="password-requirements" aria-label="Requisitos de contraseña">
+          {passwordRequirements.map((requirement) => (
+            <li key={requirement.id} className={requirement.met ? "is-met" : password ? "is-missing" : ""}>
+              <span aria-hidden="true">{requirement.met ? "✓" : "○"}</span>
+              {requirement.label}
+            </li>
+          ))}
+        </ul>
+        {passwordError && <small id="token-password-error" className="field-error">{passwordError}</small>}
+      </label>
+      <label className="registration-password-control">
+        <span>Confirmar contraseña</span>
+        <span className="password-field">
+          <Input
+            ref={confirmationRef}
+            required
+            type={showConfirmation ? "text" : "password"}
+            autoComplete="new-password"
+            minLength={12}
+            maxLength={128}
+            value={confirmation}
+            aria-invalid={Boolean(confirmationError)}
+            aria-describedby={confirmationError ? "token-confirmation-error" : undefined}
+            onChange={(event) => {
+              const next = event.target.value;
+              setConfirmation(next);
+              if (next === password) setConfirmationError("");
+            }}
+          />
+          <button type="button" onClick={() => setShowConfirmation((visible) => !visible)} aria-label={showConfirmation ? "Ocultar confirmación" : "Mostrar confirmación"}>
+            {showConfirmation ? "Ocultar" : "Ver"}
+          </button>
+        </span>
+        {confirmationError && <small id="token-confirmation-error" className="field-error">Las contraseñas no coinciden.</small>}
+      </label>
       {message && <p id="token-form-message" className="form-error" role="alert">{message}</p>}
-      <Button disabled={busy}>{busy ? "Guardando…" : purpose === "activation" ? "Activar cuenta" : "Cambiar contraseña"}</Button>
+      <Button disabled={busy}>{busy ? "Guardando…" : purpose === "activation" ? "Activar mi cuenta" : "Cambiar contraseña"}</Button>
     </form> : <p className="form-error" role="alert">{message}</p>}
     <footer><a href="/iniciar-sesion">Volver a iniciar sesión</a></footer>
   </AuthFrame>;
@@ -283,12 +397,9 @@ export function CustomerPortal() {
 }
 
 export function CustomerRegistrationInfo() {
-  const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [form, setForm] = useState({
-    firstName: "", lastName: "", phone: "", email: "", password: "", confirmation: "",
-  });
+  const [form, setForm] = useState({ firstName: "", lastName: "", phone: "" });
   const [result, setResult] = useState<null | {
     reference: string; adminReviewUrl: string; expiresAt: string; name: string;
   }>(null);
@@ -300,10 +411,10 @@ export function CustomerRegistrationInfo() {
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (step === 1) { setStep(2); return; }
     if (busy) return;
-    if (form.password !== form.confirmation) {
-      setMessage("Las contraseñas no coinciden."); return;
+    if (!event.currentTarget.checkValidity()) {
+      event.currentTarget.reportValidity();
+      return;
     }
     setBusy(true); setMessage("");
     try {
@@ -313,20 +424,19 @@ export function CustomerRegistrationInfo() {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            firstName: form.firstName, lastName: form.lastName,
-            phone: form.phone, email: form.email, password: form.password,
+            firstName: form.firstName, lastName: form.lastName, phone: form.phone,
           }),
         },
       );
       setResult({ ...created, name: `${form.firstName} ${form.lastName}`.trim() });
-      setForm({ firstName: "", lastName: "", phone: "", email: "", password: "", confirmation: "" });
+      setForm({ firstName: "", lastName: "", phone: "" });
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : "No fue posible enviar la solicitud.");
     } finally { setBusy(false); }
   }
   if (result) {
     const whatsappUrl = buildRegistrationWhatsappUrl(whatsapp, result);
-    return <AuthFrame title="SOLICITUD RECIBIDA" description="Tu cuenta todavía no está activa. El equipo de Mi Bicla debe revisarla.">
+    return <AuthFrame title="SOLICITUD RECIBIDA" description="Recibimos tu solicitud. Mi Bicla verificará tu número y te enviará por WhatsApp un enlace para crear tu contraseña.">
       <section className="registration-result">
         <p className="page-eyebrow">Estado pendiente</p>
         <h2>Referencia {result.reference}</h2>
@@ -337,22 +447,14 @@ export function CustomerRegistrationInfo() {
       </section>
     </AuthFrame>;
   }
-  return <AuthFrame title="SOLICITA TU ACCESO" description="Completa tus datos. Tu cuenta permanecerá pendiente hasta que Mi Bicla la apruebe.">
-    <form className="registration-form" onSubmit={submit}>
-      <p className="page-eyebrow">Paso {step} de 2</p>
-      {step === 1 ? <>
-        <label>Nombre<Input required maxLength={100} autoComplete="given-name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></label>
-        <label>Apellidos<Input required maxLength={100} autoComplete="family-name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></label>
-        <label>Teléfono<Input required type="tel" inputMode="tel" autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
-        <label>Correo opcional<Input type="email" inputMode="email" autoComplete="email" maxLength={254} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-        <Button>Continuar</Button>
-      </> : <>
-        <label>Contraseña<Input required type="password" autoComplete="new-password" minLength={12} maxLength={128} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
-        <label>Confirmar contraseña<Input required type="password" autoComplete="new-password" minLength={12} maxLength={128} value={form.confirmation} onChange={(e) => setForm({ ...form, confirmation: e.target.value })} /></label>
-        <label className="privacy-check"><input required type="checkbox" /> Confirmo que estos datos son míos y solicito que Mi Bicla los revise.</label>
-        {message && <p className="form-error" role="alert">{message}</p>}
-        <div className="register-step-actions"><Button type="button" variant="secondary" onClick={() => setStep(1)}>Atrás</Button><Button disabled={busy}>{busy ? "Enviando…" : "Enviar solicitud"}</Button></div>
-      </>}
+  return <AuthFrame title="SOLICITA TU ACCESO" description="Completa tus datos. Mi Bicla verificará tu número antes de activar tu cuenta.">
+    <form className="registration-form" onSubmit={submit} noValidate>
+      <label>Nombre<Input required maxLength={100} autoComplete="given-name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></label>
+      <label>Apellidos<Input required maxLength={100} autoComplete="family-name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></label>
+      <label>Teléfono<Input required type="tel" inputMode="tel" autoComplete="tel" placeholder="442 000 0000" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+      <label className="privacy-check"><input required type="checkbox" /> Confirmo que estos datos son míos y solicito que Mi Bicla los revise.</label>
+      {message && <p className="form-error registration-server-error" role="alert">{message}</p>}
+      <Button disabled={busy}>{busy ? "Enviando…" : "Solicitar cuenta"}</Button>
       <footer><a href="/iniciar-sesion">Iniciar sesión</a></footer>
     </form>
   </AuthFrame>;
