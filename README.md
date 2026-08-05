@@ -143,7 +143,7 @@ Rutas:
 
 Los clientes tienen búsqueda administrativa, edición, baja lógica, detalle, QR público, saldos y recompensas. `birthDate` acepta exclusivamente una fecha válida en formato ISO `YYYY-MM-DD`; una cadena vacía se normaliza como `null` y no se permiten fechas futuras.
 
-Los teléfonos mexicanos pueden capturarse con espacios, guiones o paréntesis. Se normalizan como `+52` seguido de 10 dígitos, por ejemplo `446 258 0377` se guarda como `+524462580377`. También se aceptan entradas compatibles que ya incluyan `+52` o el prefijo histórico `+52 1`.
+Los teléfonos mexicanos pueden capturarse con espacios, guiones o paréntesis. Se normalizan como `+52` seguido de 10 dígitos, por ejemplo `442 000 0000` se guarda como `+524420000000`. También se aceptan entradas compatibles que ya incluyan `+52` o el prefijo histórico `+52 1`.
 
 La fidelidad usa reglas configurables cuyos importes se expresan en centavos. Los ajustes manuales requieren configuración habilitada, motivo, permiso `adjust_loyalty` y respetan `allowNegativeBalance`. Cuando se alcanza `rewardUnits`, se descuentan unidades y se crean recompensas disponibles.
 

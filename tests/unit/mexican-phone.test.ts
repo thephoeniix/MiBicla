@@ -7,38 +7,38 @@ import {
 
 describe("teléfonos mexicanos", () => {
   it.each([
-    "4462580377",
-    "446 258 0377",
-    "446-258-0377",
-    "(446) 258 0377",
-    "+52 446 258 0377",
-    "+52 1 446 258 0377",
+    "4420000000",
+    "442 000 0000",
+    "442-000-0000",
+    "(442) 000 0000",
+    "+52 442 000 0000",
+    "+52 1 442 000 0000",
   ])("normaliza %s", (phone) => {
-    expect(mexicanPhoneSchema.parse(phone)).toBe("+524462580377");
+    expect(mexicanPhoneSchema.parse(phone)).toBe("+524420000000");
   });
 
   it("rechaza números que no tienen 10 dígitos", () => {
-    expect(mexicanPhoneSchema.safeParse("446 258").success).toBe(false);
+    expect(mexicanPhoneSchema.safeParse("442 000").success).toBe(false);
   });
 
   it("normaliza el teléfono de un cliente", () => {
     const result = customerCreateSchema.parse({
       firstName: "Ana",
       lastName: "López",
-      phone: "446 258 0377",
+      phone: "442 000 0000",
       email: null,
       birthDate: null,
       notes: null,
       status: "active",
     });
 
-    expect(result.phone).toBe("+524462580377");
+    expect(result.phone).toBe("+524420000000");
   });
 
   it("normaliza el teléfono de una solicitud de taller", () => {
     const result = workshopRequestSchema.parse({
       customerName: "Ana López",
-      customerPhone: "446 258 0377",
+      customerPhone: "442 000 0000",
       customerEmail: null,
       bikeBrand: null,
       bikeModel: null,
@@ -47,6 +47,6 @@ describe("teléfonos mexicanos", () => {
       preferredContactMethod: "whatsapp",
     });
 
-    expect(result.customerPhone).toBe("+524462580377");
+    expect(result.customerPhone).toBe("+524420000000");
   });
 });
