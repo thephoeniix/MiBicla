@@ -20,7 +20,7 @@ import {
   paymentDepositSettings,
   rateLimits,
 } from "@mi-bicla/db";
-import { hashSessionToken, parseEnv, verifyPassword } from "@mi-bicla/shared";
+import { hashPassword, hashSessionToken, parseEnv, verifyPassword } from "@mi-bicla/shared";
 import { createApp } from "../../artifacts/api/src/app.js";
 import { CustomerAuthService } from "../../artifacts/api/src/services/customer-auth.service.js";
 import {
@@ -275,96 +275,420 @@ describe("infraestructura PostgreSQL", () => {
   });
 });
 
-describe("registro pendiente con aprobación administrativa", () => {
-  const registration = {
-    firstName: "Registro",
-    lastName: "Ficticio",
-    phone: "442 700 0011",
-    email: "registro.ficticio@example.test",
-    password: "Registration-Fictional1!",
-  };
+describe("registro pendiente → verificación manual → activación (flujo transaccional)", () => {
+  const minimalRegistration = (phone: string, overrides: Partial<{ firstName: string; lastName: string }> = {}) => ({
+    firstName: overrides.firstName ?? "Registro",
+    lastName: overrides.lastName ?? "Ficticio",
+    phone,
+  });
 
-  it("crea pendiente sin sesión y solo activa tras aprobación explícita", async () => {
+  async function registerAndApprove(phone: string, admin: Session) {
     const created = await request("/api/public/customer-registration", {
       method: "POST",
-      body: registration,
+      body: minimalRegistration(phone),
     });
     expect(created.status).toBe(202);
-    expect(created.headers.get("set-cookie")).toBeNull();
-    const result = await created.json() as {
-      reference: string; adminReviewUrl: string;
+    const { adminReviewUrl } = await created.json() as { adminReviewUrl: string };
+    const reviewId = adminReviewUrl.split("/").at(-1)!;
+    const approve = await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
+      method: "POST", session: admin,
+    });
+    expect(approve.status, JSON.stringify(await approve.clone().json())).toBe(200);
+    return {
+      reviewId,
+      ...(await approve.json() as {
+        customerId: string; expiresAt: string; link: string; whatsappUrl: string;
+      }),
     };
-    expect(result.reference).toMatch(/^MB-[A-F0-9]{8}$/);
-    expect(result.adminReviewUrl).not.toContain(registration.phone.replace(/\D/g, ""));
-    const reviewId = result.adminReviewUrl.split("/").at(-1)!;
-    expect(reviewId).toMatch(/^[a-f0-9]{64}$/);
+  }
 
+  it("el registro público acepta exclusivamente nombre, apellidos y teléfono", async () => {
+    const withPassword = await request("/api/public/customer-registration", {
+      method: "POST",
+      body: { ...minimalRegistration("442 700 0001"), password: "Whatever-Password1!" },
+    });
+    expect(withPassword.status).toBe(400);
+
+    const withEmail = await request("/api/public/customer-registration", {
+      method: "POST",
+      body: { ...minimalRegistration("442 700 0002"), email: "extra@example.test" },
+    });
+    expect(withEmail.status).toBe(400);
+
+    const withUnexpectedField = await request("/api/public/customer-registration", {
+      method: "POST",
+      body: { ...minimalRegistration("442 700 0003"), unexpected: true },
+    });
+    expect(withUnexpectedField.status).toBe(400);
+
+    const minimal = await request("/api/public/customer-registration", {
+      method: "POST",
+      body: minimalRegistration("442 700 0004"),
+    });
+    expect(minimal.status).toBe(202);
+    expect(minimal.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("create() no genera ni almacena contraseña en la solicitud", async () => {
+    const created = await request("/api/public/customer-registration", {
+      method: "POST",
+      body: minimalRegistration("442 700 0011"),
+    });
+    const { adminReviewUrl } = await created.json() as { adminReviewUrl: string };
+    const reviewId = adminReviewUrl.split("/").at(-1)!;
     const { db, client } = createTestDatabase();
     try {
       const [pending] = await db.select().from(customerRegistrationRequests)
         .where(eq(customerRegistrationRequests.reviewId, reviewId));
       expect(pending?.status).toBe("pending");
-      expect(pending?.passwordHash).not.toBe(registration.password);
-      expect(await verifyPassword(pending!.passwordHash!, registration.password)).toBe(true);
+      expect(pending?.passwordHash).toBeNull();
+    } finally { await client.end(); }
+  });
+
+  it("aprobar crea credencial pendiente + token de activación en una sola operación; sin sesión hasta activar de verdad", async () => {
+    const phone = "442 700 0021";
+    const admin = await login();
+    const approved = await registerAndApprove(phone, admin);
+
+    expect(approved.customerId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(approved.link).toContain("/cuenta/activar?token=");
+    expect(approved.whatsappUrl).toContain(`https://wa.me/52${phone.replace(/\D/g, "")}`);
+    // La respuesta nunca expone hashes, contraseñas ni nombres de columna internos.
+    expect(JSON.stringify(approved)).not.toMatch(/hash|password/i);
+
+    // Sin contraseña todavía: nada permite iniciar sesión.
+    expect((await request("/api/customer/auth/login", {
+      method: "POST", body: { phone, password: "Whatever-Password1!" },
+    })).status).toBe(401);
+
+    const { db, client } = createTestDatabase();
+    try {
+      const [credential] = await db.select().from(customerCredentials)
+        .where(eq(customerCredentials.customerId, approved.customerId));
+      expect(credential?.status).toBe("pending");
+      expect(credential?.passwordHash).toBeNull();
+      const [tokenRow] = await db.select().from(customerAuthTokens)
+        .where(eq(customerAuthTokens.credentialId, credential!.id));
+      expect(tokenRow?.purpose).toBe("activation");
+      expect(tokenRow?.consumedAt).toBeNull();
+      expect(tokenRow?.revokedAt).toBeNull();
+      const rawToken = new URL(approved.link).searchParams.get("token")!;
+      expect(tokenRow?.tokenHash).toBe(hashSessionToken(rawToken));
+      expect(tokenRow?.tokenHash).not.toBe(rawToken);
+      // Vigencia de activación: ~24 horas, no 30 minutos.
+      const hoursUntilExpiry =
+        (new Date(approved.expiresAt).getTime() - Date.now()) / (60 * 60 * 1000);
+      expect(hoursUntilExpiry).toBeGreaterThan(23.9);
+      expect(hoursUntilExpiry).toBeLessThan(24.1);
     } finally { await client.end(); }
 
-    const pendingLogin = await request("/api/customer/auth/login", {
-      method: "POST",
-      body: { phone: registration.phone, password: registration.password },
+    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    const activate = await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: rawToken, password: "Fresh-Customer-Password1!" },
     });
-    expect(pendingLogin.status).toBe(401);
+    expect(activate.status).toBe(204);
 
-    const anonymousGet = await request(`/api/admin/customer-registration-requests/${reviewId}`);
-    expect(anonymousGet.status).toBe(401);
+    const session = await customerLogin(phone, "Fresh-Customer-Password1!");
+    expect(session.cookie).toContain("mb_customer_session=");
+  });
+
+  it("el token de activación es de un solo uso — reutilizarlo falla de forma comprensible", async () => {
     const admin = await login();
-    const detail = await request(`/api/admin/customer-registration-requests/${reviewId}`, { session: admin });
-    expect(detail.status).toBe(200);
-    expect((await detail.json() as { status: string }).status).toBe("pending");
-
-    const withoutCsrf = await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
-      method: "POST", session: admin, csrf: false,
+    const approved = await registerAndApprove("442 700 0031", admin);
+    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    const first = await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: rawToken, password: "Fresh-Customer-Password1!" },
     });
-    expect(withoutCsrf.status).toBe(403);
+    expect(first.status).toBe(204);
+    const reused = await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: rawToken, password: "Another-Password2!" },
+    });
+    expect(reused.status).toBe(401);
+    const reusedBody = await reused.json() as { error: { message: string } };
+    expect(reusedBody.error.message).not.toMatch(/hash|sql|stack/i);
+  });
 
+  it("regenerar el enlace invalida el anterior — el viejo deja de servir", async () => {
+    const admin = await login();
+    const approved = await registerAndApprove("442 700 0041", admin);
+    const oldToken = new URL(approved.link).searchParams.get("token")!;
+
+    const regenerated = await request(`/api/admin/customers/${approved.customerId}/auth/activation`, {
+      method: "POST", session: admin,
+    });
+    expect(regenerated.status).toBe(201);
+    const { link: newLink } = await regenerated.json() as { link: string };
+    const newToken = new URL(newLink).searchParams.get("token")!;
+    expect(newToken).not.toBe(oldToken);
+
+    const withOldToken = await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: oldToken, password: "Old-Token-Password1!" },
+    });
+    expect(withOldToken.status).toBe(401);
+
+    const withNewToken = await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: newToken, password: "New-Token-Password1!" },
+    });
+    expect(withNewToken.status).toBe(204);
+  });
+
+  it("doble clic en 'generar activación' no deja dos enlaces vigentes a la vez", async () => {
+    const admin = await login();
+    const approved = await registerAndApprove("442 700 0051", admin);
+    const [first, second] = await Promise.all([
+      request(`/api/admin/customers/${approved.customerId}/auth/activation`, { method: "POST", session: admin }),
+      request(`/api/admin/customers/${approved.customerId}/auth/activation`, { method: "POST", session: admin }),
+    ]);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    const { db, client } = createTestDatabase();
+    try {
+      const [credential] = await db.select().from(customerCredentials)
+        .where(eq(customerCredentials.customerId, approved.customerId));
+      const liveTokens = await db.select().from(customerAuthTokens).where(and(
+        eq(customerAuthTokens.credentialId, credential!.id),
+        eq(customerAuthTokens.purpose, "activation"),
+        isNull(customerAuthTokens.consumedAt),
+        isNull(customerAuthTokens.revokedAt),
+      ));
+      expect(liveTokens).toHaveLength(1);
+    } finally { await client.end(); }
+  });
+
+  it("la vigencia de recuperación (15 min) es distinta de la de activación (24 h)", async () => {
+    const admin = await login();
+    const phone = "442 700 0061";
+    const approved = await registerAndApprove(phone, admin);
+    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: rawToken, password: "Active-Account-Password1!" },
+    });
+    const recovery = await request(`/api/admin/customers/${approved.customerId}/auth/recovery`, {
+      method: "POST", session: admin,
+    });
+    expect(recovery.status).toBe(201);
+    const { expiresAt } = await recovery.json() as { expiresAt: string };
+    const minutesUntilExpiry = (new Date(expiresAt).getTime() - Date.now()) / (60 * 1000);
+    expect(minutesUntilExpiry).toBeGreaterThan(14.5);
+    expect(minutesUntilExpiry).toBeLessThan(15.5);
+  });
+
+  it("prepara WhatsApp con teléfono, nombre y vigencia, pero no lo envía — el administrador debe pulsarlo", async () => {
+    const admin = await login();
+    const approved = await registerAndApprove("442 700 0071", admin);
+    const url = new URL(approved.whatsappUrl);
+    expect(url.hostname).toBe("wa.me");
+    const message = decodeURIComponent(url.searchParams.get("text")!);
+    expect(message).toContain("Registro");
+    expect(message).toMatch(/vence|expira/i);
+    expect(message).not.toMatch(/mensaje enviado/i);
+  });
+
+  it("ninguna respuesta (aprobar, generar, detalle de cliente) expone hashes, contraseñas o el token crudo previo", async () => {
+    const admin = await login();
+    const approved = await registerAndApprove("442 700 0081", admin);
+    const detail = await request(`/api/admin/customers/${approved.customerId}`, { session: admin });
+    expect(detail.status).toBe(200);
+    const detailBody = await detail.json() as Record<string, unknown>;
+    expect(JSON.stringify(detailBody)).not.toMatch(/passwordHash|tokenHash/i);
+    expect(detailBody).toMatchObject({
+      credentialStatus: "pending",
+      hasActiveActivation: true,
+    });
+    expect(typeof detailBody.activationExpiresAt).toBe("string");
+  });
+
+  it("solicitud antigua con password_hash previo no lo copia a customer_credentials y lo limpia al aprobar", async () => {
+    const admin = await login();
+    const phone = "442 700 0091";
+    const { db, client } = createTestDatabase();
+    let reviewId = "";
+    try {
+      const legacyHash = await hashPassword("Legacy-Password-Should-Not-Work1!");
+      const [inserted] = await db.insert(customerRegistrationRequests).values({
+        reviewId: "a".repeat(64),
+        publicReference: "MB-LEGACY01",
+        firstName: "Legado",
+        lastName: "Previo",
+        phoneNormalized: "+52" + phone.replace(/\D/g, ""),
+        passwordHash: legacyHash,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      }).returning({ reviewId: customerRegistrationRequests.reviewId });
+      reviewId = inserted!.reviewId;
+    } finally { await client.end(); }
+
+    const approve = await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
+      method: "POST", session: admin,
+    });
+    expect(approve.status).toBe(200);
+    const approved = await approve.json() as { customerId: string; link: string };
+
+    const { db: db2, client: client2 } = createTestDatabase();
+    try {
+      const [request_] = await db2.select().from(customerRegistrationRequests)
+        .where(eq(customerRegistrationRequests.reviewId, reviewId));
+      expect(request_?.passwordHash).toBeNull();
+      const [credential] = await db2.select().from(customerCredentials)
+        .where(eq(customerCredentials.customerId, approved.customerId));
+      expect(credential?.passwordHash).toBeNull();
+    } finally { await client2.end(); }
+
+    expect((await request("/api/customer/auth/login", {
+      method: "POST",
+      body: { phone, password: "Legacy-Password-Should-Not-Work1!" },
+    })).status).toBe(401);
+
+    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    expect((await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: rawToken, password: "Genuinely-New-Password1!" },
+    })).status).toBe(204);
+  });
+
+  it("un teléfono que ya pertenece a un cliente sin credencial se vincula, sin duplicar al cliente", async () => {
+    const admin = await login();
+    const phone = "442 700 0101";
+    const normalizedPhone = "+52" + phone.replace(/\D/g, "");
+    const { db, client } = createTestDatabase();
+    try {
+      await db.insert(customers).values({
+        firstName: "Existente", lastName: "SinCredencial", phone: normalizedPhone, status: "active",
+      });
+    } finally { await client.end(); }
+
+    const approved = await registerAndApprove(phone, admin);
+
+    const { db: db2, client: client2 } = createTestDatabase();
+    try {
+      const matches = await db2.select().from(customers).where(eq(customers.phone, normalizedPhone));
+      expect(matches).toHaveLength(1);
+      expect(matches[0]?.id).toBe(approved.customerId);
+    } finally { await client2.end(); }
+  });
+
+  it("un teléfono que ya pertenece a una cuenta activa no se puede volver a aprobar (409, sin duplicar)", async () => {
+    const admin = await login();
+    const phone = "442 700 0111";
+    const approved = await registerAndApprove(phone, admin);
+    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    await request("/api/customer/auth/activate", {
+      method: "POST", body: { token: rawToken, password: "Already-Active-Password1!" },
+    });
+
+    const secondRequest = await request("/api/public/customer-registration", {
+      method: "POST", body: minimalRegistration(phone),
+    });
+    expect(secondRequest.status).toBe(202);
+    const { adminReviewUrl } = await secondRequest.json() as { adminReviewUrl: string };
+    const secondReviewId = adminReviewUrl.split("/").at(-1)!;
+    const secondApprove = await request(`/api/admin/customer-registration-requests/${secondReviewId}/approve`, {
+      method: "POST", session: admin,
+    });
+    expect(secondApprove.status).toBe(409);
+
+    const { db, client } = createTestDatabase();
+    try {
+      const matches = await db.select().from(customers)
+        .where(eq(customers.phone, "+52" + phone.replace(/\D/g, "")));
+      expect(matches).toHaveLength(1);
+    } finally { await client.end(); }
+  });
+
+  it("dos solicitudes simultáneas con el mismo teléfono no dejan dos pendientes a la vez", async () => {
+    const phone = "442 700 0121";
+    const [a, b] = await Promise.all([
+      request("/api/public/customer-registration", { method: "POST", body: minimalRegistration(phone, { firstName: "Primera" }) }),
+      request("/api/public/customer-registration", { method: "POST", body: minimalRegistration(phone, { firstName: "Segunda" }) }),
+    ]);
+    expect([a.status, b.status]).toEqual([202, 202]);
+    const { db, client } = createTestDatabase();
+    try {
+      const pendingRows = await db.select().from(customerRegistrationRequests).where(and(
+        eq(customerRegistrationRequests.phoneNormalized, "+52" + phone.replace(/\D/g, "")),
+        eq(customerRegistrationRequests.status, "pending"),
+      ));
+      expect(pendingRows).toHaveLength(1);
+    } finally { await client.end(); }
+  });
+
+  it("doble aprobación concurrente: solo una gana, la otra ve 409, sin estados parciales", async () => {
+    const created = await request("/api/public/customer-registration", {
+      method: "POST", body: minimalRegistration("442 700 0131"),
+    });
+    const { adminReviewUrl } = await created.json() as { adminReviewUrl: string };
+    const reviewId = adminReviewUrl.split("/").at(-1)!;
+    const admin = await login();
     const approvals = await Promise.all([
       request(`/api/admin/customer-registration-requests/${reviewId}/approve`, { method: "POST", session: admin }),
       request(`/api/admin/customer-registration-requests/${reviewId}/approve`, { method: "POST", session: admin }),
     ]);
     expect(approvals.map(({ status }) => status).sort()).toEqual([200, 409]);
-    const session = await customerLogin(registration.phone, registration.password);
-    expect(session.cookie).toContain("mb_customer_session=");
+    const winner = (await approvals[0]!.json()) as { customerId?: string };
+    const { db, client } = createTestDatabase();
+    try {
+      // Nunca queda un cliente aprobado sin credencial, ni una credencial sin cliente.
+      if (winner.customerId) {
+        const [credential] = await db.select().from(customerCredentials)
+          .where(eq(customerCredentials.customerId, winner.customerId));
+        expect(credential).toBeDefined();
+        expect(credential?.status).toBe("pending");
+      }
+      const customerRows = await db.select().from(customers)
+        .where(eq(customers.phone, "+524427000131"));
+      expect(customerRows).toHaveLength(1);
+    } finally { await client.end(); }
   });
 
-  it("aplica RBAC, rechazo y expiración sin activar credenciales", async () => {
-    const create = async (phone: string) => {
-      const response = await request("/api/public/customer-registration", {
-        method: "POST", body: { ...registration, phone },
-      });
-      expect(response.status).toBe(202);
-      return ((await response.json()) as { adminReviewUrl: string }).adminReviewUrl.split("/").at(-1)!;
-    };
-    const rejectedId = await create("442 700 0012");
-    const employee = await login({ email: TEST_EMPLOYEE.email, password: TEST_EMPLOYEE.password });
-    expect((await request(`/api/admin/customer-registration-requests/${rejectedId}`, { session: employee })).status).toBe(403);
+  it("reintentar tras una transacción fallida (solicitud vencida) no deja residuos y una solicitud nueva funciona normalmente", async () => {
     const admin = await login();
-    expect((await request(`/api/admin/customer-registration-requests/${rejectedId}/reject`, {
-      method: "POST", session: admin, body: { reason: "No coincide el remitente" },
-    })).status).toBe(204);
-    expect((await request("/api/customer/auth/login", {
-      method: "POST", body: { phone: "442 700 0012", password: registration.password },
-    })).status).toBe(401);
-
-    const expiredId = await create("442 700 0013");
+    const created = await request("/api/public/customer-registration", {
+      method: "POST", body: minimalRegistration("442 700 0141"),
+    });
+    const { adminReviewUrl } = await created.json() as { adminReviewUrl: string };
+    const reviewId = adminReviewUrl.split("/").at(-1)!;
     const { db, client } = createTestDatabase();
     try {
       await db.update(customerRegistrationRequests)
-        .set({
-          createdAt: new Date(Date.now() - 2_000),
-          expiresAt: new Date(Date.now() - 1_000),
-        })
-        .where(eq(customerRegistrationRequests.reviewId, expiredId));
+        .set({ createdAt: new Date(Date.now() - 2_000), expiresAt: new Date(Date.now() - 1_000) })
+        .where(eq(customerRegistrationRequests.reviewId, reviewId));
     } finally { await client.end(); }
-    expect((await request(`/api/admin/customer-registration-requests/${expiredId}/approve`, {
+
+    const failedApprove = await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
+      method: "POST", session: admin,
+    });
+    expect(failedApprove.status).toBe(409);
+
+    const { db: db2, client: client2 } = createTestDatabase();
+    try {
+      const customersFromFailedAttempt = await db2.select().from(customers)
+        .where(eq(customers.phone, "+524427000141"));
+      expect(customersFromFailedAttempt).toHaveLength(0);
+    } finally { await client2.end(); }
+
+    // El sistema sigue sano: una solicitud nueva (otro teléfono) funciona de punta a punta.
+    const retry = await registerAndApprove("442 700 0142", admin);
+    expect(retry.customerId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("aplica RBAC y respeta el rechazo (sin activación)", async () => {
+    const created = await request("/api/public/customer-registration", {
+      method: "POST", body: minimalRegistration("442 700 0151"),
+    });
+    const { adminReviewUrl } = await created.json() as { adminReviewUrl: string };
+    const reviewId = adminReviewUrl.split("/").at(-1)!;
+    const employee = await login({ email: TEST_EMPLOYEE.email, password: TEST_EMPLOYEE.password });
+    expect((await request(`/api/admin/customer-registration-requests/${reviewId}`, { session: employee })).status).toBe(403);
+    const admin = await login();
+    expect((await request(`/api/admin/customer-registration-requests/${reviewId}/reject`, {
+      method: "POST", session: admin, body: { reason: "No coincide el remitente" },
+    })).status).toBe(204);
+    const { db, client } = createTestDatabase();
+    try {
+      const [rejected] = await db.select().from(customerRegistrationRequests)
+        .where(eq(customerRegistrationRequests.reviewId, reviewId));
+      expect(rejected?.status).toBe("rejected");
+      expect(rejected?.passwordHash).toBeNull();
+    } finally { await client.end(); }
+    expect((await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
       method: "POST", session: admin,
     })).status).toBe(409);
   });

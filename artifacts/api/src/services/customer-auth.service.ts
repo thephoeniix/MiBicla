@@ -19,10 +19,9 @@ import {
   verifyPassword,
 } from "@mi-bicla/shared";
 import type { CustomerAuthPurpose } from "@mi-bicla/api-contract";
+import { issueCustomerAuthToken } from "./customer-auth-tokens.js";
 
 type Db = ReturnType<typeof createDatabase>["db"];
-const ACTIVATION_TTL_MS = 30 * 60 * 1000;
-const RECOVERY_TTL_MS = 15 * 60 * 1000;
 const defaultPasswordCrypto = {
   hash: hashPassword,
   verify: verifyPassword,
@@ -47,8 +46,6 @@ export class CustomerAuthService {
     purpose: CustomerAuthPurpose,
     administratorId: string,
   ) {
-    const token = generateSessionToken();
-
     const generated = await this.db.transaction(async (tx) => {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${customerId}), hashtext(${purpose}))`,
@@ -130,37 +127,18 @@ export class CustomerAuthService {
           .returning();
       }
       if (!row) return null;
-      await tx
-        .update(customerAuthTokens)
-        .set({ revokedAt: new Date() })
-        .where(
-          and(
-            eq(customerAuthTokens.credentialId, row.id),
-            eq(customerAuthTokens.purpose, purpose),
-            isNull(customerAuthTokens.consumedAt),
-            isNull(customerAuthTokens.revokedAt),
-          ),
-        );
-      const createdAt = new Date();
-      const expiresAt = new Date(
-        createdAt.getTime() +
-          (purpose === "activation" ? ACTIVATION_TTL_MS : RECOVERY_TTL_MS),
-      );
-      await tx.insert(customerAuthTokens).values({
+      const { token, expiresAt } = await issueCustomerAuthToken(tx, {
         credentialId: row.id,
         purpose,
-        tokenHash: hashSessionToken(token),
-        expiresAt,
-        createdBy: administratorId,
-        createdAt,
+        administratorId,
       });
-      return { credential: row, expiresAt };
+      return { credential: row, expiresAt, token };
     });
     if (!generated) return null;
 
     const page = purpose === "activation" ? "activar" : "recuperar";
     const link = new URL(`/cuenta/${page}`, this.appBaseUrl);
-    link.searchParams.set("token", token);
+    link.searchParams.set("token", generated.token);
     const message =
       purpose === "activation"
         ? `Activa tu cuenta Mi Bicla: ${link.toString()}`

@@ -65,7 +65,7 @@ export function createCustomerRegistrationAdminRouter(
     try {
       const reviewId = registrationReviewIdSchema.parse(req.params.reviewId);
       const administratorId = res.locals.auth.administrator.id as string;
-      const result = await service.approve(reviewId, administratorId);
+      const result = await service.verifyAndActivate(reviewId, administratorId);
       await audit(req, "customer.registration.approve", !!result, administratorId, result ? undefined : "CONFLICT");
       res.status(result ? 200 : 409).json(result ?? { error: "REGISTRATION_CONFLICT" });
     } catch (error) { next(error); }
