@@ -11,7 +11,6 @@ import {
   isMobileNavigationActive,
   MOBILE_NAV,
 } from "../../artifacts/web/components/AppShell";
-import { DepositsIcon } from "../../artifacts/web/components/nav-icons";
 
 describe("tema global", () => {
   it("usa Sistema cuando no existe una preferencia persistida", () => {
@@ -52,55 +51,67 @@ describe("tema global", () => {
 });
 
 describe("navegación móvil autenticada", () => {
-  it("mantiene siempre los cuatro destinos requeridos", () => {
+  it("mantiene tres destinos fijos y deja el cuarto control para Más", () => {
     expect(MOBILE_NAV.map((item) => item.short)).toEqual([
       "Inicio",
       "Clientes",
       "Taller",
-      "Depósitos",
     ]);
   });
 
-  it("muestra Depósitos para su ruta y activa también vistas hijas", () => {
-    expect(MOBILE_NAV.at(-1)).toMatchObject({
-      href: "/admin/settings/deposits",
-      short: "Depósitos",
-      label: "Depósitos",
-    });
-    expect(MOBILE_NAV.at(-1)?.icon.type).toBe(DepositsIcon);
+  it("activa destinos fijos y vistas hijas sin activar Inicio en todo admin", () => {
     expect(
       isMobileNavigationActive(
-        "/admin/settings/deposits/detail",
-        "/admin/settings/deposits",
+        "/admin/workshop/detail",
+        "/admin/workshop",
       ),
     ).toBe(true);
     expect(
       isMobileNavigationActive(
-        "/admin/settings/loyalty",
-        "/admin/settings/deposits",
+        "/admin/products",
+        "/admin",
       ),
     ).toBe(false);
     expect(
       isMobileNavigationActive(
-        "/admin/settings/general",
-        "/admin/settings/general",
+        "/admin",
+        "/admin",
       ),
+    ).toBe(true);
+    expect(
+      isMobileNavigationActive("/admin/workshop/orden", "/admin/workshop"),
     ).toBe(true);
   });
 
-  it("no presenta la ruta de depósitos como un menú Más", () => {
+  it("usa un menú Más para conservar cuatro controles móviles", () => {
     const source = readFileSync(
       new URL("../../artifacts/web/components/AppShell.tsx", import.meta.url),
       "utf8",
     );
-    expect(source).toContain('label: "Depósitos"');
-    expect(source).not.toContain('label: "Más"');
-    expect(source).not.toContain('icon: "•••"');
+    expect(source).toContain('aria-label="Más secciones"');
+    expect(source).toContain("<MoreIcon />");
+    expect(source).toContain('label: "Solicitudes y cotizaciones"');
+  });
+
+  it("usa iconos administrativos consistentes en lugar de símbolos provisionales", () => {
+    const source = readFileSync(
+      new URL("../../artifacts/web/components/AppShell.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("<AdminHomeIcon />");
+    expect(source).toContain("<LoyaltyAdminIcon />");
+    expect(source).toContain("<WorkshopAdminIcon />");
+    expect(source).toContain("<EventsIcon />");
+    expect(source).toContain("<ProductsIcon />");
+    expect(source).toContain("<RequestsIcon />");
+    expect(source).not.toContain(">◇<");
+    expect(source).not.toContain(">□<");
+    expect(source).not.toContain(">≡<");
   });
 });
 
 describe("superficies temáticas", () => {
-  it("no fuerza el fondo oscuro en la página pública de depósitos", () => {
+  it("comparte la superficie oscura de la página informativa en depósitos", () => {
     const css = readFileSync(
       new URL(
         "../../artifacts/web/pages/public/deposits.css",
@@ -108,13 +119,10 @@ describe("superficies temáticas", () => {
       ),
       "utf8",
     );
-    expect(css).toContain("background: var(--color-background)");
-    expect(css).not.toMatch(
-      /\.public-deposits-page\s*\{[^}]*background:\s*#0b0b0d/s,
-    );
-    expect(css).not.toMatch(
-      /\.public-deposit-detail\s*\{[^}]*background:\s*#0b0b0d/s,
-    );
+    expect(css).toMatch(/\.public-deposits-page\s*\{[^}]*background:\s*#070709/s);
+    expect(css).toContain(".deposit-bank-tabs");
+    expect(css).toContain(".deposit-safety-note");
+    expect(css).not.toContain(".public-deposit-detail");
   });
 
   it("centraliza containers fluidos y activa escritorio desde 1024 px", () => {

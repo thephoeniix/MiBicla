@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   cameraErrorMessage,
   canShowCustomerScanner,
   createScanGate,
+  customerAdminProfileUrl,
   extractCustomerToken,
   stopMediaStream,
 } from "../../artifacts/web/components/scanner/scanner-utils";
@@ -15,6 +17,17 @@ describe("escáner administrativo de clientes", () => {
     expect(
       extractCustomerToken(`https://mibicla.example/c/${TOKEN}`),
     ).toBe(TOKEN);
+  });
+
+  it("extrae la tarjeta pública real aunque sea relativa o incluya query/hash", () => {
+    expect(extractCustomerToken(`/c/${TOKEN}`)).toBe(TOKEN);
+    expect(extractCustomerToken(`https://mibicla.mx/c/${TOKEN}/?source=card#qr`)).toBe(TOKEN);
+  });
+
+  it("construye la ruta del perfil administrativo identificado", () => {
+    expect(customerAdminProfileUrl("customer/id")).toBe(
+      "/admin/customers?customer=customer%2Fid",
+    );
   });
 
   it("acepta un token directo", () => {
@@ -65,6 +78,19 @@ describe("escáner administrativo de clientes", () => {
     ).toContain("permiso");
   });
 
+  it("permite leer una foto del QR cuando la cámara web no está disponible", () => {
+    const scanner = readFileSync(
+      new URL(
+        "../../artifacts/web/components/scanner/QrScanner.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    expect(scanner).toContain('capture="environment"');
+    expect(scanner).toContain("decodeFromImageUrl");
+    expect(scanner).toContain("Tomar o elegir foto del QR");
+  });
+
   it("oculta la acción sin adjust_loyalty o fuera de sus rutas", () => {
     expect(canShowCustomerScanner("/admin/customers", [])).toBe(false);
     expect(
@@ -74,7 +100,7 @@ describe("escáner administrativo de clientes", () => {
       canShowCustomerScanner("/admin/workshop", ["adjust_loyalty"]),
     ).toBe(false);
     expect(
-      canShowCustomerScanner("/admin/settings/loyalty", ["adjust_loyalty"]),
-    ).toBe(false);
+      canShowCustomerScanner("/admin/loyalty", ["adjust_loyalty"]),
+    ).toBe(true);
   });
 });

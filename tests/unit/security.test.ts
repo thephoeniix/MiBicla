@@ -6,6 +6,7 @@ import {
   normalizeEmail,
   sanitizeAuditMetadata,
   safeTokenCompare,
+  parseEnv,
 } from "@mi-bicla/shared";
 describe("seguridad", () => {
   it("normaliza correo", () =>
@@ -37,5 +38,25 @@ describe("seguridad", () => {
         new Date("2026-01-01T01:20:00Z"),
       )?.toISOString(),
     ).toBe("2026-01-01T01:20:00.000Z");
+  });
+  it("exige HTTPS, loopback, un proxy y orígenes exactos en producción", () => {
+    const production = {
+      DATABASE_URL: "postgresql://user:secret@db.example.com/mibicla",
+      NODE_ENV: "production",
+      APP_BASE_URL: "https://mibicla.example.com",
+      API_BASE_URL: "https://mibicla.example.com",
+      SESSION_SECRET: "a".repeat(32),
+      APP_ENCRYPTION_KEY: "1".repeat(64),
+      TRUST_PROXY: "1",
+      ALLOWED_ORIGINS: "https://mibicla.example.com",
+      HOST: "127.0.0.1",
+      PORT: "3000",
+    };
+    expect(parseEnv(production).HOST).toBe("127.0.0.1");
+    expect(() => parseEnv({ ...production, APP_BASE_URL: "http://mibicla.example.com" })).toThrow();
+    expect(() => parseEnv({ ...production, TRUST_PROXY: "2" })).toThrow();
+    expect(() => parseEnv({ ...production, HOST: "0.0.0.0" })).toThrow();
+    expect(() => parseEnv({ ...production, ALLOWED_ORIGINS: "https://mibicla.example.com/" })).toThrow();
+    expect(() => parseEnv({ ...production, ALLOWED_ORIGINS: "" })).toThrow();
   });
 });

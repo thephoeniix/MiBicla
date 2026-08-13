@@ -21,7 +21,9 @@ describe("Taller", () => {
     expect(canTransition("received", "inspection")).toBe(true);
     expect(canTransition("waiting_parts", "in_progress")).toBe(true);
     expect(canTransition("delivered", "in_progress")).toBe(false);
-    expect(canTransition("cancelled", "ready")).toBe(false);
+    expect(canTransition("inspection", "in_progress")).toBe(true);
+    expect(canTransition("inspection", "diagnosis")).toBe(false);
+    expect(canTransition("in_progress", "cancelled")).toBe(false);
   });
   it("calcula totales en servidor ignorando cancelados", () =>
     expect(
@@ -85,7 +87,7 @@ describe("Taller", () => {
   });
   it("permite entrega desde ready pero no desde estados previos", () => {
     expect(canTransition("ready", "delivered")).toBe(true);
-    expect(canTransition("diagnosis", "delivered")).toBe(false);
+    expect(canTransition("inspection", "delivered")).toBe(false);
     expect(
       workshopStatusSchema.parse({
         status: "delivered",

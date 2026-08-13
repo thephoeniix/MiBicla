@@ -1,0 +1,27 @@
+FROM node:20.20.2-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY artifacts/api/package.json artifacts/api/package.json
+COPY artifacts/web/package.json artifacts/web/package.json
+COPY packages/api-contract/package.json packages/api-contract/package.json
+COPY packages/db/package.json packages/db/package.json
+COPY packages/shared/package.json packages/shared/package.json
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM build AS api
+EXPOSE 3100
+CMD ["node", "artifacts/api/dist/index.js"]
+
+FROM nginx:1.27-alpine AS web
+RUN apk add --no-cache openssl \
+  && mkdir -p /etc/nginx/certs \
+  && openssl req -x509 -newkey rsa:2048 -nodes -days 2 \
+    -keyout /etc/nginx/certs/localhost.key \
+    -out /etc/nginx/certs/localhost.crt \
+    -subj "/CN=mibicla.test" \
+    -addext "subjectAltName=DNS:mibicla.test"
+COPY deploy/nginx.smoke.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/artifacts/web/dist /usr/share/nginx/html
+EXPOSE 8443

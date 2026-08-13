@@ -68,6 +68,31 @@ describe("cliente API autenticado", () => {
     expect(init.credentials).toBe("include");
     expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-scanner");
   });
+  it("restaura el CSRF administrativo obsoleto y reintenta una sola vez", async () => {
+    sessionStorage.setItem("mb_csrf", "csrf-obsoleto");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: { code: "CSRF_TOKEN" },
+      }), { status: 403 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        authenticated: true,
+        csrfToken: "csrf-restaurado",
+        administrator: {},
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { apiFetch } = await import("../../artifacts/web/lib/api-client");
+    await apiFetch("/api/admin/customer-registration-requests/review/approve", {
+      method: "POST",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/auth/session");
+    const [, retry] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(new Headers(retry.headers).get("X-CSRF-Token")).toBe("csrf-restaurado");
+  });
   it.each([
     [400, "datos inválidos"],
     [401, "sesión expiró"],

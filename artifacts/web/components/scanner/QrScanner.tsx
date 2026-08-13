@@ -14,9 +14,10 @@ interface NativeBarcodeDetector {
   detect(source: HTMLVideoElement): Promise<NativeBarcode[]>;
 }
 
-type BarcodeDetectorConstructor = new (options: {
-  formats: string[];
-}) => NativeBarcodeDetector;
+interface BarcodeDetectorConstructor {
+  new (options: { formats: string[] }): NativeBarcodeDetector;
+  getSupportedFormats?: () => Promise<string[]>;
+}
 
 export function QrScanner({
   onDetected,
@@ -34,6 +35,7 @@ export function QrScanner({
   const [deviceId, setDeviceId] = useState("");
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [readingImage, setReadingImage] = useState(false);
   const [torchAvailable, setTorchAvailable] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
 
@@ -66,6 +68,8 @@ export function QrScanner({
     if (!Detector) return false;
     let detector: NativeBarcodeDetector;
     try {
+      const formats = await Detector.getSupportedFormats?.();
+      if (formats && !formats.includes("qr_code")) return false;
       detector = new Detector({ formats: ["qr_code"] });
     } catch {
       return false;
@@ -92,6 +96,12 @@ export function QrScanner({
     gateRef.current.reset();
     setStarting(true);
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        onError(
+          "La cámara no está disponible en este navegador. Abre el sitio con HTTPS o ingresa el enlace manualmente.",
+        );
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: selectedDeviceId
           ? { deviceId: { exact: selectedDeviceId } }
@@ -107,16 +117,19 @@ export function QrScanner({
       video.srcObject = stream;
       await video.play();
       const track = stream.getVideoTracks()[0];
-      const capabilities = track?.getCapabilities() as MediaTrackCapabilities & {
-        torch?: boolean;
-      };
+      const capabilities = track?.getCapabilities?.() as
+        | (MediaTrackCapabilities & { torch?: boolean })
+        | undefined;
       setTorchAvailable(Boolean(capabilities?.torch));
-      const cameras = (
-        await navigator.mediaDevices.enumerateDevices()
-      ).filter((device) => device.kind === "videoinput");
+      const cameras = navigator.mediaDevices.enumerateDevices
+        ? (await navigator.mediaDevices.enumerateDevices()).filter(
+            (device) => device.kind === "videoinput",
+          )
+        : [];
       setDevices(cameras);
-      if (!selectedDeviceId && track?.getSettings().deviceId)
-        setDeviceId(track.getSettings().deviceId ?? "");
+      const settings = track?.getSettings?.();
+      if (!selectedDeviceId && settings?.deviceId)
+        setDeviceId(settings.deviceId);
       setActive(true);
 
       if (!(await scanWithNative(video))) {
@@ -155,6 +168,24 @@ export function QrScanner({
     }
   }
 
+  async function scanImage(file: File | undefined) {
+    if (!file) return;
+    setReadingImage(true);
+    const url = URL.createObjectURL(file);
+    try {
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
+      const result = await new BrowserQRCodeReader().decodeFromImageUrl(url);
+      await accept(result.getText());
+    } catch {
+      onError(
+        "No encontramos un código QR legible en la imagen. Intenta con otra foto o ingresa el enlace manualmente.",
+      );
+    } finally {
+      URL.revokeObjectURL(url);
+      setReadingImage(false);
+    }
+  }
+
   useEffect(() => () => stop(), []);
 
   return (
@@ -169,9 +200,22 @@ export function QrScanner({
             <img src="/white-simple.png" alt="" />
             <strong>Escanea el QR del cliente</strong>
             <p>La cámara se usará únicamente durante este escaneo.</p>
-            <button type="button" onClick={() => void start()} disabled={starting}>
+            <button type="button" onClick={() => void start()} disabled={starting || readingImage}>
               {starting ? "Solicitando permiso…" : "Activar cámara"}
             </button>
+            <label className="scanner-image-action">
+              {readingImage ? "Leyendo imagen…" : "Tomar o elegir foto del QR"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={starting || readingImage}
+                onChange={(event) => {
+                  void scanImage(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </label>
           </div>
         )}
       </div>

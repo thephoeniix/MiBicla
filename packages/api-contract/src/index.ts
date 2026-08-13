@@ -65,6 +65,34 @@ export const changePasswordSchema = z
     newPassword: strongPassword,
   })
   .strict();
+export const managedAdministratorRoleSchema = z.enum(["admin", "employee"]);
+export const createManagedAdministratorSchema = z
+  .object({
+    name: z.string().trim().min(1).max(150),
+    email,
+    password: strongPassword,
+    role: managedAdministratorRoleSchema,
+  })
+  .strict();
+export const updateManagedAdministratorRoleSchema = z
+  .object({ role: managedAdministratorRoleSchema })
+  .strict();
+export const updateManagedAdministratorStatusSchema = z
+  .object({ isActive: z.boolean() })
+  .strict();
+export const resetManagedAdministratorPasswordSchema = z
+  .object({ newPassword: strongPassword })
+  .strict();
+export const managedAdministratorSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  email,
+  role: z.enum(ROLE_NAMES),
+  isActive: z.boolean(),
+  lastLoginAt: z.coerce.date().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
 export const ownerEnvironmentSchema = z.object({
   OWNER_NAME: z.string().trim().min(1).max(150),
   OWNER_EMAIL: email,
@@ -73,9 +101,17 @@ export const ownerEnvironmentSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
+export type CreateManagedAdministratorInput = z.infer<
+  typeof createManagedAdministratorSchema
+>;
+export type ManagedAdministratorRole = z.infer<
+  typeof managedAdministratorRoleSchema
+>;
 export * from "./business-settings.schema.js";
 export * from "./phone.schema.js";
 export * from "./phase-2.schema.js";
 export * from "./workshop.schema.js";
 export * from "./customer-auth.schema.js";
 export * from "./customer-registration.schema.js";
+export * from "./customer-portal.schema.js";
+export * from "./commerce.schema.js";

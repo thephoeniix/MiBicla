@@ -154,3 +154,17 @@ export const customerRewards = pgTable(
     index("customer_rewards_status_idx").on(t.status),
   ],
 );
+export const customerLoyaltyMovements = pgTable(
+  "customer_loyalty_movements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+    units: integer("units").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    movementType: varchar("movement_type", { length: 30 }).default("manual_adjustment").notNull(),
+    createdBy: uuid("created_by").references(() => administrators.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("loyalty_movements_customer_idx").on(t.customerId, t.createdAt)],
+);

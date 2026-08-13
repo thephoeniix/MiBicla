@@ -237,8 +237,17 @@ export function resolveSensitiveField(
 }
 function masked(value: string | null) {
   if (!value) return undefined;
-  const clear = decrypt(value);
+  const clear = safeDecrypt(value);
+  if (!clear) return undefined;
   return `•••• ${clear.slice(-4)}`;
+}
+function safeDecrypt(value: string | null) {
+  if (!value) return undefined;
+  try {
+    return decrypt(value);
+  } catch {
+    return undefined;
+  }
 }
 export function toAdminDeposit(d: DepositRow) {
   return {
@@ -275,13 +284,13 @@ export function toPublicDeposit(d: DepositRow | undefined) {
     accountHolder: d.showHolder ? d.accountHolder : undefined,
     accountNumber:
       d.showAccountNumber && d.accountNumberEncrypted
-        ? decrypt(d.accountNumberEncrypted)
+        ? safeDecrypt(d.accountNumberEncrypted)
         : undefined,
     clabe:
-      d.showClabe && d.clabeEncrypted ? decrypt(d.clabeEncrypted) : undefined,
+      d.showClabe && d.clabeEncrypted ? safeDecrypt(d.clabeEncrypted) : undefined,
     cardNumber:
       d.showCardNumber && d.cardNumberEncrypted
-        ? decrypt(d.cardNumberEncrypted)
+        ? safeDecrypt(d.cardNumberEncrypted)
         : undefined,
     referenceText: d.referenceText,
     instructions: d.instructions,

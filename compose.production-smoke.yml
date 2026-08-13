@@ -1,0 +1,72 @@
+name: mibicla-production-smoke
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    network_mode: host
+    command: ["postgres", "-p", "55436"]
+    environment:
+      POSTGRES_DB: mibicla_production_smoke
+      POSTGRES_USER: mibicla_smoke
+      POSTGRES_PASSWORD: smoke_only_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 55436 -U mibicla_smoke -d mibicla_production_smoke"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    volumes:
+      - mibicla_production_smoke_db:/var/lib/postgresql/data
+
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.smoke
+      target: api
+    network_mode: host
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      MIGRATION_CONFIRM: APPLY
+      DATABASE_URL: postgresql://mibicla_smoke:smoke_only_password@127.0.0.1:55436/mibicla_production_smoke
+    command: ["npm", "run", "migrate", "-w", "@mi-bicla/db"]
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.smoke
+      target: api
+    network_mode: host
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://mibicla_smoke:smoke_only_password@127.0.0.1:55436/mibicla_production_smoke
+      APP_BASE_URL: https://mibicla.test:8443
+      API_BASE_URL: https://mibicla.test:8443
+      SESSION_SECRET: production-smoke-session-secret-change-me-123456
+      APP_ENCRYPTION_KEY: "1111111111111111111111111111111111111111111111111111111111111111"
+      TRUST_PROXY: "1"
+      ALLOWED_ORIGINS: https://mibicla.test:8443
+      HOST: 127.0.0.1
+      PORT: "3100"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.smoke
+      target: web
+    network_mode: host
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  mibicla_production_smoke_db:

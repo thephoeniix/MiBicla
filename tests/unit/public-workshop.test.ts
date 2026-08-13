@@ -73,5 +73,18 @@ describe("taller público recuperado", () => {
     expect(styles).not.toMatch(
       /\.service-card\s*\{[^}]*overflow-x:/,
     );
+    expect(styles).not.toContain(".service-card:nth-child(3n + 2)");
+    expect(styles).toMatch(/\.service-card:hover\s*\{[^}]*background:\s*#f51168/);
+    expect(styles).toMatch(/\.service-card:focus-visible,\s*\.service-card:active/);
+  });
+
+  it("presenta Mi Tarjeta con un hero fotográfico como Taller", () => {
+    expect(publicPagesSource).toContain('className="loyalty-photo-hero"');
+    expect(publicPagesSource).toContain('title="CADA RODADA CUENTA"');
+    expect(styles).toContain("--brand-photo-workshop-hero: url(\"../../recursos/webp/ASN06722.webp\")");
+    expect(styles).toContain("--brand-photo-loyalty-hero: url(\"../../recursos/webp/ASN02947.webp\")");
+    expect(styles).toContain("--brand-photo-workshop-card: url(\"../../recursos/webp/1234.webp\")");
+    expect(styles).toContain("--brand-photo-loyalty-card: url(\"../../recursos/webp/ASN03155.webp\")");
+    expect(styles).toContain("--brand-photo-community: url(\"../../recursos/webp/13.webp\")");
   });
 });

@@ -18,6 +18,7 @@ import {
 } from "../../artifacts/web/pages/admin/settings/Deposits";
 import { depositSettingsSchema } from "../../packages/api-contract/src/business-settings.schema";
 import {
+  editableLoyaltySettings,
   loyaltySettingsChanged,
   moveLoyaltyStage,
   replaceLoyaltyRule,
@@ -186,6 +187,41 @@ describe("datos financieros públicos", () => {
 });
 
 describe("flujo móvil de fidelidad", () => {
+  it("muestra sólo configuración y asignación directa de puntos", () => {
+    const component = readFileSync(
+      new URL(
+        "../../artifacts/web/pages/admin/settings/Loyalty.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    expect(component).toContain("Estado del programa");
+    expect(component).toContain("Configuración de recompensa");
+    expect(component).toContain("Dar puntos a un cliente");
+    expect(component).toContain("Escanear QR");
+    expect(component).toContain("loyalty-adjustments");
+    expect(component).not.toContain("Reglas de compra");
+    expect(component).not.toContain("Simulador");
+    expect(component).not.toContain("Etapas de configuración");
+  });
+
+  it("normaliza la respuesta persistida antes de volver a guardarla", () => {
+    const result = editableLoyaltySettings({
+      id: "server-only",
+      enabled: false,
+      currency: "MXN",
+      purchaseRules: [],
+      rewardUnits: 10,
+      rewardDiscountPercent: "12.50",
+      rewardName: "Recompensa",
+      rewardDescription: "",
+      allowManualAdjustments: false,
+      allowNegativeBalance: false,
+    });
+    expect(result.rewardDiscountPercent).toBe(12.5);
+    expect(result).not.toHaveProperty("id");
+  });
+
   it("limita la navegación a sus cuatro etapas", () => {
     expect(moveLoyaltyStage(1, -1)).toBe(1);
     expect(moveLoyaltyStage(1, 1)).toBe(2);

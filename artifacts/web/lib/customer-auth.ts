@@ -2,10 +2,79 @@ import { API_BASE_URL, ApiError } from "./api-client";
 
 export interface CustomerIdentity {
   id: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   phone: string;
+  email?: string | null;
+  birthDate?: string | null;
   accountStatus: "active";
+  updatedAt?: string;
 }
+export interface CustomerLoyalty {
+  name: string;
+  balance: { availableUnits: number; pendingUnits: number; lifetimeUnits: number; updatedAt: string };
+  rewards: Array<{ id: string; rewardName: string; rewardDiscountPercent: string; requiredUnits: number; status: string; createdAt: string; expiresAt?: string | null }>;
+  movements: Array<{ id: string; units: number; balanceAfter: number; reason: string; movementType: string; createdAt: string }>;
+  loyaltyProgram: { enabled: boolean; rewardUnits: number; rewardName: string; rewardDescription: string } | null;
+  updatedAt: string;
+}
+export interface CustomerBicycle {
+  id: string;
+  nickname?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  year?: number | null;
+  bikeType?: string | null;
+  color?: string | null;
+  wheelSize?: string | null;
+  brakeType?: string | null;
+  suspensionType?: string | null;
+  drivetrain?: string | null;
+  generalCondition?: string | null;
+  serialNumber?: string | null;
+  frameNumber?: string | null;
+  photoUrl?: string | null;
+  status: string;
+  updatedAt: string;
+}
+export interface CustomerOrderSummary {
+  orderNumber: string;
+  bicycle: { id: string; nickname?: string | null; brand?: string | null; model?: string | null; photoUrl?: string | null };
+  publicStatus: string;
+  customerVisibleSummary?: string | null;
+  estimatedCompletionAt?: string | null;
+  readyAt?: string | null;
+  deliveredAt?: string | null;
+  totalCents: number;
+  paymentStatus: string;
+  isActive: boolean;
+  updatedAt: string;
+}
+export interface CustomerOrderTracking {
+  orderNumber: string;
+  bicycle: { nickname?: string | null; brand?: string | null; model?: string | null; bikeType?: string | null; color?: string | null; photoUrl?: string | null };
+  publicStatus: string;
+  customerVisibleSummary?: string | null;
+  estimatedCompletionAt?: string | null;
+  readyAt?: string | null;
+  updates: Array<{ id: string; title: string; message: string; progressPercent?: number | null; photoUrl?: string | null; createdAt: string }>;
+  visibleServices: Array<{ id: string; serviceName: string; description?: string | null; status: string }>;
+  visibleParts: Array<{ id: string; partName: string; brand?: string | null; description?: string | null; status: string }>;
+  history: Array<{ id: string; status: string; publicMessage?: string | null; createdAt: string }>;
+  updatedAt: string;
+  totalCents?: number;
+  paymentStatus?: string;
+}
+export interface CustomerWorkshopRequestSummary {
+  requestNumber: string;
+  bicycleId: string | null;
+  problemDescription: string;
+  status: string;
+  createdAt: string;
+  convertedOrderId?: string | null;
+}
+export type CustomerBicyclePayload = Omit<CustomerBicycle, "id" | "status" | "updatedAt">;
 
 export interface CustomerSession {
   authenticated: true;
@@ -150,6 +219,65 @@ export async function loginCustomer(phone: string, password: string) {
 
 export const getCustomerMe = () =>
   customerFetch<CustomerIdentity>("/api/customer/me");
+export const getMyLoyalty = (signal?: AbortSignal) =>
+  customerFetch<CustomerLoyalty>("/api/customer/loyalty", { signal });
+export const createMyCardLink = () =>
+  customerFetch<{ cardUrl: string }>("/api/customer/card-link", {
+    method: "POST",
+  }, true);
+export const getMyBicycles = (signal?: AbortSignal) =>
+  customerFetch<CustomerBicycle[]>("/api/customer/bicycles", { signal });
+export const getMyOrders = (signal?: AbortSignal) =>
+  customerFetch<CustomerOrderSummary[]>("/api/customer/orders", { signal });
+export const getMyOrder = (orderNumber: string, signal?: AbortSignal) =>
+  customerFetch<CustomerOrderTracking>(
+    `/api/customer/orders/${encodeURIComponent(orderNumber)}`,
+    { signal },
+  );
+export const getMyWorkshopRequests = (signal?: AbortSignal) =>
+  customerFetch<CustomerWorkshopRequestSummary[]>("/api/customer/workshop-requests", { signal });
+export const createMyBicycle = (input: CustomerBicyclePayload) =>
+  customerFetch<CustomerBicycle>("/api/customer/bicycles", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  }, true);
+export const updateMyBicycle = (id: string, input: Partial<CustomerBicyclePayload>) =>
+  customerFetch<CustomerBicycle>(`/api/customer/bicycles/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  }, true);
+export const updateMyProfile = (input: {
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  birthDate: string | null;
+}) => customerFetch<CustomerIdentity>("/api/customer/profile", {
+  method: "PATCH",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(input),
+}, true);
+export const changeMyPassword = (currentPassword: string, newPassword: string) =>
+  customerFetch<void>("/api/customer/password", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  }, true);
+export const createMyWorkshopRequest = (input: {
+  bicycleId: string;
+  serviceName: string | null;
+  problemDescription: string;
+  preferredContactMethod: "whatsapp" | "phone" | "email";
+}) => customerFetch<{ requestNumber: string; status: string; createdAt: string }>(
+  "/api/customer/workshop-requests",
+  {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  },
+  true,
+);
 
 export async function logoutCustomer() {
   try {

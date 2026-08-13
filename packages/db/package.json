@@ -1,1 +1,39 @@
-{"name":"@mi-bicla/db","version":"0.1.0","private":true,"type":"module","exports":{".":"./src/index.ts","./schema":"./src/schema.ts"},"scripts":{"typecheck":"tsc --noEmit","build":"tsc","generate":"drizzle-kit generate","migrate":"tsx src/migrate.ts","seed":"tsx src/seed.ts","create-owner":"tsx src/create-owner.ts","cleanup-rate-limits":"tsx src/cleanup-rate-limits.ts"},"dependencies":{"@mi-bicla/api-contract":"*","@mi-bicla/shared":"*","dotenv":"^17.4.2","drizzle-orm":"^0.45.2","postgres":"^3.4.5","vitest":"4.1.10"},"devDependencies":{"drizzle-kit":"^0.31.4","tsx":"^4.19.2"}}
+{
+  "name": "@mi-bicla/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./src/schema.ts",
+      "source": "./src/schema.ts",
+      "default": "./dist/schema.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx --conditions=source src/migrate.ts",
+    "seed": "tsx --conditions=source src/seed.ts",
+    "create-owner": "tsx --conditions=source src/create-owner.ts",
+    "cleanup-rate-limits": "tsx --conditions=source src/cleanup-rate-limits.ts"
+  },
+  "dependencies": {
+    "@mi-bicla/api-contract": "*",
+    "@mi-bicla/shared": "*",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.5",
+    "vitest": "4.1.10"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.19.2"
+  }
+}

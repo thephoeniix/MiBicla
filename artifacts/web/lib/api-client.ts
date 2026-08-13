@@ -1,5 +1,8 @@
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+  import.meta.env.VITE_API_BASE_URL?.trim() ||
+  (import.meta.env.PROD
+    ? ""
+    : `http://${globalThis.location?.hostname || "localhost"}:3000`);
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -24,21 +27,24 @@ export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const method = (init.method ?? "GET").toUpperCase(),
-    headers = new Headers(init.headers);
-  headers.set("Accept", "application/json");
-  if (MUTABLE.has(method)) {
-    const csrf = sessionStorage.getItem("mb_csrf");
-    if (csrf) headers.set("X-CSRF-Token", csrf);
-  }
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+  const method = (init.method ?? "GET").toUpperCase();
+  const execute = () => {
+    const headers = new Headers(init.headers);
+    headers.set("Accept", "application/json");
+    if (MUTABLE.has(method)) {
+      const csrf = sessionStorage.getItem("mb_csrf");
+      if (csrf) headers.set("X-CSRF-Token", csrf);
+    }
+    return fetch(`${API_BASE_URL}${path}`, {
       ...init,
       method,
       headers,
       credentials: "include",
     });
+  };
+  let response: Response;
+  try {
+    response = await execute();
   } catch {
     throw new ApiError(
       0,
@@ -46,6 +52,26 @@ export async function apiFetch<T>(
       {},
       "API_UNREACHABLE",
     );
+  }
+  if (response.status === 403 && MUTABLE.has(method)) {
+    const payload = (await response.clone().json().catch(() => null)) as {
+      error?: { code?: string };
+    } | null;
+    if (payload?.error?.code === "CSRF_TOKEN") {
+      try {
+        const restored = await fetch(`${API_BASE_URL}/auth/session`, {
+          headers: { Accept: "application/json" },
+          credentials: "include",
+        });
+        if (restored.ok) {
+          const session = (await restored.json()) as { csrfToken?: string };
+          if (session.csrfToken) sessionStorage.setItem("mb_csrf", session.csrfToken);
+          response = await execute();
+        } else response = restored;
+      } catch {
+        // Preserve the original response; the normal error path below handles it.
+      }
+    }
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {

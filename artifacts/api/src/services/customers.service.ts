@@ -3,6 +3,7 @@ import {
   customerAuthTokens,
   customerCredentials,
   customerLoyaltyBalance,
+  customerLoyaltyMovements,
   customerPublicTokens,
   customerRewards,
   customers,
@@ -11,6 +12,7 @@ import {
 } from "@mi-bicla/db";
 import { generateSessionToken, sha256 } from "@mi-bicla/shared";
 import type {
+  CustomerProfileUpdate,
   CustomerCreateInput,
   CustomerUpdateInput,
 } from "@mi-bicla/api-contract";
@@ -81,21 +83,27 @@ export class CustomersService {
       .where(and(eq(customers.id, id), isNull(customers.deletedAt)))
       .limit(1);
     if (!customer) return null;
-    const [balance] = await this.db
+    const [[balance], rewards, [credential], [loyaltyProgram]] = await Promise.all([
+      this.db
         .select()
         .from(customerLoyaltyBalance)
         .where(eq(customerLoyaltyBalance.customerId, id))
         .limit(1),
-      rewards = await this.db
+      this.db
         .select()
         .from(customerRewards)
         .where(eq(customerRewards.customerId, id))
         .orderBy(asc(customerRewards.createdAt)),
-      [credential] = await this.db
+      this.db
         .select({ id: customerCredentials.id, status: customerCredentials.status })
         .from(customerCredentials)
         .where(eq(customerCredentials.customerId, id))
-        .limit(1);
+        .limit(1),
+      this.db.select({
+        enabled: loyaltySettings.enabled,
+        allowManualAdjustments: loyaltySettings.allowManualAdjustments,
+      }).from(loyaltySettings).limit(1),
+    ]);
     // Únicamente lo necesario para que el panel decida qué botón mostrar —
     // nunca passwordHash, tokenHash ni el token crudo.
     let activationExpiresAt: Date | null = null;
@@ -123,6 +131,7 @@ export class CustomersService {
         updatedAt: customer.updatedAt,
       },
       rewards,
+      loyaltyProgram: loyaltyProgram ?? null,
       credentialStatus: credential?.status ?? null,
       activationExpiresAt,
       hasActiveActivation: activationExpiresAt !== null,
@@ -150,6 +159,25 @@ export class CustomersService {
       .where(and(eq(customers.id, id), isNull(customers.deletedAt)))
       .returning();
     return row ?? null;
+  }
+  async updateProfile(customerId: string, input: CustomerProfileUpdate) {
+    const [row] = await this.db.update(customers).set({
+      ...input,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(customers.id, customerId),
+      eq(customers.status, "active"),
+      isNull(customers.deletedAt),
+    )).returning({
+      id: customers.id,
+      firstName: customers.firstName,
+      lastName: customers.lastName,
+      phone: customers.phone,
+      email: customers.email,
+      birthDate: customers.birthDate,
+      updatedAt: customers.updatedAt,
+    });
+    return row ? { ...row, name: `${row.firstName} ${row.lastName}`, accountStatus: "active" as const } : null;
   }
   async remove(id: string, administratorId: string) {
     const [row] = await this.db
@@ -198,26 +226,76 @@ export class CustomersService {
       .update(customerPublicTokens)
       .set({ lastUsedAt: now })
       .where(eq(customerPublicTokens.id, row.token.id));
-    const [detail, [loyaltyProgram]] = await Promise.all([
-      this.get(row.customer.id),
+    const loyalty = await this.getLoyalty(row.customer.id);
+    if (!loyalty) return null;
+    const { movements, ...publicCard } = loyalty;
+    void movements;
+    return publicCard;
+  }
+  async getLoyalty(customerId: string) {
+    const now = new Date();
+    const [[customer], [balance], rewards, movements, [loyaltyProgram]] = await Promise.all([
+      this.db.select({
+        firstName: customers.firstName,
+        lastName: customers.lastName,
+        updatedAt: customers.updatedAt,
+      }).from(customers).where(and(
+        eq(customers.id, customerId),
+        eq(customers.status, "active"),
+        isNull(customers.deletedAt),
+      )).limit(1),
+      this.db.select({
+        availableUnits: customerLoyaltyBalance.availableUnits,
+        pendingUnits: customerLoyaltyBalance.pendingUnits,
+        lifetimeUnits: customerLoyaltyBalance.lifetimeUnits,
+        updatedAt: customerLoyaltyBalance.updatedAt,
+      }).from(customerLoyaltyBalance)
+        .where(eq(customerLoyaltyBalance.customerId, customerId)).limit(1),
+      this.db.select({
+        id: customerRewards.id,
+        rewardName: customerRewards.rewardName,
+        rewardDiscountPercent: customerRewards.rewardDiscountPercent,
+        requiredUnits: customerRewards.requiredUnits,
+        status: customerRewards.status,
+        createdAt: customerRewards.createdAt,
+        expiresAt: customerRewards.expiresAt,
+      }).from(customerRewards).where(and(
+        eq(customerRewards.customerId, customerId),
+        eq(customerRewards.status, "available"),
+        or(isNull(customerRewards.expiresAt), gt(customerRewards.expiresAt, now)),
+      )).orderBy(asc(customerRewards.createdAt)),
+      this.db.select({
+        id: customerLoyaltyMovements.id,
+        units: customerLoyaltyMovements.units,
+        balanceAfter: customerLoyaltyMovements.balanceAfter,
+        reason: customerLoyaltyMovements.reason,
+        movementType: customerLoyaltyMovements.movementType,
+        createdAt: customerLoyaltyMovements.createdAt,
+      }).from(customerLoyaltyMovements)
+        .where(eq(customerLoyaltyMovements.customerId, customerId))
+        .orderBy(desc(customerLoyaltyMovements.createdAt)).limit(10),
       this.db.select().from(loyaltySettings).limit(1),
     ]);
-    return detail
-      ? {
-          name: `${row.customer.firstName} ${row.customer.lastName}`,
-          balance: detail.balance,
-          rewards: detail.rewards.filter((r) => r.status === "available"),
-          loyaltyProgram: loyaltyProgram
-            ? {
-                enabled: loyaltyProgram.enabled,
-                rewardUnits: loyaltyProgram.rewardUnits,
-                rewardName: loyaltyProgram.rewardName,
-                rewardDescription: loyaltyProgram.rewardDescription,
-              }
-            : null,
-          updatedAt: detail.balance.updatedAt,
-        }
-      : null;
+    if (!customer) return null;
+    const safeBalance = balance ?? {
+      availableUnits: 0,
+      pendingUnits: 0,
+      lifetimeUnits: 0,
+      updatedAt: customer.updatedAt,
+    };
+    return {
+      name: `${customer.firstName} ${customer.lastName}`,
+      balance: safeBalance,
+      rewards,
+      movements,
+      loyaltyProgram: loyaltyProgram ? {
+        enabled: loyaltyProgram.enabled,
+        rewardUnits: loyaltyProgram.rewardUnits,
+        rewardName: loyaltyProgram.rewardName,
+        rewardDescription: loyaltyProgram.rewardDescription,
+      } : null,
+      updatedAt: safeBalance.updatedAt,
+    };
   }
   async resolvePublicToken(token: string) {
     const now = new Date();

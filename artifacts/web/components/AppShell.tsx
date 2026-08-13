@@ -4,10 +4,17 @@ import { canShowCustomerScanner } from "./scanner/scanner-utils";
 import { ThemeSelector } from "./ThemeSelector";
 import { BrandLogo } from "./brand";
 import {
+  AdminHomeIcon,
+  AdministrativeUsersIcon,
   ClientsIcon,
   DepositsIcon,
-  FidelityIcon,
-  TallerIcon,
+  EventsIcon,
+  LoyaltyAdminIcon,
+  MoreIcon,
+  ProductsIcon,
+  RequestsIcon,
+  SettingsIcon,
+  WorkshopAdminIcon,
 } from "./nav-icons";
 
 interface User {
@@ -18,11 +25,11 @@ interface User {
 
 const NAV_ITEMS = [
   {
-    href: "/admin/settings/general",
+    href: "/admin",
     label: "Inicio",
     short: "Inicio",
-    icon: "⌂",
-    permissions: ["view_business_settings"],
+    icon: <AdminHomeIcon />,
+    permissions: ["view_reports"],
   },
   {
     href: "/admin/customers",
@@ -32,48 +39,82 @@ const NAV_ITEMS = [
     permissions: ["view_customers"],
   },
   {
-    href: "/admin/workshop",
-    label: "Taller",
-    short: "Taller",
-    icon: <TallerIcon />,
-    permissions: ["view_workshop_orders", "view_workshop_requests"],
-  },
-  {
-    href: "/admin/settings/loyalty",
-    label: "Fidelidad",
-    short: "Fidelidad",
-    icon: <FidelityIcon />,
+    href: "/admin/loyalty",
+    label: "Loyalty",
+    short: "Loyalty",
+    icon: <LoyaltyAdminIcon />,
     permissions: ["view_loyalty"],
   },
   {
+    href: "/admin/workshop",
+    label: "Taller",
+    short: "Taller",
+    icon: <WorkshopAdminIcon />,
+    permissions: ["view_workshop_orders", "view_workshop_requests"],
+  },
+  {
+    href: "/admin/events",
+    label: "Eventos",
+    short: "Eventos",
+    icon: <EventsIcon />,
+    permissions: ["manage_events"],
+  },
+  {
+    href: "/admin/products",
+    label: "Productos",
+    short: "Productos",
+    icon: <ProductsIcon />,
+    permissions: ["manage_products"],
+  },
+  {
+    href: "/admin/requests",
+    label: "Solicitudes y cotizaciones",
+    short: "Solicitudes",
+    icon: <RequestsIcon />,
+    permissions: ["manage_catalog_requests"],
+  },
+  {
     href: "/admin/settings/deposits",
-    label: "Depósitos",
-    short: "Depósitos",
+    label: "Métodos de pago",
+    short: "Pagos",
     icon: <DepositsIcon />,
-    permissions: ["view_deposit_settings", "view_business_settings"],
+    permissions: ["view_deposit_settings"],
+  },
+  {
+    href: "/admin/users",
+    label: "Usuarios administrativos",
+    short: "Usuarios",
+    icon: <AdministrativeUsersIcon />,
+    permissions: ["manage_employees"],
+    ownerOnly: true,
+  },
+  {
+    href: "/admin/settings/general",
+    label: "Configuración",
+    short: "Config.",
+    icon: <SettingsIcon />,
+    permissions: ["view_business_settings", "view_deposit_settings"],
+    ownerOnly: false,
   },
 ] as const;
 
 export const MOBILE_NAV = [
   NAV_ITEMS[0],
   NAV_ITEMS[1],
-  NAV_ITEMS[2],
-  NAV_ITEMS[4],
+  NAV_ITEMS[3],
 ] as const;
 
 export function isMobileNavigationActive(pathname: string, href: string) {
-  if (href === "/admin/settings/deposits")
-    return pathname === href || pathname.startsWith(`${href}/`);
   return (
     pathname === href ||
-    (href === "/admin/settings/general" && pathname === "/admin")
+    (href !== "/admin" && pathname.startsWith(`${href}/`))
   );
 }
 
 function MobileHeader({ user }: { user: User }) {
   return (
     <header className="mobile-header">
-      <a className="app-brand" href="/admin/settings/general">
+      <a className="app-brand" href="/admin">
         <BrandLogo variant="full" color="white" />
       </a>
       <div>
@@ -86,12 +127,18 @@ function MobileHeader({ user }: { user: User }) {
 
 function BottomNavigation({
   pathname,
+  available,
 }: {
   pathname: string;
+  available: typeof NAV_ITEMS[number][];
 }) {
+  const [more, setMore] = useState(false);
+  const fixed = MOBILE_NAV.filter((item) => available.some(({ href }) => href === item.href));
+  const overflow = available.filter((item) => !fixed.some(({ href }) => href === item.href));
   return (
+    <>
     <nav className="bottom-navigation" aria-label="Navegación móvil">
-      {MOBILE_NAV.map((item) => {
+      {fixed.map((item) => {
         const active = isMobileNavigationActive(pathname, item.href);
         return (
         <a
@@ -105,7 +152,10 @@ function BottomNavigation({
         </a>
         );
       })}
+      <button type="button" aria-expanded={more} onClick={() => setMore((value) => !value)}><i aria-hidden="true"><MoreIcon /></i><span>Más</span></button>
     </nav>
+    {more && <nav className="admin-more-menu" aria-label="Más secciones">{overflow.map((item) => <a key={item.href} href={item.href} aria-current={isMobileNavigationActive(pathname, item.href) ? "page" : undefined}><i aria-hidden="true">{item.icon}</i>{item.label}</a>)}</nav>}
+    </>
   );
 }
 
@@ -120,9 +170,8 @@ export function AppShell({
 }) {
   const [scannerOpen, setScannerOpen] = useState(false);
   const available = NAV_ITEMS.filter((item) =>
-    item.permissions.some((permission) =>
-      user.permissions.includes(permission),
-    ),
+    (!("ownerOnly" in item) || !item.ownerOnly || user.role === "owner") &&
+    item.permissions.some((permission) => user.permissions.includes(permission)),
   );
   const pathname = window.location.pathname;
   const canScan = canShowCustomerScanner(pathname, user.permissions);
@@ -134,7 +183,7 @@ export function AppShell({
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
-        <a className="app-brand" href="/admin/settings/general">
+        <a className="app-brand" href="/admin">
           <BrandLogo variant="full" color="white" />
         </a>
         <nav aria-label="Navegación principal">
@@ -177,7 +226,7 @@ export function AppShell({
         </div>
         <main className="app-content">{children}</main>
       </div>
-      <BottomNavigation pathname={pathname} />
+      <BottomNavigation pathname={pathname} available={[...available]} />
       {canScan && (
         <button
           type="button"

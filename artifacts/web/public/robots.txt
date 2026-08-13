@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /mi
+Disallow: /c/
+Disallow: /cuenta/
+Disallow: /registro
+Disallow: /iniciar-sesion
+Disallow: /taller/solicitud
+
+Sitemap: https://mibiclaqro.com/sitemap.xml

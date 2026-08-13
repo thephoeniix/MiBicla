@@ -9,6 +9,8 @@ describe("rutas públicas", () => {
     expect(resolvePublicRoute("/")).toEqual({ route: "home" });
     expect(resolvePublicRoute("/admin")).toEqual({ route: "admin" });
     expect(resolvePublicRoute("/admin/workshop")).toEqual({ route: "admin" });
+    expect(resolvePublicRoute("/productos")).toEqual({ route: "products" });
+    expect(resolvePublicRoute("/eventos")).toEqual({ route: "events" });
   });
 
   it("conserva rutas públicas con token", () => {
@@ -40,8 +42,13 @@ describe("rutas públicas", () => {
     expect(resolvePublicRoute("/mi").route).toBe("customer-home");
     expect(resolvePublicRoute("/mi/tarjeta").route).toBe("customer-loyalty");
     expect(resolvePublicRoute("/mi/taller").route).toBe("customer-workshop");
+    expect(resolvePublicRoute("/mi/orden").route).toBe("customer-workshop");
+    expect(resolvePublicRoute("/mi/ordenes").route).toBe("customer-workshop");
     expect(resolvePublicRoute("/mi/bicicletas").route).toBe("customer-bikes");
     expect(resolvePublicRoute("/mi/perfil").route).toBe("customer-profile");
+    expect(resolvePublicRoute("/mi/productos").route).toBe("customer-products");
+    expect(resolvePublicRoute("/mi/eventos").route).toBe("customer-events");
+    expect(resolvePublicRoute("/mi/solicitudes").route).toBe("customer-requests");
     expect(resolvePublicRoute("/admin").route).toBe("admin");
     expect(resolvePublicRoute("/mi/cualquier-ruta").route).toBe(
       "customer-home",

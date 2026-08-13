@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import {
   customerAuthTokens,
   customerCredentials,
@@ -40,6 +40,33 @@ export class CustomerAuthService {
     private appBaseUrl: string,
     private passwordCrypto: PasswordCrypto = defaultPasswordCrypto,
   ) {}
+  async changePassword(
+    credentialId: string,
+    currentSessionId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    return this.db.transaction(async (tx) => {
+      const [credential] = await tx.select().from(customerCredentials)
+        .where(eq(customerCredentials.id, credentialId)).for("update").limit(1);
+      if (!credential?.passwordHash || credential.status !== "active") return false;
+      if (!(await this.passwordCrypto.verify(credential.passwordHash, currentPassword))) return false;
+      const passwordHash = await this.passwordCrypto.hash(newPassword);
+      await tx.update(customerCredentials).set({
+        passwordHash,
+        passwordChangedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(customerCredentials.id, credentialId));
+      await tx.update(customerSessions).set({
+        revokedAt: new Date(),
+        revokeReason: "password_changed",
+      }).where(and(
+        eq(customerSessions.credentialId, credentialId),
+        ne(customerSessions.id, currentSessionId),
+      ));
+      return true;
+    });
+  }
 
   async generateLink(
     customerId: string,

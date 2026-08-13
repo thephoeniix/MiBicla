@@ -11,7 +11,7 @@ import {
   WHEEL_SIZES,
 } from "../lib/bicycle-catalogs";
 import { SearchableCombobox } from "./SearchableCombobox";
-import { Dialog } from "./ui";
+import { FormDialog } from "./ui";
 
 export interface Bicycle {
   id: string;
@@ -155,9 +155,10 @@ export function BicycleForm({
     }
   }
   return (
-    <Dialog open aria-labelledby="bicycle-title">
+    <FormDialog open aria-labelledby="bicycle-title">
       <form onSubmit={submit} className="bicycle-form">
-        <h3 id="bicycle-title">{bicycle ? "Editar bicicleta" : "Registrar bicicleta"}</h3>
+        <h3 id="bicycle-title" className="form-dialog-header">{bicycle ? "Editar bicicleta" : "Registrar bicicleta"}</h3>
+        <div className="form-dialog-body">
         <fieldset>
           <legend>Información general</legend>
           <label>
@@ -294,13 +295,14 @@ export function BicycleForm({
           </label>
         </fieldset>
         {error && <p role="alert">{error}</p>}
-        <div className="actions">
+        </div>
+        <div className="actions form-dialog-actions">
           <button type="submit">{bicycle ? "Guardar cambios" : "Guardar bicicleta"}</button>
-          <button type="button" className="secondary" aria-label="Cerrar formulario de bicicleta" onClick={onCancel}>
+          <button type="button" data-dialog-close className="secondary" aria-label="Cerrar formulario de bicicleta" onClick={onCancel}>
             Cancelar
           </button>
         </div>
       </form>
-    </Dialog>
+    </FormDialog>
   );
 }

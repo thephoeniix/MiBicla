@@ -16,6 +16,7 @@ import {
   validateFinancialFields,
   type FinancialFieldErrors,
 } from "../../../lib/deposits";
+import { bankLogo } from "../../../lib/bank-logos";
 
 export interface DepositAdminOption {
   id: string;
@@ -52,7 +53,7 @@ const EMPTY = {
   instructions: "",
   whatsappNumber: "",
   whatsappTemplate:
-    "Hola {nombre}, envío mi comprobante por {monto}. Concepto: {concepto}. Pedido: {pedido}. Banco: {banco}.",
+    "Hola Mi Bicla, envío mi comprobante de pago.\n\nBanco: {banco}\nTitular: {titular}\n{datos}",
   showAccountNumber: false,
   showClabe: false,
   showCardNumber: false,
@@ -122,13 +123,14 @@ function DepositMethodPreview({
         "",
     },
   ].filter((field) => field.visible && field.value);
+  const logo = bankLogo(form.bankName || form.displayName);
   return (
     <aside className="deposit-admin-preview">
       <p className="page-eyebrow">Vista previa pública</p>
       <div className="deposit-preview-card">
         <header>
-          <img src="/white-simple.png" alt="" />
-          <span>Método de depósito</span>
+          <img src={logo || "/white-simple.png"} alt={logo ? `Logo de ${form.bankName || form.displayName}` : ""} />
+          <span>Método de pago</span>
         </header>
         <h3>{form.displayName || "Nombre del método"}</h3>
         {form.showHolder && form.accountHolder && (
@@ -403,7 +405,7 @@ export function Deposits({
   }
 
   if (state === "loading")
-    return <LoadingState label="Cargando métodos de depósito…" />;
+    return <LoadingState label="Cargando métodos de pago…" />;
   if (state === "error")
     return <ErrorState message={status} onRetry={load} />;
 
@@ -411,7 +413,7 @@ export function Deposits({
     <section className="admin-page deposits-admin-page">
       <PageHeader
         eyebrow="Configuración"
-        title="Métodos de depósito"
+        title="Métodos de pago"
         description="Publica instrucciones confiables sin exponer datos protegidos."
         action={
           canManage ? (
@@ -424,10 +426,13 @@ export function Deposits({
           {items.map((item, index) => (
             <article className="deposit-admin-card" key={item.id}>
               <header>
-                <div className="deposit-card-heading">
-                  <small>Orden {index + 1}</small>
-                  <h2>{item.displayName}</h2>
-                  <p>{item.bankName || "Sin institución"}</p>
+                <div className="deposit-card-identity">
+                  {bankLogo(item.bankName || item.displayName) && <img src={bankLogo(item.bankName || item.displayName)} alt={`Logo de ${item.bankName || item.displayName}`} />}
+                  <div className="deposit-card-heading">
+                   <small>Orden {index + 1}</small>
+                   <h2>{item.displayName}</h2>
+                   <p>{item.bankName || "Sin institución"}</p>
+                  </div>
                 </div>
                 <span className={`deposit-publication-status ${item.isActive ? "is-published" : "is-hidden"}`}>
                   {item.isActive ? "Publicado" : "No publicado"}
@@ -469,7 +474,7 @@ export function Deposits({
       ) : (
         <EmptyState
           title="Aún no hay métodos"
-          description="Crea el primer método para mostrar instrucciones de depósito."
+          description="Crea el primer método para mostrar instrucciones de pago."
         />
       )}
 

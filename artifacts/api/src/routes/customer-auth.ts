@@ -29,6 +29,11 @@ type Audit = (
   entityId?: string,
 ) => Promise<unknown>;
 type RateLimit = (scope: string, key: string) => Promise<boolean>;
+export type CustomerGuard = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => Promise<unknown>;
 
 const genericAuthError = (res: Response, status = 401) =>
   res.status(status).json({
@@ -38,6 +43,48 @@ const genericAuthError = (res: Response, status = 401) =>
       requestId: res.locals.requestId,
     },
   });
+
+export function createRequireCustomer(
+  service: CustomerAuthService,
+): CustomerGuard {
+  return async (req, res, next) => {
+    try {
+      const token = req.cookies.mb_customer_session as string | undefined;
+      const match = token ? await service.session(token) : null;
+      if (!match) {
+        res.clearCookie("mb_customer_session", { path: "/" });
+        return res.status(401).json({
+          error: {
+            code: "CUSTOMER_UNAUTHORIZED",
+            message: "Sesión de cliente requerida",
+            requestId: res.locals.requestId,
+          },
+        });
+      }
+      if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+        const csrf = req.get("x-csrf-token");
+        if (
+          !csrf ||
+          !safeTokenCompare(
+            hashSessionToken(csrf),
+            match.session.csrfTokenHash,
+          )
+        )
+          return res.status(403).json({
+            error: {
+              code: "CUSTOMER_CSRF_TOKEN",
+              message: "Token CSRF inválido",
+              requestId: res.locals.requestId,
+            },
+          });
+      }
+      res.locals.customerAuth = match;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
 
 export function createCustomerAuthAdminRouter(
   service: CustomerAuthService,
@@ -118,47 +165,7 @@ export function createCustomerAuthRouter(
     return ipLimited || tokenLimited;
   };
 
-  const requireCustomer = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ) => {
-    try {
-      const token = req.cookies.mb_customer_session as string | undefined;
-      const match = token ? await service.session(token) : null;
-      if (!match) {
-        res.clearCookie("mb_customer_session", { path: "/" });
-        return res.status(401).json({
-          error: {
-            code: "CUSTOMER_UNAUTHORIZED",
-            message: "Sesión de cliente requerida",
-            requestId: res.locals.requestId,
-          },
-        });
-      }
-      if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
-        const csrf = req.get("x-csrf-token");
-        if (
-          !csrf ||
-          !safeTokenCompare(
-            hashSessionToken(csrf),
-            match.session.csrfTokenHash,
-          )
-        )
-          return res.status(403).json({
-            error: {
-              code: "CUSTOMER_CSRF_TOKEN",
-              message: "Token CSRF inválido",
-              requestId: res.locals.requestId,
-            },
-          });
-      }
-      res.locals.customerAuth = match;
-      next();
-    } catch (error) {
-      next(error);
-    }
-  };
+  const requireCustomer = createRequireCustomer(service);
 
   router.post("/auth/activation/validate", async (req, res, next) => {
     try {
@@ -274,9 +281,14 @@ export function createCustomerAuthRouter(
         csrfToken,
         customer: {
           id: match.customer.id,
+          firstName: match.customer.firstName,
+          lastName: match.customer.lastName,
           name: `${match.customer.firstName} ${match.customer.lastName}`,
           phone: match.customer.phone,
+          email: match.customer.email,
+          birthDate: match.customer.birthDate,
           accountStatus: "active",
+          updatedAt: match.customer.updatedAt,
         },
       });
     } catch (error) {
@@ -288,9 +300,14 @@ export function createCustomerAuthRouter(
     const match = res.locals.customerAuth;
     res.json({
       id: match.customer.id,
+      firstName: match.customer.firstName,
+      lastName: match.customer.lastName,
       name: `${match.customer.firstName} ${match.customer.lastName}`,
       phone: match.customer.phone,
+      email: match.customer.email,
+      birthDate: match.customer.birthDate,
       accountStatus: "active",
+      updatedAt: match.customer.updatedAt,
     });
   });
 

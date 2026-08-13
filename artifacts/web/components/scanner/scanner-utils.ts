@@ -4,7 +4,7 @@ export function extractCustomerToken(value: string): string | null {
   const candidate = value.trim();
   if (TOKEN_PATTERN.test(candidate)) return candidate.toLowerCase();
   try {
-    const url = new URL(candidate);
+    const url = new URL(candidate, "https://scanner.mibicla.invalid");
     if (!["http:", "https:"].includes(url.protocol)) return null;
     const match = url.pathname.match(/^\/c\/([^/]+)\/?$/);
     if (!match || !TOKEN_PATTERN.test(match[1] ?? "")) return null;
@@ -12,6 +12,10 @@ export function extractCustomerToken(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+export function customerAdminProfileUrl(customerId: string) {
+  return `/admin/customers?customer=${encodeURIComponent(customerId)}`;
 }
 
 export function createScanGate() {
@@ -45,13 +49,13 @@ export function cameraErrorMessage(error: unknown): string {
     error instanceof DOMException &&
     ["NotAllowedError", "SecurityError"].includes(error.name)
   )
-    return "No diste permiso para usar la cámara.";
+    return "No diste permiso para usar la cámara. Habilítala en los permisos del navegador o ingresa el enlace manualmente.";
   if (
     error instanceof DOMException &&
     ["NotFoundError", "OverconstrainedError"].includes(error.name)
   )
-    return "No encontramos una cámara disponible.";
-  return "No fue posible iniciar la cámara.";
+    return "No encontramos una cámara disponible. Puedes ingresar el enlace del cliente manualmente.";
+  return "No fue posible iniciar la cámara. Verifica que el sitio use HTTPS o ingresa el enlace manualmente.";
 }
 
 export function canShowCustomerScanner(
@@ -63,6 +67,8 @@ export function canShowCustomerScanner(
       "/admin",
       "/admin/settings/general",
       "/admin/customers",
+      "/admin/loyalty",
+      "/admin/settings/loyalty",
     ].includes(pathname) && permissions.includes("adjust_loyalty")
   );
 }

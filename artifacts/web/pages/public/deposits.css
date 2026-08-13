@@ -1,132 +1,70 @@
-.public-deposits-page {
-  min-height: 100vh;
-  padding: max(22px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
-  color: var(--color-text);
-  background: var(--color-background);
+.public-deposits-page { min-height: 100vh; color: #f8f8fa; background: #070709; }
+.public-deposits-section { width: min(calc(100% - 32px), 1280px); padding: 72px 0 90px; margin: auto; }
+.public-deposits-heading { display: grid; gap: 20px; align-items: end; margin-bottom: 36px; }
+.public-deposits-heading span { display: block; margin-bottom: 13px; color: #ff4d91; font-size: .72rem; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
+.public-deposits-heading h1 { max-width: 760px; margin: 0; font-family: var(--brand-display); font-size: clamp(3.6rem, 12vw, 6rem); font-weight: 800; letter-spacing: -.025em; line-height: .92; text-transform: uppercase; }
+.public-deposits-heading h1 em { color: #f51168; font-style: normal; }
+.public-deposits-heading p { max-width: 500px; margin: 0; color: #aaaab3; line-height: 1.6; }
+.public-deposits-page .ui-state { color: #aaaab3; background: #101014; border-color: rgb(255 255 255 / .11); }
+.public-deposits-page .ui-state strong { color: #f8f8fa; }
+.deposit-bank-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px; margin-bottom: 16px; }
+.deposit-bank-tabs button { display: flex; min-width: 0; min-height: 76px; align-items: center; justify-content: center; gap: 10px; padding: 11px 14px; color: #a2a2aa; background: #0d0d10; border: 1px solid rgb(255 255 255 / .11); border-radius: 16px; }
+.deposit-bank-tabs button:hover { color: #fff; border-color: rgb(245 17 104 / .5); }
+.deposit-bank-tabs button[aria-selected="true"] { color: #fff; background: rgb(245 17 104 / .1); border-color: #f51168; box-shadow: 0 0 0 1px #f51168; }
+.deposit-bank-tabs button > span { display: grid; width: 40px; height: 40px; flex: 0 0 40px; color: #f51168; background: #fff; border-radius: 10px; place-items: center; }
+.deposit-bank-tabs button > span img { width: 88%; height: 88%; padding: 3px; object-fit: contain; }
+.deposit-bank-tabs svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.deposit-bank-tabs strong { min-width: 0; overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.deposit-reference-layout { display: grid; gap: 20px; }
+.deposit-account-card { min-width: 0; padding: clamp(24px, 4vw, 44px); background: linear-gradient(145deg, #141419, #0d0d11); border: 1px solid rgb(255 255 255 / .11); border-left: 3px solid #f51168; border-radius: 20px; }
+.deposit-account-card > header { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+.deposit-bank-mark { display: grid; width: 72px; height: 64px; flex: 0 0 72px; color: #f51168; background: #fff; border-radius: 14px; place-items: center; }
+.deposit-bank-mark svg { width: 31px; height: 31px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.deposit-bank-mark img { width: 86%; height: 86%; padding: 5px; object-fit: contain; }
+.deposit-account-card h2 { margin: 0; font-family: var(--brand-display); font-size: clamp(1.8rem, 6vw, 2.3rem); line-height: 1; text-transform: uppercase; }
+.deposit-account-card header p { margin: 5px 0 0; color: #aaaab3; font-size: .8rem; }
+.deposit-account-fields { display: grid; gap: 10px; }
+.deposit-account-row { display: grid; min-width: 0; min-height: 82px; align-items: center; grid-template-columns: 28px minmax(0, 1fr) 48px; gap: 14px; padding: 13px 16px; background: rgb(0 0 0 / .2); border: 1px solid rgb(255 255 255 / .11); border-radius: 14px; }
+.deposit-account-row > svg { width: 23px; height: 23px; color: #ff4d91; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.deposit-account-row > span { min-width: 0; }
+.deposit-account-row small, .deposit-account-row strong { display: block; }
+.deposit-account-row small { color: #aaaab3; font-size: .7rem; }
+.deposit-account-row strong { margin-top: 4px; color: #ff4d91; font-size: clamp(.85rem, 3.4vw, 1.12rem); font-variant-numeric: tabular-nums; letter-spacing: .03em; overflow-wrap: anywhere; }
+.deposit-account-row button { display: grid; width: 44px; height: 44px; padding: 0; color: #ff4d91; background: #17171c; border: 1px solid rgb(255 255 255 / .11); border-radius: 12px; place-items: center; }
+.deposit-account-row button:hover, .deposit-account-row button.is-copied { color: #fff; background: #f51168; border-color: #f51168; }
+.deposit-account-row button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.deposit-account-row button span { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.deposit-reference { display: grid; gap: 4px; padding: 18px 2px; border-bottom: 1px solid rgb(255 255 255 / .11); }
+.deposit-reference small { color: #aaaab3; }
+.deposit-reference strong { color: #ff4d91; }
+.deposit-account-instructions { padding: 14px 16px; color: #d8d8df; background: rgb(245 17 104 / .08); border-left: 2px solid #f51168; font-size: .8rem; line-height: 1.5; }
+.deposit-copy-feedback { min-height: 20px; margin: 10px 0; color: #ff4d91; font-size: .76rem; text-align: center; }
+.deposit-whatsapp { display: flex; min-height: 52px; align-items: center; justify-content: center; gap: 10px; color: #fff; background: #18b95b; border-radius: 14px; font-size: .82rem; font-weight: 800; text-decoration: none; }
+.deposit-whatsapp:hover { background: #0fa34e; transform: translateY(-1px); }
+.deposit-whatsapp svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.deposit-safety-note { display: none; padding: clamp(28px, 4vw, 42px); background: #0d0d11; border: 1px solid rgb(255 255 255 / .11); border-radius: 20px; }
+.deposit-shield { display: grid; width: 62px; height: 62px; margin-bottom: 28px; color: #f51168; border: 1px solid rgb(245 17 104 / .5); place-items: center; }
+.deposit-shield svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.deposit-safety-note > small { color: #ff4d91; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+.deposit-safety-note h2 { margin: 14px 0 16px; font-family: var(--brand-display); font-size: 2rem; line-height: 1.08; text-transform: uppercase; }
+.deposit-safety-note > p { margin: 0 0 28px; color: #aaaab3; font-size: .78rem; }
+.deposit-safety-note ol { padding: 0; margin: 0; list-style: none; }
+.deposit-safety-note li { display: flex; align-items: center; gap: 13px; padding: 11px 0; border-top: 1px solid rgb(255 255 255 / .11); font-size: .76rem; font-weight: 700; }
+.deposit-safety-note li span { display: grid; width: 25px; height: 25px; flex: 0 0 25px; background: #f51168; border-radius: 50%; place-items: center; font-size: .66rem; }
+@media (min-width: 768px) {
+  .public-deposits-section { width: min(calc(100% - 64px), 1280px); }
+  .public-deposits-heading { grid-template-columns: 1.1fr .8fr; gap: 48px; }
+  .deposit-account-row { grid-template-columns: 28px minmax(0, 1fr) 120px; }
+  .deposit-account-row button { display: inline-flex; width: auto; min-height: 44px; padding: 0 14px; gap: 8px; }
+  .deposit-account-row button span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
 }
-.public-deposits-shell { max-width: 760px; }
-.public-deposits-header { display: flex; align-items: center; gap: 13px; }
-.public-deposits-header img { width: 54px; height: 54px; object-fit: contain; }
-.public-deposits-header small { color: var(--color-text-muted); }
-.public-deposits-header h1 { margin: 3px 0 0; font-size: clamp(34px, 10vw, 50px); letter-spacing: -.05em; }
-.public-deposits-intro { max-width: 580px; margin: 28px 0; color: var(--color-text-muted); font-size: 16px; line-height: 1.6; }
-.deposit-method-list { display: grid; gap: 12px; }
-.public-deposit-card {
-  display: grid;
-  width: 100%;
-  min-height: 116px;
-  grid-template-columns: 50px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: 14px;
-  padding: 17px;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 21px;
-  text-align: left;
+@media (min-width: 1024px) {
+  .deposit-reference-layout { align-items: stretch; grid-template-columns: 1.35fr .65fr; }
+  .deposit-safety-note { display: block; }
 }
-.public-deposit-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-card); }
-.deposit-method-icon { display: grid; width: 50px; height: 50px; place-items: center; color: #fff; background: var(--mb-color-brand-500); border-radius: 15px; font-size: 22px; }
-.public-deposit-card > span:nth-child(2) { display: grid; min-width: 0; gap: 3px; }
-.public-deposit-card small { color: var(--color-primary); font-size: 12px; font-weight: 700; }
-.public-deposit-card strong { font-size: 19px; }
-.public-deposit-card em { overflow: hidden; color: var(--color-text-muted); font-size: 14px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
-.public-deposit-card > i { color: var(--color-primary); font-size: 28px; font-style: normal; }
-.public-deposits-shell > footer { display: flex; align-items: center; justify-content: center; gap: 10px; padding-top: 34px; color: var(--color-text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
-.public-deposits-shell > footer img { width: 40px; height: 40px; object-fit: contain; }
-.public-deposits-page .ui-state { color: var(--color-text-muted); }
-.public-deposits-page .ui-state strong { color: var(--color-text); }
-.public-deposit-detail {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  width: 100%;
-  max-width: none;
-  height: 100%;
-  max-height: none;
-  padding: 0;
-  margin: 0;
-  overflow: auto;
-  color: var(--color-text);
-  background: var(--color-background);
-  border: 0;
-}
-.public-deposit-detail > header { position: sticky; z-index: 2; top: 0; display: grid; min-height: 68px; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 8px 16px; background: color-mix(in srgb, var(--color-background) 90%, transparent); border-bottom: 1px solid var(--color-border); backdrop-filter: blur(16px); text-align: center; }
-.public-deposit-detail > header button { display: grid; width: 44px; height: 44px; place-items: center; color: var(--mb-color-brand-500); background: transparent; border: 0; font-size: 30px; }
-.deposit-detail-shell { width: min(100%, 680px); padding: 20px 16px max(40px, env(safe-area-inset-bottom)); margin: auto; }
-.deposit-wallet-card { position: relative; min-height: 280px; padding: 25px; overflow: hidden; background: radial-gradient(circle at 100% 100%, rgb(230 0 126 / .3), transparent 42%), #171719; border: 1px solid rgb(255 255 255 / .11); border-radius: 24px; box-shadow: 0 26px 55px rgb(0 0 0 / .3); }
-.deposit-wallet-card::after { position: absolute; right: -45px; bottom: -60px; width: 230px; height: 230px; content: ""; background: url("/black-simple.png") center / contain no-repeat; }
-.deposit-wallet-card > div { display: flex; align-items: center; gap: 10px; color: var(--mb-color-brand-400); font-size: 11px; font-weight: 700; }
-.deposit-wallet-card img { width: 42px; height: 42px; object-fit: contain; }
-.deposit-wallet-card h1 { max-width: 70%; margin: 28px 0 36px; font-size: 30px; letter-spacing: -.04em; }
-.deposit-wallet-card p { position: relative; z-index: 1; display: grid; width: fit-content; gap: 3px; margin: 15px 0 0; }
-.deposit-wallet-card p small { color: var(--mb-color-brand-500); }
-.deposit-data-sheet { padding: 24px 16px; margin-top: 16px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 24px; box-shadow: var(--shadow-card); }
-.financial-field { display: flex; min-height: 88px; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
-.financial-field > span { display: grid; gap: 7px; min-width: 0; }
-.financial-field small, .deposit-reference small { color: var(--color-text-muted); }
-.financial-field strong { min-width: 0; font-size: clamp(16px, 5vw, 21px); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.financial-field button { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 13px; color: #fff; background: var(--mb-color-brand-500); border: 0; border-radius: 13px; font-weight: 700; }
-.financial-field button i { font-style: normal; }
-.deposit-reference { display: grid; gap: 5px; padding: 18px 0; }
-.deposit-instructions { display: flex; align-items: flex-start; gap: 12px; padding: 15px; color: var(--color-primary); background: var(--mb-color-primary-soft); border-radius: 15px; }
-.deposit-instructions i { display: grid; flex: 0 0 24px; height: 24px; place-items: center; border: 1px solid var(--mb-color-brand-500); border-radius: 50%; font-style: normal; }
-.deposit-instructions p { margin: 0; line-height: 1.5; }
-.deposit-copy-feedback { min-height: 20px; margin: 12px 0 0; color: var(--color-success); font-size: 13px; text-align: center; }
-.receipt-share { padding: 18px; margin-top: 16px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 20px; }
-.receipt-share summary { min-height: 44px; color: var(--color-primary); font-weight: 750; cursor: pointer; }
-.receipt-share > div { display: grid; gap: 13px; }
-.receipt-share label { display: grid; gap: 6px; font-size: 12px; font-weight: 650; }
-.receipt-share input { width: 100%; min-height: 48px; padding: 0 13px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 13px; font-size: 16px; }
-.receipt-share a { display: flex; min-height: 48px; align-items: center; justify-content: center; color: #fff; background: #25a960; border-radius: 14px; font-weight: 750; text-decoration: none; }
-.receipt-share small { color: var(--color-text-muted); line-height: 1.4; }
-@media (min-width: 700px) {
-  .deposit-method-list { grid-template-columns: 1fr 1fr; }
-  .public-deposit-detail { inset: 4vh 50% auto auto; width: min(calc(100% - 40px), 720px); height: 92vh; border-radius: 26px; transform: translateX(50%); }
-  .deposit-data-sheet { padding-inline: 26px; }
-}
-
-.public-deposits-header { padding-bottom: 18px; border-bottom: 3px solid var(--mb-color-brand-500); }
-.public-deposits-header h1,
-.deposit-wallet-card h1 { font-family: var(--mb-font-display); text-transform: uppercase; }
-.public-deposit-card,
-.deposit-data-sheet,
-.receipt-share { border-radius: 12px; box-shadow: var(--mb-shadow-xs); }
-.deposit-method-icon,
-.financial-field button,
-.receipt-share input,
-.receipt-share a { border-radius: 8px; }
-.deposit-wallet-card {
-  color: var(--mb-color-inverse-text);
-  background:
-    repeating-radial-gradient(ellipse at 110% -20%, transparent 0 30px, rgb(236 61 146 / .22) 31px 33px),
-    var(--mb-color-inverse-surface);
-  border-color: var(--mb-color-brand-800);
-  border-radius: 14px;
-}
-.deposit-wallet-card h1,
-.deposit-wallet-card p strong { color: var(--mb-color-inverse-text); }
-.deposit-wallet-card h1 {
-  max-width: min(100%, 34rem);
-  overflow-wrap: anywhere;
-  text-wrap: balance;
-}
-.deposit-wallet-card p { max-width: 100%; }
-.deposit-wallet-card p strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.deposit-wallet-card p small { color: var(--mb-color-brand-300); font-size: 14px; }
-.financial-field { min-width: 0; }
-@media (max-width: 380px) {
-  .public-deposit-card {
-    grid-template-columns: 44px minmax(0, 1fr) 14px;
-    gap: 10px;
-    padding-inline: 13px;
-  }
-  .deposit-method-icon { width: 44px; height: 44px; }
-  .deposit-wallet-card { min-height: 240px; padding: 20px; }
-  .financial-field { align-items: stretch; flex-direction: column; }
-  .financial-field button { width: 100%; justify-content: center; }
+@media (max-width: 420px) {
+  .deposit-bank-tabs { grid-template-columns: 1fr; }
+  .deposit-bank-tabs button { justify-content: flex-start; }
+  .deposit-account-card { padding-inline: 17px; }
+  .deposit-account-row { gap: 10px; padding-inline: 12px; }
 }

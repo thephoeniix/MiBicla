@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api-client";
 import { BrandLogo } from "../../components/brand";
+import { workshopTimelineMessage } from "../../lib/workshop-timeline";
 import {
   EmptyState,
   ErrorState,
@@ -159,12 +160,15 @@ export function WorkshopTracking({ token }: { token: string }) {
                 title: update.title,
                 message: update.message,
                 createdAt: update.createdAt,
-              })), ...data.history.map((event) => ({
-                id: event.id,
-                title: statusLabel(event.status),
-                message: event.publicMessage || "La orden cambió de estado.",
-                createdAt: event.createdAt,
-              }))]
+              })), ...data.history.map((event) => {
+                const title = statusLabel(event.status);
+                return {
+                  id: event.id,
+                  title,
+                  message: workshopTimelineMessage(event.publicMessage, title),
+                  createdAt: event.createdAt,
+                };
+              })]
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
             } />
           ) : <EmptyState title="Aún no hay actualizaciones" description="Los avances del taller aparecerán aquí." />}

@@ -10,6 +10,7 @@ const workshopServicesSource = readFileSync(
   "utf8",
 );
 const styles = readFileSync("artifacts/web/style.css", "utf8");
+const uiSource = readFileSync("artifacts/web/components/ui.tsx", "utf8");
 
 describe("detalle administrativo de órdenes del taller", () => {
   it("conserva las cinco vistas y las acciones operativas existentes", () => {
@@ -38,6 +39,47 @@ describe("detalle administrativo de órdenes del taller", () => {
     expect(styles).toContain("height: 100dvh");
     expect(styles).toContain(".workshop-detail .ui-stepper");
     expect(styles).toContain("@media (min-width: 600px)");
-    expect(styles).toContain("width: min(calc(100% - 40px), 920px)");
+    expect(styles).toContain("width: min(calc(100% - 48px), 1120px)");
+    expect(styles).toMatch(/\.order-status-layout\s*\{[^}]*grid-template-columns:/);
+  });
+
+  it("simplifica Estado y exige confirmar los cambios manuales", () => {
+    expect(workshopSource).toContain("Siguiente paso recomendado");
+    expect(workshopSource).toContain("Cambiar a otro estado");
+    expect(workshopSource).toContain("Guardar cambio");
+    expect(workshopSource).toContain("Enviar al cliente");
+    expect(workshopSource).toContain(
+      "disabled={selectedStatus === detail.order.status}",
+    );
+    expect(workshopSource).not.toContain(
+      'value={detail.order.status} onChange={(event) => change(event.target.value)}',
+    );
+    expect(workshopSource).toContain('"received", "inspection", "in_progress", "waiting_parts", "quality_check"');
+    expect(workshopSource).not.toContain('inspection: "diagnosis"');
+  });
+
+  it("captura piezas en MXN y las administra como tarjetas de servicio", () => {
+    expect(workshopSource).toContain("parseMxnToCents(line.price)");
+    expect(workshopSource).toContain("Precio unitario (MXN)");
+    expect(workshopSource).toContain('inputMode="decimal"');
+    expect(workshopSource).not.toContain("Precio centavos");
+    expect(workshopSource).toContain('className="selected-services order-parts-list"');
+    expect(workshopSource).toContain("Editar pieza");
+    expect(workshopSource).toContain("Marcar instalada");
+    expect(workshopSource).toContain("removePart(part)");
+  });
+
+  it("usa iconos propios para cada estado del progreso", () => {
+    for (const icon of [
+      "receive-.svg",
+      "dagnostico.svg",
+      "approve.svg",
+      "reparacion.svg",
+      "pickup.svg",
+      "entregado.svg",
+    ]) {
+      expect(uiSource).toContain(icon);
+    }
+    expect(styles).toContain("mask: var(--step-icon) center / contain no-repeat");
   });
 });

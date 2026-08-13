@@ -1,8 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ThemeSelector } from "../ThemeSelector";
-import { TokenAccessDialog } from "./TokenAccessDialog";
 import { BrandLogo } from "../brand";
-import { FidelityIcon, MoreIcon, TallerIcon } from "../nav-icons";
 import footerChain from "../../../../logo/footer.svg";
 
 export interface PublicBusiness {
@@ -27,10 +24,14 @@ export interface PublicBusiness {
 }
 
 const NAV = [
-  ["/", "Inicio", "⌂"],
-  ["/taller", "Taller", <TallerIcon key="taller" />],
-  ["/fidelidad", "Fidelidad", <FidelityIcon key="fidelidad" />],
+  ["/", "Inicio"],
+  ["/taller", "Taller"],
+  ["/fidelidad", "Mi Tarjeta"],
 ] as const;
+
+function isPublicNavigationActive(pathname: string, href: string) {
+  return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+}
 
 function FooterChainDivider() {
   return (
@@ -59,7 +60,6 @@ function PublicFooter() {
         <FooterChainDivider />
         <div className="footer-legal">
           <span>© {year} MI BICLA QUERÉTARO</span>
-          <nav aria-label="Información legal"><a href="/aviso-de-privacidad">Aviso de privacidad</a><a href="/terminos">Términos</a></nav>
           <button type="button" onClick={goTop}>Ir arriba <span aria-hidden="true">↑</span></button>
         </div>
       </div>
@@ -69,23 +69,14 @@ function PublicFooter() {
 
 export function PublicShell({
   children,
-  business,
 }: {
   children: ReactNode;
   business?: PublicBusiness | null;
 }) {
-  const [dialog, setDialog] = useState<"workshop" | "card" | null>(null);
-  const [more, setMore] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const mobileMenu = useRef<HTMLDivElement>(null);
   const path = window.location.pathname;
-  useEffect(() => {
-    const handler = (event: Event) =>
-      setDialog((event as CustomEvent<"workshop" | "card">).detail);
-    window.addEventListener("public:token-dialog", handler);
-    return () => window.removeEventListener("public:token-dialog", handler);
-  }, []);
   useEffect(() => {
     if (!menuOpen) return;
     const close = (event: KeyboardEvent) => {
@@ -124,11 +115,7 @@ export function PublicShell({
       <a className="mb-sr-only mb-sr-only-focusable" href="#public-content">Saltar al contenido</a>
       <header className="public-header">
         <a className="app-brand" href="/">
-          {business?.logoUrl ? (
-            <img src={business.logoUrl} alt={business.businessName || "Mi Bicla"} />
-          ) : (
-            <BrandLogo variant="full" color="white" />
-          )}
+          <BrandLogo variant="symbol" color="pink" />
         </a>
         <button
           ref={menuButton}
@@ -142,14 +129,15 @@ export function PublicShell({
           <span /><span /><span />
         </button>
         <nav aria-label="Navegación pública">
-          {NAV.map(([href, label]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}>{label}</a>)}
-          <a href="/depositos">Depósitos</a>
-          <a href="/#ubicacion">Ubicación</a>
+          {NAV.map(([href, label]) => <a key={href} href={href} aria-current={isPublicNavigationActive(path, href) ? "page" : undefined}>{label}</a>)}
+          <a href="/productos" aria-current={path === "/productos" ? "page" : undefined}>Productos</a>
+          <a href="/eventos" aria-current={path === "/eventos" ? "page" : undefined}>Eventos</a>
+          <a href="/depositos">Métodos de pago</a>
+          <a href="/#contacto">Contacto</a>
         </nav>
         <div className="public-account-links">
           <a href="/iniciar-sesion">Iniciar sesión</a>
           <a className="ui-button" href="/registro">Crear cuenta</a>
-          <ThemeSelector compact />
         </div>
       </header>
       {menuOpen && (
@@ -163,29 +151,19 @@ export function PublicShell({
         >
           <nav aria-label="Menú público">
             {NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
-            <a href="/depositos">Depósitos</a>
+            <a href="/productos">Productos</a>
+            <a href="/eventos">Eventos</a>
+            <a href="/depositos">Métodos de pago</a>
+            <a href="/#contacto">Contacto</a>
+            <a href="/mi/taller">Consultar orden</a>
+            <a href="/mi/tarjeta">Mi tarjeta</a>
             <a href="/iniciar-sesion">Iniciar sesión</a>
             <a className="ui-button" href="/registro">Crear mi cuenta</a>
           </nav>
-          <ThemeSelector />
         </div>
       )}
       <main id="public-content">{children}</main>
       <PublicFooter />
-      <nav className="public-bottom-nav" aria-label="Navegación pública móvil">
-        {NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={path === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}
-        <button type="button" aria-expanded={more} onClick={() => setMore(!more)}><i aria-hidden="true"><MoreIcon /></i>Más</button>
-      </nav>
-      {more && <div className="public-more-menu">
-        <a href="/depositos">Depósitos</a><a href="/#horarios">Horarios</a><a href="/#ubicacion">Ubicación</a><a href="/#redes">Redes sociales</a>
-        <button type="button" onClick={() => { setMore(false); setDialog("workshop"); }}>Consultar orden</button>
-        <button type="button" onClick={() => { setMore(false); setDialog("card"); }}>Mi tarjeta</button>
-      </div>}
-      <TokenAccessDialog open={dialog !== null} kind={dialog || "workshop"} onClose={() => setDialog(null)} />
     </div>
   );
-}
-
-export function openTokenDialog(kind: "workshop" | "card") {
-  window.dispatchEvent(new CustomEvent("public:token-dialog", { detail: kind }));
 }

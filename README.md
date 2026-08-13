@@ -39,8 +39,17 @@ La contraseña del owner requiere entre 12 y 128 caracteres, minúscula, mayúsc
 - Limpieza segura de límites vencidos: `npm run db:cleanup-rate-limits`
 - Verificación completa local: `npm run verify` ejecuta typecheck, lint, pruebas
   y build.
+- Simulación de producción y Playwright responsive: `npm run test:e2e`
+- Ensayo aislado de respaldo y restauración: `npm run test:backup`
+- Paquete de release y checksum SHA-256: `npm run release -- <etiqueta>`
 
 Las pruebas de integración requieren una base PostgreSQL desechable indicada por `TEST_DATABASE_URL`; nunca debe apuntar a producción.
+
+La instalación y operación del servidor definitivo se documentan en
+[`docs/production-runbook.md`](docs/production-runbook.md). Incluye HTTPS,
+variables, migraciones confirmadas, systemd, Nginx, respaldos y rollback.
+El procedimiento específico para Raspberry Pi 4 con arranque desde SSD y Neon
+está en [`docs/raspberry-pi-deployment.md`](docs/raspberry-pi-deployment.md).
 
 El servicio `postgres` de `compose.local.yml` escucha exclusivamente en
 `127.0.0.1:55435` y usa la base `mibicla_local_test`. Está reservado para
@@ -79,7 +88,7 @@ y deben usar el PostgreSQL local o el servicio desechable del CI.
 
 La aplicación utiliza `DATABASE_URL`, `NODE_ENV`, `APP_BASE_URL`,
 `API_BASE_URL`, `SESSION_SECRET`, `APP_ENCRYPTION_KEY`, `TRUST_PROXY`,
-`ALLOWED_ORIGINS` y `PORT`. Los scripts del owner usan `OWNER_NAME`,
+`ALLOWED_ORIGINS`, `PORT` y `UPLOAD_DIR`. Los scripts del owner usan `OWNER_NAME`,
 `OWNER_EMAIL` y `OWNER_PASSWORD`. El frontend acepta `VITE_API_BASE_URL`.
 
 ## Migraciones
@@ -96,6 +105,7 @@ Las migraciones se aplican en orden y no se deben reescribir después de haber s
 - `0007_workshop_service_catalog.sql`: catálogo configurable de servicios de taller y relación opcional con las líneas históricas de una orden.
 - `0008_customer_auth.sql`: credenciales, sesiones y tokens de activación o recuperación de clientes, separados de la autenticación administrativa.
 - `0009_customer_registration_requests.sql`: solicitudes públicas pendientes y revisión administrativa antes de activar credenciales.
+- `0010_loyalty_movements.sql`: historial inmutable de movimientos de fidelidad visible desde el portal del cliente.
 
 ## Seguridad y operación
 
