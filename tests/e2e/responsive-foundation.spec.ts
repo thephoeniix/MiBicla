@@ -20,8 +20,11 @@ test("customer navigation and QR fit the supported viewport matrix", async ({ pa
   await mockCustomer(page);
   for (const [width, height] of viewports) {
     await page.setViewportSize({ width, height });
-    await page.goto("/mi/tarjeta");
-    await expect(page.getByRole("heading", { level: 1, name: "Mi tarjeta" })).toBeVisible();
+    await page.goto("/mi");
+    const bottomNavigation = page.getByRole("navigation", { name: "Navegación del cliente" });
+    for (const label of ["Inicio", "Biclas", "Órdenes", "Eventos", "Menú"]) {
+      await expect(bottomNavigation.getByText(label, { exact: true })).toBeVisible();
+    }
     await expectViewportFit(page);
 
     await page.getByRole("button", { name: "Menú" }).click();

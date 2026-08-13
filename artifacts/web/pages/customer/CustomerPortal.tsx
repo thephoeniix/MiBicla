@@ -71,10 +71,10 @@ function NotificationIcon() {
 }
 
 const NAV = [
-  ["/mi/bicicletas", "Bicicletas", <BicyclesIcon key="bicicletas" />],
-  ["/mi/eventos", "Eventos", <EventsIcon key="eventos" />],
+  ["/mi", "Inicio", <HomeAssetIcon key="inicio" />],
+  ["/mi/bicicletas", "Biclas", <BicyclesIcon key="bicicletas" />],
   ["/mi/ordenes", "Órdenes", <OrdersIcon key="ordenes" />],
-  ["/mi/productos", "Productos", <ProductsIcon key="productos" />],
+  ["/mi/eventos", "Eventos", <EventsIcon key="eventos" />],
 ] as const;
 
 const CUSTOMER_MENU = [
@@ -211,7 +211,30 @@ function requestStatusText(status: string) {
   return labels[status] ?? "Consulta el estado con el equipo Mi Bicla.";
 }
 
-function LoyaltyProgress({ loyalty, compact = false }: { loyalty: CustomerLoyalty; compact?: boolean }) {
+function CustomerQrButton({ name, className = "" }: { name: string; className?: string }) {
+  const [qr, setQr] = useState("");
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  async function showQr() {
+    setOpen(true); setError("");
+    if (qr) return;
+    try {
+      const { cardUrl } = await createMyCardLink();
+      setQr(await QRCode.toDataURL(cardUrl, {
+        width: 360,
+        margin: 2,
+        color: { dark: "#09090b", light: "#ffffff" },
+        errorCorrectionLevel: "M",
+      }));
+    } catch { setError("No fue posible generar tu QR."); }
+  }
+  return <>
+    <Button className={className} type="button" onClick={() => void showQr()}>Ver mi QR</Button>
+    {open && <Dialog open className="ui-modal customer-qr-modal" aria-labelledby="customer-qr-title"><section className="customer-qr-dialog"><p className="page-eyebrow">TARJETA MI BICLA</p><h2 id="customer-qr-title">Tu código QR</h2><p>El equipo lo escaneará para identificar tu cuenta.</p>{qr ? <img src={qr} alt={`Código QR de ${name}`} /> : error ? <p className="form-error">{error}</p> : <LoadingState label="Generando QR…" />}<Button type="button" data-dialog-close variant="secondary" onClick={() => setOpen(false)}>Cerrar</Button></section></Dialog>}
+  </>;
+}
+
+function LoyaltyProgress({ loyalty, compact = false, action }: { loyalty: CustomerLoyalty; compact?: boolean; action?: ReactNode }) {
   const goal = loyalty.loyaltyProgram?.rewardUnits ?? 0;
   const points = loyalty.balance.availableUnits;
   const iconCount = Math.min(Math.max(goal, 0), 10);
@@ -221,7 +244,7 @@ function LoyaltyProgress({ loyalty, compact = false }: { loyalty: CustomerLoyalt
   const progress = iconCount > 0 && <div className="client-progress" aria-label={`${points} de ${goal} puntos`}>
     {Array.from({ length: iconCount }, (_, index) => <i key={index} className={index < earned ? "earned" : ""}><img src="/pink-simple.png" alt="" /></i>)}
   </div>;
-  if (compact) return <section className="client-home-progress"><small>TU PROGRESO</small><div className="client-score"><strong>{String(points).padStart(2, "0")}</strong>{goal > 0 && <span>/ {goal}<small>puntos</small></span>}</div>{progress}<p>{goal > 0 ? `Faltan ${Math.max(goal - points, 0)} puntos para tu próxima recompensa.` : "El programa no tiene una meta configurada."}</p></section>;
+  if (compact) return <section className="client-home-progress"><small>TU PROGRESO</small><div className="client-score"><strong>{String(points).padStart(2, "0")}</strong>{goal > 0 && <span>/ {goal}<small>puntos</small></span>}</div>{progress}<p>{goal > 0 ? `Faltan ${Math.max(goal - points, 0)} puntos para tu próxima recompensa.` : "El programa no tiene una meta configurada."}</p>{action}</section>;
   const nextReward = loyalty.rewards[0]?.rewardName || loyalty.loyaltyProgram?.rewardName || "Tu próxima recompensa";
   return <div className="customer-loyalty-cards">
     <section className="client-member-card"><header><span>MIEMBRO</span><BrandLogo variant="symbol" color="pink" decorative /></header><strong>MI BICLA</strong><small>{loyalty.name}</small></section>
@@ -245,7 +268,7 @@ function Home({ identity }: { identity: CustomerIdentity | null }) {
           {activeOrder && <a className="customer-secondary-link" href="/mi/ordenes">Agendar otro servicio</a>}
         </Card>
       </section>
-      {loyalty.data ? <LoyaltyProgress loyalty={loyalty.data} compact /> : loyalty.error ? <ErrorState message="No fue posible consultar tus puntos." /> : <LoadingState label="Consultando tus puntos…" />}
+      {loyalty.data ? <LoyaltyProgress loyalty={loyalty.data} compact action={<CustomerQrButton name={loyalty.data.name} className="client-home-qr-button" />} /> : loyalty.error ? <ErrorState message="No fue posible consultar tus puntos." /> : <LoadingState label="Consultando tus puntos…" />}
       <p className="customer-bike-count">{bicycles.error ? "No fue posible consultar tus bicicletas." : `${bicycles.data?.length ?? 0} bicicletas vinculadas a tu cuenta.`}</p>
       <nav className="customer-commerce-discovery brand-feature-grid" aria-label="Compra y eventos"><FeatureCard tone="black" icon={<ProductsIcon />} title="Productos" description="Explora y cotiza equipo" href="/mi/productos" /><FeatureCard tone="pink" icon={<EventsIcon />} title="Eventos" description="Consulta las próximas rodadas" href="/mi/eventos" /><FeatureCard tone="black" icon={<RequestsIcon />} title="Solicitudes" description="Consulta tus respuestas" href="/mi/solicitudes" /></nav>
     </div>
@@ -254,28 +277,11 @@ function Home({ identity }: { identity: CustomerIdentity | null }) {
 
 function Loyalty({ identity }: { identity: CustomerIdentity | null }) {
   const { data, error } = usePortalData("loyalty", getMyLoyalty);
-  const [qr, setQr] = useState("");
-  const [qrOpen, setQrOpen] = useState(false);
-  const [qrError, setQrError] = useState("");
-  async function openQr() {
-    setQrOpen(true); setQrError("");
-    if (qr) return;
-    try {
-      const { cardUrl } = await createMyCardLink();
-      setQr(await QRCode.toDataURL(cardUrl, {
-        width: 360,
-        margin: 2,
-        color: { dark: "#09090b", light: "#ffffff" },
-        errorCorrectionLevel: "M",
-      }));
-    } catch { setQrError("No fue posible generar tu QR."); }
-  }
   return <Shell identity={identity} section="loyalty" title="Mi tarjeta" description="Cada visita cuenta. Consulta tu avance y las recompensas listas para usar.">
     {error ? <ErrorState message="No fue posible consultar tu tarjeta." /> : !data ? <LoadingState label="Consultando tu tarjeta…" /> : <>
       <LoyaltyProgress loyalty={data} />
-      <section className="customer-qr-action"><div><p className="page-eyebrow">IDENTIFÍCATE EN TIENDA</p><p>Muestra tu QR al equipo de Mi Bicla para acumular o canjear puntos.</p></div><Button onClick={() => void openQr()}>Ver mi QR</Button></section>
+      <section className="customer-qr-action"><div><p className="page-eyebrow">IDENTIFÍCATE EN TIENDA</p><p>Muestra tu QR al equipo de Mi Bicla para acumular o canjear puntos.</p></div><CustomerQrButton name={data.name} /></section>
       <section className="customer-section"><p className="page-eyebrow">MOVIMIENTOS RECIENTES</p>{data.movements.length ? <div className="profile-menu">{data.movements.map((movement) => <div className="customer-movement" key={movement.id}><b className={movement.units >= 0 ? "is-positive" : ""}>{movement.units >= 0 ? "+" : ""}{movement.units}</b><span><strong>{movement.reason}</strong><small>{new Date(movement.createdAt).toLocaleDateString("es-MX")}</small></span></div>)}</div> : <EmptyState title="Aún no hay movimientos" description="Tus próximos movimientos de puntos aparecerán aquí." />}</section>
-      {qrOpen && <Dialog open className="ui-modal customer-qr-modal" aria-labelledby="customer-qr-title"><section className="customer-qr-dialog"><p className="page-eyebrow">TARJETA MI BICLA</p><h2 id="customer-qr-title">Tu código QR</h2><p>El equipo lo escaneará para identificar tu cuenta.</p>{qr ? <img src={qr} alt={`Código QR de ${data.name}`} /> : qrError ? <p className="form-error">{qrError}</p> : <LoadingState label="Generando QR…" />}<Button type="button" data-dialog-close variant="secondary" onClick={() => setQrOpen(false)}>Cerrar</Button></section></Dialog>}
     </>}
   </Shell>;
 }

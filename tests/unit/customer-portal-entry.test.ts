@@ -25,16 +25,16 @@ describe("acceso al portal del cliente", () => {
     expect(portal).toContain('"Inicio", <HomeAssetIcon');
     expect(portal).toContain('"Mi tarjeta", <FidelityAssetIcon');
     expect(portal).toContain('"Órdenes"');
-    expect(portal).toContain('"Bicicletas"');
+    expect(portal).toContain('"Mis bicicletas"');
     expect(portal).toContain('"Mi perfil", <SettingsIcon');
   });
 
   it("reserva la navegación inferior para /mi y usa cinco accesos útiles", () => {
     expect(publicShell).not.toContain('className="public-bottom-nav"');
-    expect(portal).toContain('["/mi/bicicletas", "Bicicletas"');
+    expect(portal).toContain('["/mi", "Inicio"');
+    expect(portal).toContain('["/mi/bicicletas", "Biclas"');
     expect(portal).toContain('["/mi/eventos", "Eventos"');
     expect(portal).toContain('["/mi/ordenes", "Órdenes"');
-    expect(portal).toContain('["/mi/productos", "Productos"');
     expect(portal).toContain("<MoreIcon />");
     expect(portal).toContain('aria-label="Todos los destinos del cliente"');
     expect(portal).toContain("CUSTOMER_MENU");
