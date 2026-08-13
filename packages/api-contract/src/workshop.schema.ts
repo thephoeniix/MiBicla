@@ -55,13 +55,33 @@ export const workshopRequestSchema = z
     bikeBrand: opt(safe(100)),
     bikeModel: opt(safe(100)),
     bikeType: opt(safe(100)),
+    bikeColor: opt(safe(100)),
+    bikeWheelSize: opt(safe(50)),
+    bikeYear: z.number().int().min(1900).max(2100).nullable().optional(),
+    bikeBrakeType: opt(safe(100)),
+    bikeSuspensionType: opt(safe(100)),
+    bikeDrivetrain: opt(safe(100)),
+    bikeGeneralCondition: opt(safe(100)),
+    bikeSerialNumber: opt(safe(150)),
+    bikeFrameNumber: opt(safe(150)),
+    bikeNotes: opt(safe(2000)),
+    bikeAccessories: opt(safe(1000)),
+    catalogServiceId: z.string().uuid().nullable().optional(),
+    serviceName: opt(safe(200)),
     problemDescription: safe(3000, 10),
+    symptoms: opt(safe(2000)),
+    visibleDamage: opt(safe(2000)),
+    additionalComments: opt(safe(2000)),
+    requestedDate: opt(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+    requestedTime: opt(z.string().regex(/^\d{2}:\d{2}$/)),
+    desiredDeliveryDate: opt(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+    urgency: z.enum(["normal", "soon", "urgent"]).nullable().optional(),
     preferredContactMethod: z.enum(["whatsapp", "phone", "email"]),
   })
   .strict();
 export const workshopRequestStatusSchema = z
   .object({
-    status: z.enum(["reviewing", "accepted", "rejected", "cancelled"]),
+    status: z.enum(["reviewing", "awaiting_contact", "confirmed", "reschedule_proposed", "accepted", "rejected", "cancelled"]),
     rejectionReason: opt(safe(1000)),
   })
   .strict();
@@ -82,13 +102,36 @@ export const workshopOrderSchema = z
     customerVisibleSummary: opt(safe(3000)),
     estimatedCompletionAt: opt(z.string().datetime()),
     assignedTo: z.string().uuid().nullable().optional(),
-    discountCents: z.number().int().nonnegative().default(0),
   })
   .strict();
 export const workshopOrderUpdateSchema = workshopOrderSchema
   .omit({ customerId: true, bicycleId: true })
   .partial()
   .strict();
+export const WORKSHOP_MOVEMENT_TYPES = ["advance", "payment", "discount", "credit_applied", "charge", "refund", "correction"] as const;
+export const WORKSHOP_PAYMENT_METHODS = ["cash", "card", "transfer", "customer_credit", "agreement", "other"] as const;
+export const workshopMovementSchema = z.object({
+  type: z.enum(["advance", "payment", "discount", "charge"]),
+  amountCents: z.number().int().positive(),
+  paymentMethod: z.enum(WORKSHOP_PAYMENT_METHODS).nullable().optional(),
+  reference: opt(safe(300)),
+  note: opt(safe(2000)),
+  occurredDate: z.string().date(),
+}).strict().superRefine((value, ctx) => {
+  if (value.paymentMethod === "other" && !value.note) ctx.addIssue({ code: "custom", path: ["note"], message: "La nota es obligatoria para otro método" });
+  if (["customer_credit", "agreement"].includes(value.paymentMethod ?? "")) ctx.addIssue({ code: "custom", path: ["paymentMethod"], message: "Este método requiere su flujo dedicado" });
+});
+export const workshopMovementReversalSchema = z.object({ reason: safe(1000, 1) }).strict();
+export const workshopFavorApplicationSchema = z.object({ targetOrderId: z.string().uuid(), amountCents: z.number().int().positive(), occurredDate: z.string().date(), note: opt(safe(1000)) }).strict();
+export const workshopRefundSchema = z.object({ amountCents: z.number().int().positive(), paymentMethod: z.enum(WORKSHOP_PAYMENT_METHODS), reference: opt(safe(300)), reason: safe(1000, 1), occurredDate: z.string().date() }).strict();
+export const teamSchema = z.object({ name: safe(200, 1), active: z.boolean().default(true) }).strict();
+export const agreementSchema = z.object({
+  teamId: z.string().uuid(), discountType: z.enum(["percentage", "fixed"]), value: z.number().int().positive(),
+  validFrom: z.string().date(), validUntil: z.string().date().nullable(), conditions: opt(safe(3000)), active: z.boolean(), combinable: z.boolean(),
+}).strict().superRefine((value, ctx) => { if (value.discountType === "percentage" && value.value > 10000) ctx.addIssue({ code: "custom", path: ["value"], message: "El porcentaje usa puntos base y no puede exceder 10000" }); });
+export const affiliationRequestSchema = z.object({ teamId: z.string().uuid().optional(), proposedTeamName: safe(200, 1).optional() }).strict().refine((v) => Number(!!v.teamId) + Number(!!v.proposedTeamName) === 1, "Selecciona un equipo o propón otro");
+export const affiliationReviewSchema = z.object({ status: z.enum(["verified", "rejected", "expired"]), evidenceNote: safe(2000, 1) }).strict();
+export const workshopAgreementApplicationSchema = z.object({ agreementId: z.string().uuid(), occurredDate: z.string().date() }).strict();
 export const workshopStatusSchema = z
   .object({
     status: z.enum(WORKSHOP_STATUSES),
@@ -160,6 +203,11 @@ export const workshopSettingsSchema = z
     publicTrackingEnabled: z.boolean(),
     allowCustomerPhotos: z.boolean(),
     defaultEstimatedDays: z.number().int().positive().nullable(),
+    scheduleTimezone: z.literal("America/Mexico_City").default("America/Mexico_City"),
+    minimumNoticeMinutes: z.number().int().nonnegative().default(120),
+    bookingHorizonDays: z.number().int().positive().max(365).default(30),
+    dailyCapacity: z.number().int().positive().nullable(),
+    schedule: z.record(z.string(), z.array(z.string().regex(/^\d{2}:\d{2}$/))).default({}),
     readyWhatsappTemplate: safe(2000),
     statusWhatsappTemplates: z.record(z.string(), safe(2000)),
     publicStatusLabels: z.record(z.string(), safe(100)),

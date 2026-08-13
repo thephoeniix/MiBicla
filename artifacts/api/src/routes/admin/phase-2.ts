@@ -9,6 +9,7 @@ import {
   customerListQuerySchema,
   customerScanTokenSchema,
   customerUpdateSchema,
+  customerCreditLimitSchema,
   loyaltyAdjustmentSchema,
   loyaltySettingsSchema,
 } from "@mi-bicla/api-contract";
@@ -127,6 +128,13 @@ export function createPhase2AdminRouter(
       res.status(204).end();
     }),
   );
+  r.patch("/customers/:id/credit-limit", ...guard("manage_customer_financing"), run(async (req, res) => {
+    const input = customerCreditLimitSchema.parse(req.body), admin = res.locals.auth.administrator.id, id = String(req.params.id);
+    const result = await customers.updateCreditLimit(id, input.creditLimitCents, admin);
+    if (!result) return res.status(404).json({ error: "NOT_FOUND" });
+    await audit(req, "customer.credit_limit.update", true, admin, undefined, { creditLimitCents: input.creditLimitCents }, id);
+    res.json(result);
+  }));
   r.post(
     "/customers/:id/token",
     ...guard("manage_customers"),

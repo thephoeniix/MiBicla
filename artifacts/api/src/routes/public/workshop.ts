@@ -25,10 +25,17 @@ export function createWorkshopPublicRouter(s: WorkshopService) {
       p.status(202).json({
         requestNumber: x?.requestNumber,
         status: "pending",
+        publicUrl: x?.publicUrl,
       });
     } catch (e) {
       n(e);
     }
+  });
+  r.get("/workshop/catalog", async (_q, p, n) => {
+    try { p.json(await s.publicCatalog()); } catch (e) { n(e); }
+  });
+  r.get("/workshop/availability", async (_q, p, n) => {
+    try { p.json(await s.availability()); } catch (e) { n(e); }
   });
   r.get("/workshop/:token", async (q, p, n) => {
     try {

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import QRCode from "qrcode";
 import { BrandLogo } from "../../components/brand";
 import { Timeline } from "../../components/domain";
@@ -24,6 +24,7 @@ import {
   StatusBadge,
   Stepper,
   statusLabel,
+  useDismissiblePopover,
 } from "../../components/ui";
 import {
   getMyBicycles,
@@ -35,6 +36,10 @@ import {
   getMyOrder,
   getMyOrders,
   getMyWorkshopRequests,
+  getMyWorkshopFinancials,
+  getCustomerTeams,
+  getMyTeamAffiliation,
+  requestMyTeamAffiliation,
   updateMyBicycle,
   updateMyProfile,
   type CustomerBicycle,
@@ -43,6 +48,7 @@ import {
   type CustomerOrderSummary,
   type CustomerOrderTracking,
   type CustomerBicyclePayload,
+  type CustomerWorkshopFinancials,
 } from "../../lib/customer-auth";
 import { useCustomerAuth } from "./CustomerAuth";
 import {
@@ -53,9 +59,10 @@ import {
   BRAKE_TYPES,
   WHEEL_SIZES,
 } from "../../lib/bicycle-catalogs";
-import { WORKSHOP_SERVICES } from "../../lib/public-content";
 import { CustomerCommerce } from "./CustomerCommerce";
 import { workshopTimelineMessage } from "../../lib/workshop-timeline";
+import { WorkshopRequestFlow } from "../../components/WorkshopRequestFlow";
+import type { WorkshopRequestDraft } from "../../lib/workshop-request";
 
 function NotificationIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>;
@@ -73,16 +80,17 @@ const MORE_PATHS = ["/mi", "/mi/tarjeta", "/mi/solicitudes", "/mi/perfil"];
 function usePortalData<T>(key: string, loader: (signal: AbortSignal) => Promise<T>) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     const controller = new AbortController();
-    setError(false);
+    setError(false); setLoading(true);
     loader(controller.signal).then(setData).catch((caught) => {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
       setError(true);
-    });
+    }).finally(() => setLoading(false));
     return () => controller.abort();
   }, [key]);
-  return { data, error };
+  return { data, error, loading };
 }
 
 export function CustomerPortalShell({ identity, title, section, description, children }: {
@@ -93,6 +101,10 @@ export function CustomerPortalShell({ identity, title, section, description, chi
   children: ReactNode;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const moreMenu = useRef<HTMLElement>(null);
+  const closeMore = () => setMoreOpen(false);
+  useDismissiblePopover({ open: moreOpen, onClose: closeMore, triggerRef: moreButton, popoverRef: moreMenu });
   const activePath = ["/mi/taller", "/mi/orden"].includes(location.pathname)
     ? "/mi/ordenes"
     : location.pathname;
@@ -106,7 +118,7 @@ export function CustomerPortalShell({ identity, title, section, description, chi
       <header className={`customer-portal-hero customer-portal-hero--${section}`}><div>{section === "home" && <time dateTime={today.toISOString().slice(0, 10)}>{today.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}<span>{today.toLocaleDateString("es-MX", { weekday: "long" })}</span></time>}<p className="page-eyebrow">PORTAL DEL CLIENTE</p><h1>{title}</h1><p>{description}</p></div></header>
       {children}
     </Container>
-    {moreOpen && <nav className="customer-more-menu" aria-label="Más opciones del cliente">
+    {moreOpen && <nav ref={moreMenu} id="customer-more-menu" className="customer-more-menu" aria-label="Más opciones del cliente" onClick={(event) => { if ((event.target as Element).closest("a")) closeMore(); }}>
       <a href="/mi" aria-current={activePath === "/mi" ? "page" : undefined}>Inicio</a>
       <a href="/mi/tarjeta" aria-current={activePath === "/mi/tarjeta" ? "page" : undefined}>Mi tarjeta</a>
       <a href="/mi/solicitudes" aria-current={activePath === "/mi/solicitudes" ? "page" : undefined}><RequestsIcon />Solicitudes</a>
@@ -114,7 +126,7 @@ export function CustomerPortalShell({ identity, title, section, description, chi
     </nav>}
     <nav className="customer-bottom-nav" aria-label="Navegación del cliente">
       {NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={activePath === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}
-      <button type="button" aria-expanded={moreOpen} aria-current={MORE_PATHS.includes(activePath) ? "page" : undefined} onClick={() => setMoreOpen((current) => !current)}><i aria-hidden="true"><MoreIcon /></i>Más</button>
+      <button ref={moreButton} type="button" aria-expanded={moreOpen} aria-controls="customer-more-menu" aria-haspopup="menu" aria-current={MORE_PATHS.includes(activePath) ? "page" : undefined} onClick={() => setMoreOpen((current) => !current)}><i aria-hidden="true"><MoreIcon /></i>Más</button>
     </nav>
   </div>;
 }
@@ -217,7 +229,7 @@ function Loyalty({ identity }: { identity: CustomerIdentity | null }) {
       <LoyaltyProgress loyalty={data} />
       <section className="customer-qr-action"><div><p className="page-eyebrow">IDENTIFÍCATE EN TIENDA</p><p>Muestra tu QR al equipo de Mi Bicla para acumular o canjear puntos.</p></div><Button onClick={() => void openQr()}>Ver mi QR</Button></section>
       <section className="customer-section"><p className="page-eyebrow">MOVIMIENTOS RECIENTES</p>{data.movements.length ? <div className="profile-menu">{data.movements.map((movement) => <div className="customer-movement" key={movement.id}><b className={movement.units >= 0 ? "is-positive" : ""}>{movement.units >= 0 ? "+" : ""}{movement.units}</b><span><strong>{movement.reason}</strong><small>{new Date(movement.createdAt).toLocaleDateString("es-MX")}</small></span></div>)}</div> : <EmptyState title="Aún no hay movimientos" description="Tus próximos movimientos de puntos aparecerán aquí." />}</section>
-      {qrOpen && <Dialog open aria-labelledby="customer-qr-title"><section className="customer-qr-dialog"><p className="page-eyebrow">TARJETA MI BICLA</p><h2 id="customer-qr-title">Tu código QR</h2><p>El equipo lo escaneará para identificar tu cuenta.</p>{qr ? <img src={qr} alt={`Código QR de ${data.name}`} /> : qrError ? <p className="form-error">{qrError}</p> : <LoadingState label="Generando QR…" />}<Button type="button" data-dialog-close variant="secondary" onClick={() => setQrOpen(false)}>Cerrar</Button></section></Dialog>}
+      {qrOpen && <Dialog open className="ui-modal customer-qr-modal" aria-labelledby="customer-qr-title"><section className="customer-qr-dialog"><p className="page-eyebrow">TARJETA MI BICLA</p><h2 id="customer-qr-title">Tu código QR</h2><p>El equipo lo escaneará para identificar tu cuenta.</p>{qr ? <img src={qr} alt={`Código QR de ${data.name}`} /> : qrError ? <p className="form-error">{qrError}</p> : <LoadingState label="Generando QR…" />}<Button type="button" data-dialog-close variant="secondary" onClick={() => setQrOpen(false)}>Cerrar</Button></section></Dialog>}
     </>}
   </Shell>;
 }
@@ -289,6 +301,7 @@ function Workshop({ identity }: { identity: CustomerIdentity | null }) {
   const [requestRevision, setRequestRevision] = useState(0);
   const requests = usePortalData(`requests-${requestRevision}-${trackingRevision}`, getMyWorkshopRequests);
   const bicycles = usePortalData("workshop-bicycles", getMyBicycles);
+  const financials = usePortalData("workshop-financials", getMyWorkshopFinancials);
   const [requestOpen, setRequestOpen] = useState(false);
   const [scope, setScope] = useState<"active" | "history">("active");
   const [selected, setSelected] = useState<string | null>(null);
@@ -333,6 +346,7 @@ function Workshop({ identity }: { identity: CustomerIdentity | null }) {
         {detail.customerVisibleSummary && <p>{detail.customerVisibleSummary}</p>}
         {detail.totalCents !== undefined && detail.totalCents > 0 && <p className="customer-order-total"><span>Total o estimación</span><strong>{new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(detail.totalCents / 100)}</strong></p>}
         <Stepper status={detail.publicStatus} />
+        <CustomerOrderFinancials orderNumber={detail.orderNumber} financials={financials.data} error={financials.error} />
         {detail.visibleServices.length > 0 && <section className="customer-section"><h2>Servicios</h2><ul>{detail.visibleServices.map((service) => <li key={service.id}>{service.serviceName} · {statusLabel(service.status)}</li>)}</ul></section>}
         {detail.visibleParts.length > 0 && <section className="customer-section"><h2>Piezas y refacciones</h2><ul>{detail.visibleParts.map((part) => <li key={part.id}>{[part.brand, part.partName].filter(Boolean).join(" ")} · {statusLabel(part.status)}</li>)}</ul></section>}
         {detail.updates.length + detail.history.length > 0 && <section className="customer-section"><h2>Actualizaciones</h2><Timeline items={[...detail.updates.map((update) => ({ id: update.id, title: update.title, message: update.message, createdAt: update.createdAt })), ...detail.history.map((event) => { const title = statusLabel(event.status); return { id: event.id, title, message: workshopTimelineMessage(event.publicMessage, title), createdAt: event.createdAt }; })].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())} /></section>}
@@ -344,11 +358,28 @@ function Workshop({ identity }: { identity: CustomerIdentity | null }) {
   </Shell>;
 }
 
+function CustomerOrderFinancials({ orderNumber, financials, error }: { orderNumber: string; financials: CustomerWorkshopFinancials | null; error: boolean }) {
+  if (error) return <p className="form-error">No fue posible consultar el estado financiero.</p>;
+  if (!financials) return <LoadingState label="Consultando pagos…" />;
+  const summary = financials.summaries.find((item) => item.orderNumber === orderNumber);
+  const movements = financials.movements.filter((item) => item.orderNumber === orderNumber);
+  if (!summary && !movements.length) return null;
+  const money = (cents: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(cents / 100);
+  const labels: Record<string, string> = { advance: "Anticipo", payment: "Pago", discount: "Descuento", credit_applied: "Favor aplicado", charge: "Cargo", refund: "Reembolso", correction: "Reversión" };
+  return <section className="customer-order-financials"><h2>Cuenta de la orden</h2>{summary && <dl><div><dt>Total</dt><dd>{money(summary.totalCents)}</dd></div><div><dt>Pagado</dt><dd>{money(summary.paidCents)}</dd></div><div><dt>Descuento</dt><dd>{money(summary.discountCents)}</dd></div><div><dt>Pendiente</dt><dd>{money(summary.pendingCents)}</dd></div>{summary.favorCents > 0 && <div><dt>A favor</dt><dd>{money(summary.favorCents)}</dd></div>}</dl>}<h3>Movimientos</h3>{movements.length ? <div className="customer-finance-movements">{movements.map((movement) => <div key={movement.id}><span><strong>{labels[movement.type] ?? movement.type}</strong><small>{movement.occurredDate}{movement.reference ? ` · ${movement.reference}` : ""}</small></span><b>{money(movement.amountCents)}</b></div>)}</div> : <p>Aún no hay movimientos registrados.</p>}</section>;
+}
+
 function WorkshopRequestEditor({ bicycles, onClose, onSaved }: { bicycles: CustomerBicycle[]; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ bicycleId: bicycles[0]?.id ?? "", serviceName: "", problemDescription: "", preferredContactMethod: "whatsapp" as "whatsapp" | "phone" | "email" });
-  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setError(""); try { await createMyWorkshopRequest({ ...form, serviceName: form.serviceName || null }); onSaved(); } catch { setError("No fue posible enviar la solicitud."); } finally { setBusy(false); } }
-  return <FormDialog open aria-labelledby="customer-request-title"><form className="customer-editor-form" onSubmit={submit}><header className="form-dialog-header"><p className="page-eyebrow">TALLER MI BICLA</p><h2 id="customer-request-title">Solicitar servicio</h2></header><div className="form-dialog-body"><label>Bicicleta<select required value={form.bicycleId} onChange={(event) => setForm({ ...form, bicycleId: event.target.value })}>{bicycles.map((bike) => <option value={bike.id} key={bike.id}>{bicycleName(bike)}</option>)}</select></label><label>Servicio<select value={form.serviceName} onChange={(event) => setForm({ ...form, serviceName: event.target.value })}><option value="">Otro / diagnóstico</option>{WORKSHOP_SERVICES.map((service) => <option key={service}>{service}</option>)}</select></label><label>¿Qué necesita tu bicicleta?<textarea required minLength={10} rows={5} value={form.problemDescription} onChange={(event) => setForm({ ...form, problemDescription: event.target.value })} /></label><label>Contacto preferido<select value={form.preferredContactMethod} onChange={(event) => setForm({ ...form, preferredContactMethod: event.target.value as typeof form.preferredContactMethod })}><option value="whatsapp">WhatsApp</option><option value="phone">Llamada</option><option value="email">Correo</option></select></label>{error && <p className="form-error">{error}</p>}</div><div className="modal-actions form-dialog-actions"><Button type="button" data-dialog-close variant="ghost" onClick={onClose}>Cancelar</Button><Button disabled={busy}>{busy ? "Enviando…" : "Enviar solicitud"}</Button></div></form></FormDialog>;
+  async function submit(draft: WorkshopRequestDraft) {
+    await createMyWorkshopRequest({ bicycleId: draft.bicycleId, catalogServiceId: draft.catalogServiceId || null,
+      serviceName: draft.serviceName || null, problemDescription: draft.problemDescription, symptoms: draft.symptoms || null,
+      visibleDamage: draft.visibleDamage || null, additionalComments: draft.additionalComments || null,
+      requestedDate: draft.requestedDate || null, requestedTime: draft.requestedTime || null,
+      desiredDeliveryDate: draft.desiredDeliveryDate || null, urgency: draft.urgency,
+      preferredContactMethod: draft.preferredContactMethod });
+    onSaved();
+  }
+  return <FormDialog open aria-labelledby="customer-request-title"><section className="customer-editor-form"><header className="form-dialog-header"><p className="page-eyebrow">TALLER MI BICLA</p><h2 id="customer-request-title">Solicitar servicio</h2></header><div className="form-dialog-body"><WorkshopRequestFlow authenticated bicycles={bicycles.map((bike) => ({ id: bike.id, label: bicycleName(bike) }))} initial={{ bicycleId: bicycles[0]?.id ?? "" }} onSubmit={submit} onCancel={onClose} /></div></section></FormDialog>;
 }
 
 function Profile({ identity, signOut }: { identity: CustomerIdentity | null; signOut: () => Promise<void> }) {
@@ -363,10 +394,30 @@ function Profile({ identity, signOut }: { identity: CustomerIdentity | null; sig
   return <Shell identity={identity} section="profile" title="Mi perfil" description="Mantén tus datos al día para que podamos acompañar mejor cada servicio."><section className="customer-profile-page">
     <header className="customer-profile-identity"><span aria-hidden="true">{identity?.name.charAt(0).toUpperCase() || "M"}</span><div><h1>{identity?.name || "Mi cuenta"}</h1><p>Miembro Mi Bicla</p></div></header>
     <p className="customer-profile-label">CUENTA</p><Card className="customer-profile-contact"><div className="customer-section-heading"><p className="page-eyebrow">DATOS DE CONTACTO</p><button type="button" onClick={() => setEditing(!editing)}>{editing ? "Cancelar" : "Editar"}</button></div>{editing ? <form className="customer-profile-form" onSubmit={save}><label>Nombre<input required value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} /></label><label>Apellidos<input required value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} /></label><label>Correo<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label><label>Fecha de nacimiento<input type="date" max={new Date().toISOString().slice(0, 10)} value={form.birthDate} onChange={(event) => setForm({ ...form, birthDate: event.target.value })} /></label><Button disabled={busy}>{busy ? "Guardando…" : "Guardar cambios"}</Button></form> : identity && <dl><div><dt><span aria-hidden="true">☎</span> Teléfono</dt><dd>{identity.phone} <small>Verificado</small></dd></div><div><dt><span aria-hidden="true">✉</span> Correo electrónico</dt><dd>{identity.email || "Sin correo registrado"}</dd></div>{identity.birthDate && <div><dt>Fecha de nacimiento</dt><dd>{new Date(`${identity.birthDate}T00:00:00`).toLocaleDateString("es-MX")}</dd></div>}</dl>}{notice && <p role="status">{notice}</p>}</Card>
+    <TeamAffiliation />
     <Card className="customer-profile-settings"><div><span aria-hidden="true">◐</span><ThemeSelector /></div><details><summary><span aria-hidden="true">▣</span> Cambiar contraseña <b aria-hidden="true">›</b></summary><form className="customer-profile-form" onSubmit={savePassword}><label>Contraseña actual<input type="password" autoComplete="current-password" required value={passwords.current} onChange={(event) => setPasswords({ ...passwords, current: event.target.value })} /></label><label>Nueva contraseña<input type="password" autoComplete="new-password" minLength={12} required value={passwords.next} onChange={(event) => setPasswords({ ...passwords, next: event.target.value })} /></label><label>Confirmar contraseña<input type="password" autoComplete="new-password" minLength={12} required value={passwords.confirmation} onChange={(event) => setPasswords({ ...passwords, confirmation: event.target.value })} /></label><Button disabled={busy}>Actualizar contraseña</Button>{passwordNotice && <p role="status">{passwordNotice}</p>}</form></details></Card>
     <p className="customer-profile-label">AYUDA</p><nav className="customer-profile-links" aria-label="Ayuda"><a href="/#contacto"><span aria-hidden="true">?</span>Centro de ayuda <b aria-hidden="true">›</b></a></nav>
     <button className="customer-sign-out" type="button" onClick={() => void signOut().then(() => location.replace("/iniciar-sesion"))}>Cerrar sesión</button>
   </section></Shell>;
+}
+
+function TeamAffiliation() {
+  const [revision, setRevision] = useState(0);
+  const teams = usePortalData("profile-teams", getCustomerTeams);
+  const affiliation = usePortalData(`profile-affiliation-${revision}`, getMyTeamAffiliation);
+  const [selection, setSelection] = useState("");
+  const [proposedName, setProposedName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setNotice("");
+    if (!selection || (selection === "other" && !proposedName.trim())) return setNotice("Selecciona un equipo o escribe su nombre.");
+    setBusy(true);
+    try { await requestMyTeamAffiliation(selection === "other" ? { proposedTeamName: proposedName.trim() } : { teamId: selection }); setNotice("Solicitud enviada para revisión. No se aplicó ningún descuento automático."); setRevision((current) => current + 1); }
+    catch { setNotice("No fue posible enviar la solicitud."); }
+    finally { setBusy(false); }
+  }
+  return <Card className="customer-team-affiliation"><p className="page-eyebrow">EQUIPO O CLUB</p>{teams.error || affiliation.error ? <ErrorState message="No fue posible consultar tu afiliación." /> : teams.loading || affiliation.loading ? <LoadingState label="Consultando afiliación…" /> : affiliation.data ? <div><h3>{affiliation.data.team?.name ?? affiliation.data.affiliation.proposedTeamName}</h3><StatusBadge status={affiliation.data.affiliation.status} /><p>{affiliation.data.affiliation.status === "pending" ? "El equipo Mi Bicla revisará tu solicitud. Esto no aplica descuentos automáticamente." : "Afiliación verificada. Los convenios válidos se aplican únicamente al registrar una orden."}</p></div> : <form className="customer-profile-form" onSubmit={submit}><p>Solicita vincular tu cuenta. El taller debe verificarla antes de usar cualquier convenio.</p><label>Equipo<select required value={selection} onChange={(event) => setSelection(event.target.value)}><option value="">Selecciona</option>{teams.data?.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}<option value="other">Otro</option></select></label>{selection === "other" && <label>Nombre propuesto<input required maxLength={200} value={proposedName} onChange={(event) => setProposedName(event.target.value)} /></label>}<Button disabled={busy}>{busy ? "Enviando…" : "Enviar solicitud"}</Button></form>}{notice && <p role="status">{notice}</p>}</Card>;
 }
 
 export function CustomerPortal() {

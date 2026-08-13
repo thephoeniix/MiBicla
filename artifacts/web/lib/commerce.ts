@@ -1,6 +1,7 @@
 import { apiFetch } from "./api-client";
 import { customerFetch } from "./customer-auth";
 import { configuredWhatsappUrl, MI_BICLA_CONTACT } from "./public-links";
+import { buildWhatsappUrl } from "./whatsapp";
 
 export const PRODUCT_CATEGORIES = [
   "Bicicletas",
@@ -207,7 +208,7 @@ export const getCommerceWhatsapp = () =>
     .catch(() => configuredWhatsappUrl(MI_BICLA_CONTACT.primaryWhatsapp)!);
 
 export function whatsappMessageUrl(baseUrl: string, message: string) {
-  return `${baseUrl}?text=${encodeURIComponent(message)}`;
+  return buildWhatsappUrl(baseUrl, message);
 }
 
 export const googleMapsSearchUrl = (location: string) =>

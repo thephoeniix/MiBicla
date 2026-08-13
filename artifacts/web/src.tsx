@@ -10,6 +10,7 @@ import { Customers } from "./pages/admin/Customers";
 import { Loyalty } from "./pages/admin/settings/Loyalty";
 import { Workshop } from "./pages/admin/Workshop";
 import { WorkshopRequest } from "./pages/public/WorkshopRequest";
+import { PublicLink } from "./pages/public/PublicLink";
 import { WorkshopTracking } from "./pages/public/WorkshopTracking";
 import { apiFetch, ApiError } from "./lib/api-client";
 import { AppShell } from "./components/AppShell";
@@ -28,6 +29,7 @@ import { CustomerPortal } from "./pages/customer/CustomerPortal";
 import { PublicEvents, PublicProducts } from "./pages/public/Commerce";
 import { AdminDashboard, AdminEvents, AdminProducts, AdminRequests } from "./pages/admin/CommerceAdmin";
 import { AdministrativeUsers } from "./pages/admin/AdministrativeUsers";
+import { Agreements } from "./pages/admin/Agreements";
 interface Administrator {
   id: string;
   name: string;
@@ -114,6 +116,8 @@ function AdminApp() {
           <AdminRequests permissions={user.permissions} />
         ) : window.location.pathname === "/admin/workshop" ? (
           <Workshop permissions={user.permissions} />
+        ) : window.location.pathname === "/admin/agreements" ? (
+          <Agreements permissions={user.permissions} />
         ) : window.location.pathname.startsWith("/admin/customers") ? (
           <Customers permissions={user.permissions} />
         ) : window.location.pathname === "/admin/users" && user.role === "owner" ? (
@@ -201,6 +205,7 @@ function App() {
     "customer-login": ["Iniciar sesión | Mi Bicla Querétaro", "Acceso de clientes de Mi Bicla."],
     "customer-activation": ["Activar cuenta | Mi Bicla Querétaro", "Activación segura de cuenta.", true],
     "customer-recovery": ["Recuperar acceso | Mi Bicla Querétaro", "Recuperación segura de acceso.", true],
+    "public-link": ["Enlace seguro | Mi Bicla Querétaro", "Acceso privado de Mi Bicla.", true],
     "customer-home": ["Mi espacio | Mi Bicla Querétaro", "Portal privado de clientes.", true],
     "customer-loyalty": ["Mi tarjeta | Mi Bicla Querétaro", "Puntos y recompensas del cliente.", true],
     "customer-workshop": ["Mi taller | Mi Bicla Querétaro", "Órdenes y seguimiento del cliente.", true],
@@ -244,6 +249,7 @@ function App() {
     case "products": return <PublicProducts />;
     case "events": return <PublicEvents />;
     case "workshop-request": return <WorkshopRequest />;
+    case "public-link": return <PublicLink code={match.token!} />;
     case "workshop-tracking": return <WorkshopTracking token={match.token!} />;
     case "customer-card": return <CustomerCard token={match.token!} />;
     case "deposits": return <Depositos />;

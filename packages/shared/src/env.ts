@@ -51,4 +51,13 @@ export const envSchema = z.object({
 });
 export type AppEnv = z.infer<typeof envSchema>;
 export const parseEnv = (input: NodeJS.ProcessEnv): AppEnv =>
-  envSchema.parse(input);
+  envSchema.transform((env) => {
+    const normalize = (value: string) => {
+      const url = new URL(value);
+      url.pathname = "/";
+      url.search = "";
+      url.hash = "";
+      return url.toString().replace(/\/$/, "");
+    };
+    return { ...env, APP_BASE_URL: normalize(env.APP_BASE_URL), API_BASE_URL: normalize(env.API_BASE_URL) };
+  }).parse(input);

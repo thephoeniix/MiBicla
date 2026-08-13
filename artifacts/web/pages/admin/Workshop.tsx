@@ -25,6 +25,7 @@ import {
   Toast,
 } from "../../components/ui";
 import { Drawer, WorkshopOrderCard } from "../../components/domain";
+import { WorkshopFinancials } from "../../components/WorkshopFinancials";
 interface Customer {
   id: string;
   firstName: string;
@@ -57,6 +58,18 @@ interface OrderPart {
   status: string;
   isCustomerVisible: boolean;
 }
+interface WorkshopSettings {
+  publicRequestsEnabled: boolean; publicTrackingEnabled: boolean; allowCustomerPhotos: boolean;
+  defaultEstimatedDays: number | null; scheduleTimezone: "America/Mexico_City"; minimumNoticeMinutes: number;
+  bookingHorizonDays: number; dailyCapacity: number | null; schedule: Record<string, string[]>;
+  readyWhatsappTemplate: string; statusWhatsappTemplates: Record<string, string>; publicStatusLabels: Record<string, string>;
+}
+const DEFAULT_SETTINGS: WorkshopSettings = {
+  publicRequestsEnabled: true, publicTrackingEnabled: true, allowCustomerPhotos: false, defaultEstimatedDays: null,
+  scheduleTimezone: "America/Mexico_City", minimumNoticeMinutes: 120, bookingHorizonDays: 30, dailyCapacity: null,
+  schedule: {}, readyWhatsappTemplate: "Hola {nombre}. Tu bicicleta {bicicleta} está {estado}. Orden: {orden}. Seguimiento: {url}",
+  statusWhatsappTemplates: {}, publicStatusLabels: {},
+};
 const ORDER_EMPTY = {
   customerId: "",
   bicycleId: "",
@@ -124,6 +137,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
   const [detailTab, setDetailTab] = useState("summary");
   const [mobileSection, setMobileSection] = useState("requests");
   const [orderFilter, setOrderFilter] = useState("all");
+  const [settings, setSettings] = useState<WorkshopSettings>(DEFAULT_SETTINGS);
   const load = () =>
     Promise.all([
       apiFetch<RequestItem[]>("/api/admin/workshop/requests"),
@@ -142,7 +156,37 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       .then(({ items }) => setCustomers(items))
       .catch(() => setCustomersError("Error al cargar clientes."))
       .finally(() => setCustomersLoading(false));
+    if (permissions.includes("manage_workshop_settings")) apiFetch<WorkshopSettings | null>("/api/admin/settings/workshop").then((value) => value && setSettings({ ...DEFAULT_SETTINGS, ...value })).catch(show);
   }, []);
+  useEffect(() => {
+    const closeMenus = (event: Event) => {
+      const target = event.target as Element;
+      document.querySelectorAll<HTMLDetailsElement>(".workshop-page .service-actions-menu[open]").forEach((menu) => {
+        if (!menu.contains(target) || target.closest("button")) menu.open = false;
+      });
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const menu = document.querySelector<HTMLDetailsElement>(".workshop-page .service-actions-menu[open]");
+      if (!menu) return;
+      event.preventDefault();
+      menu.open = false;
+      menu.querySelector<HTMLElement>("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeMenus);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenus);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+  async function saveSettings(event: FormEvent) {
+    event.preventDefault();
+    try {
+      await apiFetch("/api/admin/settings/workshop", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) });
+      setStatus("Configuración de agenda guardada.");
+    } catch (error) { show(error); }
+  }
   function show(e: unknown) {
     if (!(e instanceof ApiError)) {
       setStatus("No fue posible completar la solicitud.");
@@ -180,7 +224,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
   }
   async function convert(id: string) {
     try {
-      const x = await apiFetch<{ publicToken: string }>(
+      const x = await apiFetch<{ publicToken: string; publicUrl?: string }>(
         `/api/admin/workshop/requests/${id}/convert`,
         {
           method: "POST",
@@ -189,7 +233,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
         },
       );
       setStatus(
-        `Orden creada. Seguimiento: ${location.origin}/taller/${x.publicToken}`,
+        `Orden creada. Seguimiento: ${x.publicUrl ?? `${location.origin}/l/${x.publicToken}`}`,
       );
       await load();
     } catch (e) {
@@ -203,7 +247,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       return;
     }
     try {
-      const x = await apiFetch<{ publicToken: string }>(
+      const x = await apiFetch<{ publicToken: string; publicUrl?: string }>(
         "/api/admin/workshop/orders",
         {
           method: "POST",
@@ -211,7 +255,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           body: JSON.stringify(orderForm),
         },
       );
-      setStatus(`Orden creada: ${location.origin}/taller/${x.publicToken}`);
+      setStatus(`Orden creada: ${x.publicUrl ?? `${location.origin}/l/${x.publicToken}`}`);
       setOrderForm(ORDER_EMPTY);
       setBicycles([]);
       setShowCreateOrder(false);
@@ -359,7 +403,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       `/api/admin/workshop/orders/${detail.order.id}/regenerate-token`,
       { method: "POST" },
     );
-    setStatus(`${location.origin}/taller/${x.publicToken}`);
+    setStatus(`${location.origin}/l/${x.publicToken}`);
   }
   async function whatsapp() {
     if (!detail) return;
@@ -415,6 +459,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           detail="Para entregar"
         />
       </div>
+      {permissions.includes("manage_workshop_settings") && <details className="workshop-schedule-settings"><summary>Configuración y agenda</summary><form onSubmit={saveSettings}><div className="workshop-flow-grid"><label><span>Solicitudes públicas</span><input type="checkbox" checked={settings.publicRequestsEnabled} onChange={(event) => setSettings({ ...settings, publicRequestsEnabled: event.target.checked })} /></label><label><span>Seguimiento público</span><input type="checkbox" checked={settings.publicTrackingEnabled} onChange={(event) => setSettings({ ...settings, publicTrackingEnabled: event.target.checked })} /></label><label>Capacidad diaria<input type="number" min="1" placeholder="Sin configurar" value={settings.dailyCapacity ?? ""} onChange={(event) => setSettings({ ...settings, dailyCapacity: event.target.value ? Number(event.target.value) : null })} /></label><label>Anticipación mínima (minutos)<input type="number" min="0" value={settings.minimumNoticeMinutes} onChange={(event) => setSettings({ ...settings, minimumNoticeMinutes: Number(event.target.value) })} /></label><label>Horizonte (días)<input type="number" min="1" max="365" value={settings.bookingHorizonDays} onChange={(event) => setSettings({ ...settings, bookingHorizonDays: Number(event.target.value) })} /></label>{[["mon", "Lunes"], ["tue", "Martes"], ["wed", "Miércoles"], ["thu", "Jueves"], ["fri", "Viernes"], ["sat", "Sábado"], ["sun", "Domingo"]].map(([key, label]) => <label key={key}>{label}<input placeholder="10:00, 12:00, 16:00" value={(settings.schedule[key] ?? []).join(", ")} onChange={(event) => setSettings({ ...settings, schedule: { ...settings.schedule, [key]: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) } })} /></label>)}</div><p>Zona horaria: America/Mexico_City. Las franjas son preferencias informativas y comparten la capacidad total del día.</p><Button>Guardar agenda</Button></form></details>}
       <div className="workshop-mobile-tabs">
         <Tabs
           label="Vista del taller"
@@ -638,7 +683,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             { id: "summary", label: "Resumen" },
             { id: "status", label: "Estado" },
             { id: "services", label: "Servicios" },
-            { id: "costs", label: "Costos" },
+            ...(permissions.includes("view_workshop_financials") ? [{ id: "costs", label: "Costos" }] : []),
             { id: "customer", label: "Cliente" },
           ]} />
           <div className="workshop-detail-content">
@@ -682,12 +727,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
             onChanged={() => open(detail.order.id)}
           />}
           {detailTab === "costs" && <section className="order-costs">
-            <dl>
-              <div><dt>Servicios</dt><dd>{detail.order.subtotalServicesCents === undefined ? "Restringido" : `$${(detail.order.subtotalServicesCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`}</dd></div>
-              <div><dt>Refacciones</dt><dd>{detail.order.subtotalPartsCents === undefined ? "Restringido" : `$${(detail.order.subtotalPartsCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`}</dd></div>
-              {detail.order.discountCents > 0 && <div><dt>Descuento</dt><dd>−${(detail.order.discountCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</dd></div>}
-              <div className="order-cost-total"><dt>Total</dt><dd>{detail.order.totalCents === undefined ? "Restringido" : `$${(detail.order.totalCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN`}</dd></div>
-            </dl>
+            <WorkshopFinancials order={detail.order} orders={orders} permissions={permissions} />
           <section className="workshop-parts">
             <div className="workshop-services-heading"><div><p className="page-eyebrow">Orden</p><h4>Piezas</h4></div><span>{detail.parts.length}</span></div>
             {detail.parts.length > 0 && <div className="selected-services order-parts-list">

@@ -69,7 +69,7 @@ function Confetti() {
   );
 }
 
-export function CustomerCard({ token }: { token: string }) {
+export function CustomerCard({ token, endpoint }: { token: string; endpoint?: string }) {
   const [data, setData] = useState<Card | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [qr, setQr] = useState("");
@@ -82,10 +82,11 @@ export function CustomerCard({ token }: { token: string }) {
   const loadCard = useCallback(
     async (signal?: AbortSignal) => {
       try {
-        const next = await apiFetch<Card>(
-          `/api/public/customer/${encodeURIComponent(token)}`,
+        const response = await apiFetch<Card | { data: Card }>(
+          endpoint ?? `/api/public/customer/${encodeURIComponent(token)}`,
           { signal },
         );
+        const next = "data" in response ? response.data : response;
         const previous = previousPoints.current;
         const current = next.balance.availableUnits;
 

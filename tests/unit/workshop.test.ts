@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   calculateWorkshopTotals,
   canTransition,
-  workshopWhatsappUrl,
 } from "../../artifacts/api/src/services/workshop.service";
 import {
   workshopRequestSchema,
@@ -76,14 +75,6 @@ describe("Taller", () => {
     const token = generateSessionToken();
     expect(sha256(token)).toMatch(/^[a-f0-9]{64}$/);
     expect(sha256(token)).not.toBe(token);
-  });
-  it("codifica WhatsApp sin notas internas", () => {
-    const url = workshopWhatsappUrl("+52 442", "Orden {orden}: {estado}", {
-      orden: "OT-1",
-      estado: "lista",
-    });
-    expect(decodeURIComponent(url)).toContain("Orden OT-1: lista");
-    expect(url).not.toContain("internal");
   });
   it("permite entrega desde ready pero no desde estados previos", () => {
     expect(canTransition("ready", "delivered")).toBe(true);

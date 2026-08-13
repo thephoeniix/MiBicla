@@ -41,6 +41,9 @@ export const PERMISSION_NAMES = [
   "notify_workshop_customers",
   "view_workshop_financials",
   "manage_workshop_financials",
+  "manage_workshop_pricing",
+  "manage_workshop_agreements",
+  "manage_customer_financing",
   "manage_workshop_settings",
 ] as const;
 export type PermissionName = (typeof PERMISSION_NAMES)[number];
@@ -83,6 +86,9 @@ export const ROLE_PERMISSIONS: Record<RoleName, readonly PermissionName[]> = {
     "notify_workshop_customers",
     "view_workshop_financials",
     "manage_workshop_financials",
+    "manage_workshop_pricing",
+    "manage_workshop_agreements",
+    "manage_customer_financing",
     "manage_workshop_settings",
   ],
   employee: [

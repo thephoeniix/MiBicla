@@ -23,9 +23,11 @@ import {
   customerRewards,
   customers,
   paymentDepositSettings,
+  publicLinks,
   rateLimits,
   roles,
   workshopCustomerUpdates,
+  workshopFinancialMovements,
   workshopOrders,
   workshopOrderServices,
   workshopStatusHistory,
@@ -33,6 +35,7 @@ import {
 import { hashPassword, hashSessionToken, parseEnv, verifyPassword } from "@mi-bicla/shared";
 import { createApp } from "../../artifacts/api/src/app.js";
 import { CustomerAuthService } from "../../artifacts/api/src/services/customer-auth.service.js";
+import { PublicLinksService } from "../../artifacts/api/src/services/public-links.service.js";
 import {
   TEST_EMPLOYEE,
   TEST_OWNER,
@@ -160,6 +163,78 @@ async function createCustomer(admin: Session, suffix = "uno") {
   };
 }
 
+async function createWorkshopOrder(admin: Session, customerId: string, suffix: string) {
+  const bicycleResponse = await request("/api/admin/bicycles", {
+    method: "POST",
+    session: admin,
+    body: {
+      customerId, nickname: `Bici ${suffix}`, brand: "Marca ficticia",
+      model: null, year: null, bikeType: null, color: null, wheelSize: null,
+      brakeType: null, suspensionType: null, drivetrain: null,
+      generalCondition: null, serialNumber: null, frameNumber: null,
+      notes: null, photoUrl: null, status: "active",
+    },
+  });
+  expect(bicycleResponse.status).toBe(201);
+  const bicycle = (await bicycleResponse.json()) as { id: string };
+  const orderResponse = await request("/api/admin/workshop/orders", {
+    method: "POST",
+    session: admin,
+    body: {
+      customerId, bicycleId: bicycle.id,
+      problemDescription: `Orden financiera ${suffix}`, priority: "normal",
+    },
+  });
+  expect(orderResponse.status).toBe(201);
+  return (await orderResponse.json()) as { order: { id: string; orderNumber: string } };
+}
+
+async function addWorkshopService(admin: Session, orderId: string, unitPriceCents: number) {
+  const response = await request(`/api/admin/workshop/orders/${orderId}/services`, {
+    method: "POST",
+    session: admin,
+    body: {
+      catalogServiceId: null, serviceName: "Servicio financiero ficticio",
+      description: "Línea para integración", quantity: 1, unitPriceCents,
+      isCustomerVisible: true, performedBy: null, status: "approved",
+    },
+  });
+  expect(response.status, await response.clone().text()).toBe(201);
+  return (await response.json()) as { id: string };
+}
+
+async function addWorkshopPart(admin: Session, orderId: string, unitPriceCents: number) {
+  const response = await request(`/api/admin/workshop/orders/${orderId}/parts`, {
+    method: "POST",
+    session: admin,
+    body: {
+      partName: "Refacción financiera ficticia", brand: null, sku: null,
+      description: "Línea para integración", quantity: 1, unitPriceCents,
+      isCustomerVisible: true, status: "planned",
+    },
+  });
+  expect(response.status, await response.clone().text()).toBe(201);
+  return (await response.json()) as { id: string };
+}
+
+async function createMovement(
+  admin: Session,
+  orderId: string,
+  body: {
+    type: "advance" | "payment" | "discount" | "charge";
+    amountCents: number;
+    paymentMethod?: "cash" | "card" | "transfer" | "other" | null;
+    reference?: string | null;
+    note?: string | null;
+  },
+) {
+  const response = await request(`/api/admin/workshop/orders/${orderId}/movements`, {
+    method: "POST", session: admin, body: { occurredDate: "2026-08-13", ...body },
+  });
+  expect(response.status, await response.clone().text()).toBe(201);
+  return (await response.json()) as { id: string; amountCents: number; responsibleAdminId: string | null };
+}
+
 async function generateCustomerLink(
   admin: Session,
   customerId: string,
@@ -174,9 +249,14 @@ async function generateCustomerLink(
     link: string;
     whatsappUrl: string;
   };
-  const token = new URL(body.link).searchParams.get("token");
+  const token = credentialFromLink(body.link);
   if (!token) throw new Error("La respuesta no incluyó token.");
   return { ...body, token };
+}
+
+function credentialFromLink(link: string) {
+  const url = new URL(link);
+  return url.searchParams.get("token") ?? url.pathname.match(/^\/l\/([A-Za-z0-9_-]{16})$/)?.[1] ?? null;
 }
 
 async function activateCustomer(admin: Session, customerId: string) {
@@ -260,7 +340,7 @@ describe("infraestructura PostgreSQL", () => {
         from information_schema.tables
         where table_schema = 'public'
       `);
-      expect(migrations[0]?.count).toBe(15);
+      expect(migrations[0]?.count).toBe(17);
       expect(tables.map(({ name }) => name)).toEqual(
         expect.arrayContaining([
           "administrators",
@@ -273,6 +353,12 @@ describe("infraestructura PostgreSQL", () => {
           "customer_auth_tokens",
           "customer_registration_requests",
           "customer_loyalty_movements",
+          "public_links",
+          "teams",
+          "agreements",
+          "customer_team_affiliations",
+          "workshop_order_agreement_applications",
+          "workshop_financial_movements",
         ]),
       );
     } finally {
@@ -371,7 +457,7 @@ describe("registro pendiente → verificación manual → activación (flujo tra
     const approved = await registerAndApprove(phone, admin);
 
     expect(approved.customerId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(approved.link).toContain("/cuenta/activar?token=");
+    expect(new URL(approved.link).pathname).toMatch(/^\/l\/[A-Za-z0-9_-]{16}$/);
     expect(approved.whatsappUrl).toContain(`https://wa.me/52${phone.replace(/\D/g, "")}`);
     // La respuesta nunca expone hashes, contraseñas ni nombres de columna internos.
     expect(JSON.stringify(approved)).not.toMatch(/hash|password/i);
@@ -392,9 +478,9 @@ describe("registro pendiente → verificación manual → activación (flujo tra
       expect(tokenRow?.purpose).toBe("activation");
       expect(tokenRow?.consumedAt).toBeNull();
       expect(tokenRow?.revokedAt).toBeNull();
-      const rawToken = new URL(approved.link).searchParams.get("token")!;
-      expect(tokenRow?.tokenHash).toBe(hashSessionToken(rawToken));
-      expect(tokenRow?.tokenHash).not.toBe(rawToken);
+      const shortCode = credentialFromLink(approved.link)!;
+      expect(tokenRow?.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(tokenRow?.tokenHash).not.toBe(shortCode);
       // Vigencia de activación: ~24 horas, no 30 minutos.
       const hoursUntilExpiry =
         (new Date(approved.expiresAt).getTime() - Date.now()) / (60 * 60 * 1000);
@@ -402,7 +488,7 @@ describe("registro pendiente → verificación manual → activación (flujo tra
       expect(hoursUntilExpiry).toBeLessThan(24.1);
     } finally { await client.end(); }
 
-    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    const rawToken = credentialFromLink(approved.link)!;
     const activate = await request("/api/customer/auth/activate", {
       method: "POST", body: { token: rawToken, password: "Fresh-Customer-Password1!" },
     });
@@ -440,7 +526,7 @@ describe("registro pendiente → verificación manual → activación (flujo tra
     };
     expect(approved.whatsappUrl).toContain(`https://wa.me/52${phone.replace(/\D/g, "")}`);
 
-    const activationToken = new URL(approved.link).searchParams.get("token")!;
+    const activationToken = credentialFromLink(approved.link)!;
     expect((await request("/api/customer/auth/activate", {
       method: "POST",
       body: { token: activationToken, password },
@@ -517,7 +603,7 @@ describe("registro pendiente → verificación manual → activación (flujo tra
   it("el token de activación es de un solo uso — reutilizarlo falla de forma comprensible", async () => {
     const admin = await login();
     const approved = await registerAndApprove("442 700 0031", admin);
-    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    const rawToken = credentialFromLink(approved.link)!;
     const first = await request("/api/customer/auth/activate", {
       method: "POST", body: { token: rawToken, password: "Fresh-Customer-Password1!" },
     });
@@ -533,14 +619,14 @@ describe("registro pendiente → verificación manual → activación (flujo tra
   it("regenerar el enlace invalida el anterior — el viejo deja de servir", async () => {
     const admin = await login();
     const approved = await registerAndApprove("442 700 0041", admin);
-    const oldToken = new URL(approved.link).searchParams.get("token")!;
+    const oldToken = credentialFromLink(approved.link)!;
 
     const regenerated = await request(`/api/admin/customers/${approved.customerId}/auth/activation`, {
       method: "POST", session: admin,
     });
     expect(regenerated.status).toBe(201);
     const { link: newLink } = await regenerated.json() as { link: string };
-    const newToken = new URL(newLink).searchParams.get("token")!;
+    const newToken = credentialFromLink(newLink)!;
     expect(newToken).not.toBe(oldToken);
 
     const withOldToken = await request("/api/customer/auth/activate", {
@@ -581,7 +667,7 @@ describe("registro pendiente → verificación manual → activación (flujo tra
     const admin = await login();
     const phone = "442 700 0061";
     const approved = await registerAndApprove(phone, admin);
-    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    const rawToken = credentialFromLink(approved.link)!;
     await request("/api/customer/auth/activate", {
       method: "POST", body: { token: rawToken, password: "Active-Account-Password1!" },
     });
@@ -660,7 +746,7 @@ describe("registro pendiente → verificación manual → activación (flujo tra
       body: { phone, password: "Legacy-Password-Should-Not-Work1!" },
     })).status).toBe(401);
 
-    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    const rawToken = credentialFromLink(approved.link)!;
     expect((await request("/api/customer/auth/activate", {
       method: "POST", body: { token: rawToken, password: "Genuinely-New-Password1!" },
     })).status).toBe(204);
@@ -691,7 +777,7 @@ describe("registro pendiente → verificación manual → activación (flujo tra
     const admin = await login();
     const phone = "442 700 0111";
     const approved = await registerAndApprove(phone, admin);
-    const rawToken = new URL(approved.link).searchParams.get("token")!;
+    const rawToken = credentialFromLink(approved.link)!;
     await request("/api/customer/auth/activate", {
       method: "POST", body: { token: rawToken, password: "Already-Active-Password1!" },
     });
@@ -871,11 +957,12 @@ describe("autenticación de clientes", () => {
     const { password } = await activateCustomer(admin, customer.id);
     const { db, client } = createTestDatabase();
     const verify = vi.fn(async () => true);
+    const links = new PublicLinksService(db, "00".repeat(32), ORIGIN);
     const service = new CustomerAuthService(db, ORIGIN, {
       hash: vi.fn(async () => "unused"),
       verify,
       dummyHash: Promise.resolve("dummy-hash"),
-    });
+    }, links);
     try {
       expect(
         await service.authenticateAndCreateSession(customer.phone, password),
@@ -899,11 +986,12 @@ describe("autenticación de clientes", () => {
     const link = await generateCustomerLink(admin, customer.id, "activation");
     const { db, client } = createTestDatabase();
     const hash = vi.fn(async () => "should-not-be-used");
+    const links = new PublicLinksService(db, "00".repeat(32), ORIGIN);
     const service = new CustomerAuthService(db, ORIGIN, {
       hash,
       verify: vi.fn(async () => false),
       dummyHash: Promise.resolve("dummy-hash"),
-    });
+    }, links);
     try {
       expect(
         await service.consumePasswordToken(
@@ -912,13 +1000,15 @@ describe("autenticación de clientes", () => {
           "activation",
         ),
       ).toBeNull();
+      const [short] = await db.select({ authTokenId: publicLinks.customerAuthTokenId }).from(publicLinks)
+        .where(eq(publicLinks.codeHash, hashSessionToken(link.token)));
       await db
         .update(customerAuthTokens)
         .set({
           createdAt: new Date(Date.now() - 120_000),
           expiresAt: new Date(Date.now() - 60_000),
         })
-        .where(eq(customerAuthTokens.tokenHash, hashSessionToken(link.token)));
+        .where(eq(customerAuthTokens.id, short!.authTokenId!));
       expect(
         await service.consumePasswordToken(
           link.token,
@@ -937,13 +1027,14 @@ describe("autenticación de clientes", () => {
     const { customer } = await createCustomer(admin);
     const link = await generateCustomerLink(admin, customer.id, "activation");
     const { db, client } = createTestDatabase();
+    const links = new PublicLinksService(db, "00".repeat(32), ORIGIN);
     const service = new CustomerAuthService(db, ORIGIN, {
       hash: vi.fn(async () => {
         throw new Error("Fallo criptográfico ficticio");
       }),
       verify: vi.fn(async () => false),
       dummyHash: Promise.resolve("dummy-hash"),
-    });
+    }, links);
     try {
       await expect(
         service.consumePasswordToken(
@@ -955,12 +1046,13 @@ describe("autenticación de clientes", () => {
       const [token] = await db
         .select()
         .from(customerAuthTokens)
-        .where(eq(customerAuthTokens.tokenHash, hashSessionToken(link.token)));
+        .innerJoin(publicLinks, eq(publicLinks.customerAuthTokenId, customerAuthTokens.id))
+        .where(eq(publicLinks.codeHash, hashSessionToken(link.token)));
       const [credential] = await db
         .select()
         .from(customerCredentials)
         .where(eq(customerCredentials.customerId, customer.id));
-      expect(token?.consumedAt).toBeNull();
+      expect(token?.customer_auth_tokens.consumedAt).toBeNull();
       expect(credential?.passwordHash).toBeNull();
       expect(credential?.status).toBe("pending");
     } finally {
@@ -1073,7 +1165,7 @@ describe("autenticación de clientes", () => {
     const { db, client } = createTestDatabase();
     try {
       const [stored] = await db.select().from(customerAuthTokens).limit(1);
-      expect(stored?.tokenHash).toBe(hashSessionToken(link.token));
+      expect(stored?.tokenHash).toMatch(/^[a-f0-9]{64}$/);
       expect(stored?.tokenHash).not.toBe(link.token);
       const whatsapp = new URL(link.whatsappUrl);
       expect(whatsapp.hostname).toBe("wa.me");
@@ -1138,13 +1230,15 @@ describe("autenticación de clientes", () => {
     );
     const { db, client } = createTestDatabase();
     try {
+      const [short] = await db.select({ authTokenId: publicLinks.customerAuthTokenId }).from(publicLinks)
+        .where(eq(publicLinks.codeHash, hashSessionToken(expired.token)));
       await db
         .update(customerAuthTokens)
         .set({
           createdAt: new Date(Date.now() - 120_000),
           expiresAt: new Date(Date.now() - 60_000),
         })
-        .where(eq(customerAuthTokens.tokenHash, hashSessionToken(expired.token)));
+        .where(eq(customerAuthTokens.id, short!.authTokenId!));
     } finally {
       await client.end();
     }
@@ -1941,11 +2035,12 @@ describe("autenticación de clientes", () => {
       session: firstSession,
     });
     const secondCardToken = new URL((await secondCardLink.json()).cardUrl).pathname.split("/").pop()!;
+    expect(secondCardToken).toBe(firstCardToken);
     expect((await request("/api/admin/customers/resolve-token", {
       method: "POST",
       session: admin,
       body: { token: firstCardToken },
-    })).status).toBe(404);
+    })).status).toBe(200);
     const scannedCard = await request("/api/admin/customers/resolve-token", {
       method: "POST",
       session: admin,
@@ -2345,5 +2440,275 @@ describe("clientes y depósitos", () => {
         },
       ],
     });
+  });
+});
+
+describe("finanzas y convenios de taller", () => {
+  it("calcula parcialidades, cargos, descuentos y favor con signos contables", async () => {
+    const admin = await login();
+    const { customer } = await createCustomer(admin, "finanzas");
+    const { order } = await createWorkshopOrder(admin, customer.id, "parcialidades");
+    const service = await addWorkshopService(admin, order.id, 10_000);
+    const part = await addWorkshopPart(admin, order.id, 5_000);
+    expect((await request(`/api/admin/workshop/orders/${order.id}/services/${service.id}`, {
+      method: "PUT", session: admin, body: { quantity: 2, unitPriceCents: 6_000 },
+    })).status).toBe(200);
+    expect((await request(`/api/admin/workshop/orders/${order.id}/parts/${part.id}`, {
+      method: "PUT", session: admin, body: { quantity: 2, unitPriceCents: 2_500 },
+    })).status).toBe(200);
+
+    const advance = await createMovement(admin, order.id, {
+      type: "advance",
+      amountCents: 4_000,
+      paymentMethod: "cash",
+    });
+    expect(advance.responsibleAdminId).toMatch(/^[0-9a-f-]{36}$/);
+    await createMovement(admin, order.id, {
+      type: "payment",
+      amountCents: 6_000,
+      paymentMethod: "transfer",
+      reference: "TRANSFERENCIA-SENSIBLE-1234",
+      note: "Nota administrativa que no debe salir",
+    });
+    await createMovement(admin, order.id, {
+      type: "charge",
+      amountCents: 2_000,
+      paymentMethod: null,
+    });
+    await createMovement(admin, order.id, {
+      type: "discount",
+      amountCents: 1_000,
+      paymentMethod: null,
+    });
+
+    let response = await request(`/api/admin/workshop/orders/${order.id}/movements`, { session: admin });
+    expect(response.status).toBe(200);
+    expect((await response.json()).summary).toMatchObject({
+      totalCents: 18_000,
+      paidCents: 10_000,
+      discountCents: 1_000,
+      pendingCents: 8_000,
+      favorCents: 0,
+      paymentStatus: "partial",
+    });
+
+    await createMovement(admin, order.id, {
+      type: "payment",
+      amountCents: 10_000,
+      paymentMethod: "card",
+    });
+    response = await request(`/api/admin/workshop/orders/${order.id}/movements`, { session: admin });
+    expect((await response.json()).summary).toMatchObject({
+      totalCents: 18_000,
+      paidCents: 20_000,
+      pendingCents: 0,
+      favorCents: 2_000,
+      paymentStatus: "favor",
+    });
+
+    const invalidOther = await request(`/api/admin/workshop/orders/${order.id}/movements`, {
+      method: "POST",
+      session: admin,
+      body: { type: "payment", amountCents: 100, paymentMethod: "other", note: null, occurredDate: "2026-08-13" },
+    });
+    expect(invalidOther.status).toBe(400);
+  });
+
+  it("aplica favor solo entre órdenes del mismo cliente y revierte ambos lados una sola vez", async () => {
+    const admin = await login();
+    const first = await createCustomer(admin, "favor");
+    const second = await createCustomer(admin, "ajeno");
+    const source = (await createWorkshopOrder(admin, first.customer.id, "origen")).order;
+    const target = (await createWorkshopOrder(admin, first.customer.id, "destino")).order;
+    const foreign = (await createWorkshopOrder(admin, second.customer.id, "ajena")).order;
+    await addWorkshopService(admin, source.id, 10_000);
+    await addWorkshopService(admin, target.id, 8_000);
+    await addWorkshopService(admin, foreign.id, 8_000);
+    await createMovement(admin, source.id, { type: "payment", amountCents: 15_000, paymentMethod: "cash" });
+
+    const crossCustomer = await request(`/api/admin/workshop/orders/${source.id}/apply-favor`, {
+      method: "POST",
+      session: admin,
+      body: { targetOrderId: foreign.id, amountCents: 1_000, occurredDate: "2026-08-13", note: null },
+    });
+    expect(crossCustomer.status).not.toBe(201);
+
+    const application = await request(`/api/admin/workshop/orders/${source.id}/apply-favor`, {
+      method: "POST",
+      session: admin,
+      body: { targetOrderId: target.id, amountCents: 3_000, occurredDate: "2026-08-13", note: "Aplicación entre órdenes" },
+    });
+    expect(application.status).toBe(201);
+    const applied = (await application.json()) as {
+      sourceMovement: { id: string };
+      targetMovement: { id: string };
+    };
+    let sourceSummary = await request(`/api/admin/workshop/orders/${source.id}/movements`, { session: admin });
+    let targetSummary = await request(`/api/admin/workshop/orders/${target.id}/movements`, { session: admin });
+    expect((await sourceSummary.json()).summary).toMatchObject({ paidCents: 12_000, favorCents: 2_000 });
+    expect((await targetSummary.json()).summary).toMatchObject({ paidCents: 3_000, creditAppliedCents: 3_000, pendingCents: 5_000 });
+
+    for (const movementId of [applied.sourceMovement.id, applied.targetMovement.id]) {
+      const reversed = await request(`/api/admin/workshop/movements/${movementId}/reverse`, {
+        method: "POST",
+        session: admin,
+        body: { reason: "Reversión completa de prueba" },
+      });
+      expect(reversed.status).toBe(201);
+      const duplicate = await request(`/api/admin/workshop/movements/${movementId}/reverse`, {
+        method: "POST",
+        session: admin,
+        body: { reason: "No debe duplicarse" },
+      });
+      expect(duplicate.status).not.toBe(201);
+    }
+    sourceSummary = await request(`/api/admin/workshop/orders/${source.id}/movements`, { session: admin });
+    targetSummary = await request(`/api/admin/workshop/orders/${target.id}/movements`, { session: admin });
+    expect((await sourceSummary.json()).summary).toMatchObject({ paidCents: 15_000, favorCents: 5_000 });
+    expect((await targetSummary.json()).summary).toMatchObject({ paidCents: 0, creditAppliedCents: 0, pendingCents: 8_000 });
+  });
+
+  it("exige afiliación verificada, vigencia, aplicación única y combinabilidad", async () => {
+    const admin = await login();
+    const { customer } = await createCustomer(admin, "convenio");
+    const activation = await activateCustomer(admin, customer.id);
+    const customerSession = await customerLogin(customer.phone, activation.password);
+    const teamResponse = await request("/api/admin/workshop/teams", {
+      method: "POST", session: admin, body: { name: "Equipo Integración", active: true },
+    });
+    expect(teamResponse.status).toBe(201);
+    const team = (await teamResponse.json()) as { id: string };
+    const agreementResponse = await request("/api/admin/workshop/agreements", {
+      method: "POST",
+      session: admin,
+      body: { teamId: team.id, discountType: "percentage", value: 1000, validFrom: "2026-01-01", validUntil: "2026-12-31", conditions: "Afiliación vigente", active: true, combinable: false },
+    });
+    expect(agreementResponse.status).toBe(201);
+    const agreement = (await agreementResponse.json()) as { id: string };
+    const order = (await createWorkshopOrder(admin, customer.id, "convenio-no-combinable")).order;
+    await addWorkshopService(admin, order.id, 20_000);
+
+    const unverified = await request(`/api/admin/workshop/orders/${order.id}/agreement`, {
+      method: "POST", session: admin, body: { agreementId: agreement.id, occurredDate: "2026-08-13" },
+    });
+    expect(unverified.status).not.toBe(201);
+    const affiliationResponse = await request("/api/customer/team-affiliation", {
+      method: "POST", session: customerSession, body: { teamId: team.id },
+    });
+    expect(affiliationResponse.status).toBe(201);
+    const affiliation = (await affiliationResponse.json()) as { id: string };
+    const secondCurrent = await request("/api/customer/team-affiliation", {
+      method: "POST", session: customerSession, body: { proposedTeamName: "Otro equipo" },
+    });
+    expect(secondCurrent.status).not.toBe(201);
+    expect((await request(`/api/admin/workshop/affiliations/${affiliation.id}`, {
+      method: "PATCH", session: admin, body: { status: "verified", evidenceNote: "Credencial verificada" },
+    })).status).toBe(200);
+
+    const outOfDate = await request(`/api/admin/workshop/orders/${order.id}/agreement`, {
+      method: "POST", session: admin, body: { agreementId: agreement.id, occurredDate: "2027-01-01" },
+    });
+    expect(outOfDate.status).not.toBe(201);
+    const applied = await request(`/api/admin/workshop/orders/${order.id}/agreement`, {
+      method: "POST", session: admin, body: { agreementId: agreement.id, occurredDate: "2026-08-13" },
+    });
+    expect(applied.status).toBe(201);
+    expect((await applied.json()).application).toMatchObject({ discountCents: 2_000, teamName: "Equipo Integración", combinable: false });
+    expect((await request(`/api/admin/workshop/orders/${order.id}/agreement`, {
+      method: "POST", session: admin, body: { agreementId: agreement.id, occurredDate: "2026-08-13" },
+    })).status).not.toBe(201);
+    expect((await request(`/api/admin/workshop/orders/${order.id}/movements`, {
+      method: "POST", session: admin, body: { type: "discount", amountCents: 100, paymentMethod: null, occurredDate: "2026-08-13" },
+    })).status).not.toBe(201);
+
+    const combinableResponse = await request("/api/admin/workshop/agreements", {
+      method: "POST",
+      session: admin,
+      body: { teamId: team.id, discountType: "fixed", value: 1_500, validFrom: "2026-01-01", validUntil: null, conditions: null, active: true, combinable: true },
+    });
+    const combinable = (await combinableResponse.json()) as { id: string };
+    const combinedOrder = (await createWorkshopOrder(admin, customer.id, "convenio-combinable")).order;
+    await addWorkshopService(admin, combinedOrder.id, 10_000);
+    await createMovement(admin, combinedOrder.id, { type: "discount", amountCents: 500, paymentMethod: null });
+    const combined = await request(`/api/admin/workshop/orders/${combinedOrder.id}/agreement`, {
+      method: "POST", session: admin, body: { agreementId: combinable.id, occurredDate: "2026-08-13" },
+    });
+    expect(combined.status, await combined.clone().text()).toBe(201);
+    const combinedSummary = await request(`/api/admin/workshop/orders/${combinedOrder.id}/movements`, { session: admin });
+    expect((await combinedSummary.json()).summary).toMatchObject({ discountCents: 2_000, totalCents: 8_000 });
+  });
+
+  it("bloquea entrega pendiente, permite entrega pagada y expone resumen seguro al cliente", async () => {
+    const admin = await login();
+    const { customer } = await createCustomer(admin, "entrega");
+    const activation = await activateCustomer(admin, customer.id);
+    const customerSession = await customerLogin(customer.phone, activation.password);
+    const { order } = await createWorkshopOrder(admin, customer.id, "entrega");
+    await addWorkshopService(admin, order.id, 9_000);
+    const pendingDelivery = await request(`/api/admin/workshop/orders/${order.id}/status`, {
+      method: "PATCH", session: admin,
+      body: { status: "delivered", publicMessage: null, internalReason: "Entrega forzada de prueba", customerVisible: true, force: true },
+    });
+    expect(pendingDelivery.status).not.toBe(200);
+    await createMovement(admin, order.id, {
+      type: "payment", amountCents: 9_000, paymentMethod: "transfer",
+      reference: "REFERENCIA-CONFIDENCIAL-9876", note: "NOTA ADMINISTRATIVA CONFIDENCIAL",
+    });
+    const delivered = await request(`/api/admin/workshop/orders/${order.id}/status`, {
+      method: "PATCH", session: admin,
+      body: { status: "delivered", publicMessage: "Entregada", internalReason: "Entrega forzada de prueba", customerVisible: true, force: true },
+    });
+    expect(delivered.status).toBe(200);
+    const customerFinancials = await request("/api/customer/workshop-financials", { session: customerSession });
+    const serialized = JSON.stringify(await customerFinancials.json());
+    expect(serialized).toContain("***9876");
+    expect(serialized).not.toMatch(/REFERENCIA-CONFIDENCIAL|NOTA ADMINISTRATIVA|responsibleAdminId|note/i);
+  });
+
+  it("aplica permisos de finanzas, convenios, crédito y precios dinámicos", async () => {
+    const owner = await login();
+    const employee = await login(TEST_EMPLOYEE);
+    const { customer } = await createCustomer(owner, "permisos");
+    const { order } = await createWorkshopOrder(owner, customer.id, "permisos");
+    const line = await addWorkshopService(owner, order.id, 5_000);
+
+    expect((await request(`/api/admin/workshop/orders/${order.id}/services/${line.id}`, {
+      method: "PUT", session: employee, body: { description: "Cambio permitido" },
+    })).status).toBe(200);
+    expect((await request(`/api/admin/workshop/orders/${order.id}/services/${line.id}`, {
+      method: "PUT", session: employee, body: { quantity: 2 },
+    })).status).toBe(403);
+    expect((await request(`/api/admin/workshop/orders/${order.id}/movements`, {
+      method: "POST", session: employee,
+      body: { type: "payment", amountCents: 100, paymentMethod: "cash", occurredDate: "2026-08-13" },
+    })).status).toBe(403);
+    expect((await request("/api/admin/workshop/teams", { session: employee })).status).toBe(403);
+    expect((await request(`/api/admin/customers/${customer.id}/credit-limit`, {
+      method: "PATCH", session: employee, body: { creditLimitCents: 25_000 },
+    })).status).toBe(403);
+
+    const credit = await request(`/api/admin/customers/${customer.id}/credit-limit`, {
+      method: "PATCH", session: owner, body: { creditLimitCents: 25_000 },
+    });
+    expect(credit.status).toBe(200);
+    expect(await credit.json()).toEqual({ id: customer.id, creditLimitCents: 25_000 });
+  });
+
+  it("impide UPDATE y DELETE físico de movimientos financieros", async () => {
+    const admin = await login();
+    const { customer } = await createCustomer(admin, "inmutable");
+    const { order } = await createWorkshopOrder(admin, customer.id, "inmutable");
+    await addWorkshopService(admin, order.id, 1_000);
+    const movement = await createMovement(admin, order.id, { type: "payment", amountCents: 1_000, paymentMethod: "cash" });
+    const { db, client } = createTestDatabase();
+    try {
+      await expect(db.update(workshopFinancialMovements).set({ note: "mutación" }).where(eq(workshopFinancialMovements.id, movement.id))).rejects.toThrow();
+      await expect(db.delete(workshopFinancialMovements).where(eq(workshopFinancialMovements.id, movement.id))).rejects.toThrow();
+      const [unchanged] = await db.select().from(workshopFinancialMovements)
+        .where(eq(workshopFinancialMovements.id, movement.id));
+      expect(unchanged).toMatchObject({ id: movement.id, note: null });
+    } finally {
+      await client.end();
+    }
   });
 });

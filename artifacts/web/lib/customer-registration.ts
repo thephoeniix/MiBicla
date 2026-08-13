@@ -13,5 +13,6 @@ export function buildRegistrationWhatsappUrl(
     "Revisar solicitud:",
     input.adminReviewUrl,
   ].join("\n");
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+  return buildWhatsappUrl(digits, message);
 }
+import { buildWhatsappUrl } from "./whatsapp";

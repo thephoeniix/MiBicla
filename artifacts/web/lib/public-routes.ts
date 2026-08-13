@@ -22,6 +22,7 @@ export type PublicRoute =
   | "customer-recovery"
   | "customer-activation"
   | "customer-verify"
+  | "public-link"
   | "admin"
   | "not-found";
 
@@ -54,6 +55,8 @@ export function resolvePublicRoute(pathname: string): {
   if (pathname === "/mi/solicitudes") return { route: "customer-requests" };
   if (pathname.startsWith("/mi/")) return { route: "customer-home" };
   if (pathname === "/taller/solicitud") return { route: "workshop-request" };
+  const link = pathname.match(/^\/l\/([A-Za-z0-9_-]{16})$/);
+  if (link) return { route: "public-link", token: link[1] };
   const workshop = pathname.match(/^\/taller\/([^/]+)$/);
   if (workshop) return { route: "workshop-tracking", token: workshop[1] };
   const card = pathname.match(/^\/c\/([^/]+)$/);

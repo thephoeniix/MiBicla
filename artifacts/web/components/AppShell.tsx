@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CustomerScanFlow } from "./scanner/CustomerScanFlow";
 import { canShowCustomerScanner } from "./scanner/scanner-utils";
 import { ThemeSelector } from "./ThemeSelector";
 import { BrandLogo } from "./brand";
+import { useDismissiblePopover } from "./ui";
 import {
   AdminHomeIcon,
   AdministrativeUsersIcon,
@@ -51,6 +52,13 @@ const NAV_ITEMS = [
     short: "Taller",
     icon: <WorkshopAdminIcon />,
     permissions: ["view_workshop_orders", "view_workshop_requests"],
+  },
+  {
+    href: "/admin/agreements",
+    label: "Equipos y convenios",
+    short: "Convenios",
+    icon: <RequestsIcon />,
+    permissions: ["manage_workshop_agreements"],
   },
   {
     href: "/admin/events",
@@ -133,6 +141,10 @@ function BottomNavigation({
   available: typeof NAV_ITEMS[number][];
 }) {
   const [more, setMore] = useState(false);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const moreMenu = useRef<HTMLElement>(null);
+  const closeMore = () => setMore(false);
+  useDismissiblePopover({ open: more, onClose: closeMore, triggerRef: moreButton, popoverRef: moreMenu });
   const fixed = MOBILE_NAV.filter((item) => available.some(({ href }) => href === item.href));
   const overflow = available.filter((item) => !fixed.some(({ href }) => href === item.href));
   return (
@@ -152,9 +164,9 @@ function BottomNavigation({
         </a>
         );
       })}
-      <button type="button" aria-expanded={more} onClick={() => setMore((value) => !value)}><i aria-hidden="true"><MoreIcon /></i><span>Más</span></button>
+       <button ref={moreButton} type="button" aria-expanded={more} aria-controls="admin-more-menu" aria-haspopup="menu" onClick={() => setMore((value) => !value)}><i aria-hidden="true"><MoreIcon /></i><span>Más</span></button>
     </nav>
-    {more && <nav className="admin-more-menu" aria-label="Más secciones">{overflow.map((item) => <a key={item.href} href={item.href} aria-current={isMobileNavigationActive(pathname, item.href) ? "page" : undefined}><i aria-hidden="true">{item.icon}</i>{item.label}</a>)}</nav>}
+    {more && <nav ref={moreMenu} id="admin-more-menu" className="admin-more-menu" aria-label="Más secciones" onClick={(event) => { if ((event.target as Element).closest("a")) closeMore(); }}>{overflow.map((item) => <a key={item.href} href={item.href} aria-current={isMobileNavigationActive(pathname, item.href) ? "page" : undefined}><i aria-hidden="true">{item.icon}</i>{item.label}</a>)}</nav>}
     </>
   );
 }

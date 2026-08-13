@@ -2,20 +2,20 @@ import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import {
   customerCredentials,
   customerLoyaltyBalance,
-  customerPublicTokens,
   customerRegistrationRequests,
   customers,
   type createDatabase,
 } from "@mi-bicla/db";
-import { generateSessionToken, sha256 } from "@mi-bicla/shared";
+import { generateSessionToken } from "@mi-bicla/shared";
 import type { CustomerRegistrationInput } from "@mi-bicla/api-contract";
 import { issueCustomerAuthToken } from "./customer-auth-tokens.js";
+import { buildWhatsappUrl, type PublicLinksService } from "./public-links.service.js";
 
 type Db = ReturnType<typeof createDatabase>["db"];
 const REGISTRATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class CustomerRegistrationService {
-  constructor(private db: Db, private appBaseUrl: string) {}
+  constructor(private db: Db, private appBaseUrl: string, private publicLinks?: PublicLinksService) {}
 
   async create(input: CustomerRegistrationInput) {
     const reviewId = generateSessionToken();
@@ -134,12 +134,7 @@ export class CustomerRegistrationService {
           updatedBy: administratorId,
         }).returning();
         if (!customer) throw new Error("No se pudo crear el cliente");
-        const publicToken = generateSessionToken();
         await tx.insert(customerLoyaltyBalance).values({ customerId: customer.id });
-        await tx.insert(customerPublicTokens).values({
-          customerId: customer.id,
-          publicTokenHash: sha256(publicToken),
-        });
       }
       // Credencial pendiente, deliberadamente sin passwordHash: la
       // contraseña anterior de la solicitud (si existía, de un registro
@@ -149,7 +144,7 @@ export class CustomerRegistrationService {
         phoneNormalized: request.phoneNormalized,
       }).returning();
       if (!credential) throw new Error("No se pudo crear la credencial");
-      const { token, expiresAt } = await issueCustomerAuthToken(tx, {
+      const { id: authTokenId, token, expiresAt } = await issueCustomerAuthToken(tx, {
         credentialId: credential.id,
         purpose: "activation",
         administratorId,
@@ -166,12 +161,17 @@ export class CustomerRegistrationService {
         firstName: request.firstName,
         phoneNormalized: request.phoneNormalized,
         token,
+        authTokenId,
         expiresAt,
       };
     });
     if (!result) return null;
-    const link = new URL("/cuenta/activar", this.appBaseUrl);
-    link.searchParams.set("token", result.token);
+    const short = this.publicLinks
+      ? await this.publicLinks.getOrCreateActiveLink("customer_verification", { customerAuthTokenId: result.authTokenId }, result.expiresAt)
+      : null;
+    const legacy = new URL("/cuenta/activar", this.appBaseUrl);
+    legacy.searchParams.set("token", result.token);
+    const link = short?.url ?? legacy.toString();
     const expiry = result.expiresAt.toLocaleString("es-MX", {
       dateStyle: "long",
       timeStyle: "short",
@@ -180,19 +180,15 @@ export class CustomerRegistrationService {
       `Hola, ${result.firstName}. Mi Bicla verificó tu solicitud.`,
       "",
       "Crea tu contraseña para activar tu cuenta:",
-      link.toString(),
+      link,
       "",
       `Este enlace es personal, vence el ${expiry} y solo puede utilizarse una vez.`,
     ].join("\n");
-    const whatsappUrl = new URL(
-      `https://wa.me/${result.phoneNormalized.replace(/\D/g, "")}`,
-    );
-    whatsappUrl.searchParams.set("text", message);
     return {
       customerId: result.customerId,
       expiresAt: result.expiresAt,
-      link: link.toString(),
-      whatsappUrl: whatsappUrl.toString(),
+      link,
+      whatsappUrl: buildWhatsappUrl(result.phoneNormalized, message),
     };
   }
 

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { mexicanPhoneSchema } from "./phone.schema.js";
 
 export const customerAuthTokenSchema = z
-  .object({ token: z.string().regex(/^[a-f0-9]{64}$/) })
+  .object({ token: z.string().regex(/^(?:[a-f0-9]{64}|[A-Za-z0-9_-]{16})$/) })
   .strict();
 
 const password = z

@@ -24,8 +24,16 @@ export const customerBicycleUpdateSchema = customerBicycleSchema.partial().stric
 
 export const customerWorkshopRequestSchema = z.object({
   bicycleId: z.string().uuid(),
-  serviceName: clean(150).nullable().optional(),
+  catalogServiceId: z.string().uuid().nullable().optional(),
+  serviceName: clean(200).nullable().optional(),
   problemDescription: clean(3000, 10),
+  symptoms: nullable(clean(2000, 0)).optional(),
+  visibleDamage: nullable(clean(2000, 0)).optional(),
+  additionalComments: nullable(clean(2000, 0)).optional(),
+  requestedDate: nullable(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  requestedTime: nullable(z.string().regex(/^\d{2}:\d{2}$/)).optional(),
+  desiredDeliveryDate: nullable(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  urgency: z.enum(["normal", "soon", "urgent"]).nullable().optional(),
   preferredContactMethod: z.enum(["whatsapp", "phone", "email"]).default("whatsapp"),
 }).strict();
 export const customerPasswordChangeSchema = z.object({

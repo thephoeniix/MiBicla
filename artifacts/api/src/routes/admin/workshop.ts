@@ -18,6 +18,14 @@ import {
   workshopStatusSchema,
   workshopUpdateSchema,
   workshopWhatsappSchema,
+  agreementSchema,
+  affiliationReviewSchema,
+  teamSchema,
+  workshopAgreementApplicationSchema,
+  workshopFavorApplicationSchema,
+  workshopMovementReversalSchema,
+  workshopMovementSchema,
+  workshopRefundSchema,
 } from "@mi-bicla/api-contract";
 import type { WorkshopService } from "../../services/workshop.service.js";
 type Guard = (
@@ -50,6 +58,22 @@ export function createWorkshopAdminRouter(
       },
     aid = (p: Response) => p.locals.auth.administrator.id,
     id = (q: Request, key = "id") => String(q.params[key]);
+  const pricingGuard = Router().use(...guard("manage_workshop_pricing"));
+  const requirePricingForPriceChanges = (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    const body = req.body;
+    if (
+      !body ||
+      typeof body !== "object" ||
+      (!("quantity" in body) && !("unitPriceCents" in body))
+    )
+      return next();
+    pricingGuard(req, res, next);
+  };
+  const financeAudit = (q: Request) => ({ requestId: q.res!.locals.requestId as string, ipAddress: q.ip, userAgent: q.get("user-agent") });
   r.get(
     "/bicycles",
     ...guard("view_bicycles"),
@@ -63,11 +87,25 @@ export function createWorkshopAdminRouter(
       ),
     ),
   );
+  r.get("/workshop/teams", ...guard("manage_workshop_agreements"), run(async (q, p) => p.json(await s.listTeams(q.query.includeInactive === "true"))));
+  r.post("/workshop/teams", ...guard("manage_workshop_agreements"), run(async (q, p) => p.status(201).json(await s.createTeam(teamSchema.parse(q.body), aid(p)))));
+  r.put("/workshop/teams/:id", ...guard("manage_workshop_agreements"), run(async (q, p) => p.json(await s.updateTeam(id(q), teamSchema.partial().parse(q.body), aid(p)))));
+  r.get("/workshop/agreements", ...guard("manage_workshop_agreements"), run(async (q, p) => p.json(await s.listAgreements(q.query.includeInactive === "true"))));
+  r.post("/workshop/agreements", ...guard("manage_workshop_agreements"), run(async (q, p) => p.status(201).json(await s.createAgreement(agreementSchema.parse(q.body), aid(p)))));
+  r.put("/workshop/agreements/:id", ...guard("manage_workshop_agreements"), run(async (q, p) => p.json(await s.updateAgreement(id(q), agreementSchema.innerType().partial().parse(q.body), aid(p)))));
+  r.get("/workshop/affiliations", ...guard("manage_workshop_agreements"), run(async (q, p) => p.json(await s.listAffiliations(typeof q.query.status === "string" ? q.query.status : undefined))));
+  r.patch("/workshop/affiliations/:id", ...guard("manage_workshop_agreements"), run(async (q, p) => { const input = affiliationReviewSchema.parse(q.body); p.json(await s.reviewAffiliation(id(q), input.status, input.evidenceNote, aid(p))); }));
   r.get(
     "/workshop/service-catalog",
     ...guard("view_workshop_orders"),
     run(async (_q, p) => p.json(await s.listServiceCatalog())),
   );
+  r.get("/workshop/orders/:id/movements", ...guard("view_workshop_financials"), run(async (q, p) => p.json(await s.listFinancialMovements(id(q)))));
+  r.post("/workshop/orders/:id/movements", ...guard("manage_workshop_financials"), run(async (q, p) => p.status(201).json(await s.createFinancialMovement(id(q), workshopMovementSchema.parse(q.body), aid(p), financeAudit(q)))));
+  r.post("/workshop/movements/:id/reverse", ...guard("manage_workshop_financials"), run(async (q, p) => { const input = workshopMovementReversalSchema.parse(q.body); p.status(201).json(await s.reverseFinancialMovement(id(q), input.reason, aid(p), financeAudit(q))); }));
+  r.post("/workshop/orders/:id/apply-favor", ...guard("manage_workshop_financials"), run(async (q, p) => { const input = workshopFavorApplicationSchema.parse(q.body); p.status(201).json(await s.applyFavor(id(q), input.targetOrderId, input.amountCents, input.occurredDate, input.note, aid(p), financeAudit(q))); }));
+  r.post("/workshop/orders/:id/refund-favor", ...guard("manage_workshop_financials"), run(async (q, p) => p.status(201).json(await s.refundFavor(id(q), workshopRefundSchema.parse(q.body), aid(p), financeAudit(q)))));
+  r.post("/workshop/orders/:id/agreement", ...guard("manage_workshop_agreements"), run(async (q, p) => { const input = workshopAgreementApplicationSchema.parse(q.body); p.status(201).json(await s.applyAgreement(id(q), input.agreementId, input.occurredDate, aid(p), financeAudit(q))); }));
   r.post(
     "/workshop/service-catalog",
     ...guard("manage_workshop_services"),
@@ -280,6 +318,7 @@ export function createWorkshopAdminRouter(
     r.post(
       `/workshop/orders/:id/${kind}`,
       ...guard(permission),
+      ...guard("manage_workshop_pricing"),
       run(async (q, p) => {
         const value = schema.parse(q.body),
           row =
@@ -301,9 +340,10 @@ export function createWorkshopAdminRouter(
     r.put(
       `/workshop/orders/:id/${kind}/:lineId`,
       ...guard(permission),
+      requirePricingForPriceChanges,
       run(async (q, p) => {
-        const value = schema.partial().parse(q.body),
-          row =
+        const value = schema.partial().parse(q.body);
+        const row =
             kind === "services"
               ? await s.updateService(id(q, "lineId"), value as never)
               : await s.updatePart(id(q, "lineId"), value as never);
@@ -313,6 +353,7 @@ export function createWorkshopAdminRouter(
     r.delete(
       `/workshop/orders/:id/${kind}/:lineId`,
       ...guard(permission),
+      ...guard("manage_workshop_pricing"),
       run(async (q, p) => {
         if (kind === "services") await s.deleteService(id(q, "lineId"));
         else await s.deletePart(id(q, "lineId"));
@@ -377,7 +418,7 @@ export function createWorkshopAdminRouter(
         {},
         id(q),
       );
-      p.json({ publicToken: token });
+      p.json({ publicToken: token, publicUrl: new URL(`/l/${token}`, baseUrl).toString() });
     }),
   );
   r.post(

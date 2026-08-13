@@ -51,9 +51,10 @@ describe("edición administrativa de clientes y bicicletas", () => {
 
 describe("errores comprensibles y presentación móvil", () => {
   it("traduce el error de nombre y lo asocia al campo", () => {
-    expect(requestSource).toContain("Escribe un nombre de al menos 2 caracteres.");
-    expect(requestSource).toContain("aria-invalid={Boolean(fieldErrors[k])}");
-    expect(requestSource).toContain("fieldRefs.current[first]?.focus()");
+    const flowSource = readFileSync("artifacts/web/components/WorkshopRequestFlow.tsx", "utf8");
+    expect(flowSource).toContain("Completa los campos requeridos de este paso.");
+    expect(flowSource).toContain("isValidMexicanPhone(draft.customerPhone)");
+    expect(flowSource).toContain("heading.current?.focus()");
     expect(requestSource).not.toContain("customerName: String must contain");
   });
 

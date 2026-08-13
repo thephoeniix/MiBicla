@@ -38,17 +38,17 @@ interface Tracking {
   updatedAt: string;
 }
 
-export function WorkshopTracking({ token }: { token: string }) {
+export function WorkshopTracking({ token, endpoint }: { token: string; endpoint?: string }) {
   const [data, setData] = useState<Tracking | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   function load(signal?: AbortSignal) {
     setState("loading");
-    apiFetch<Tracking>(`/api/public/workshop/${encodeURIComponent(token)}`, {
+    apiFetch<Tracking | { data: Tracking }>(endpoint ?? `/api/public/workshop/${encodeURIComponent(token)}`, {
       signal,
     })
       .then((result) => {
-        setData(result);
+        setData("data" in result ? result.data : result);
         setState("ready");
       })
       .catch((error) => {
