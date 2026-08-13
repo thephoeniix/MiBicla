@@ -21,10 +21,13 @@ import {
   CustomerActivation,
   CustomerAuthProvider,
   CustomerLogin,
-  CustomerPortal,
   CustomerRecovery,
   CustomerRegistrationInfo,
 } from "./pages/customer/CustomerAuth";
+import { CustomerPortal } from "./pages/customer/CustomerPortal";
+import { PublicEvents, PublicProducts } from "./pages/public/Commerce";
+import { AdminDashboard, AdminEvents, AdminProducts, AdminRequests } from "./pages/admin/CommerceAdmin";
+import { AdministrativeUsers } from "./pages/admin/AdministrativeUsers";
 interface Administrator {
   id: string;
   name: string;
@@ -39,8 +42,11 @@ function AdminApp() {
     [loginLoading, setLoginLoading] = useState(false),
     [showPassword, setShowPassword] = useState(false);
   const session = () =>
-    apiFetch<{ administrator: Administrator }>("/auth/session")
-      .then((x) => setUser(x.administrator))
+    apiFetch<{ administrator: Administrator; csrfToken: string }>("/auth/session")
+      .then((x) => {
+        sessionStorage.setItem("mb_csrf", x.csrfToken);
+        setUser(x.administrator);
+      })
       .catch((e) => {
         setUser(null);
         if (e instanceof ApiError && e.status !== 401) setError(e.message);
@@ -98,10 +104,20 @@ function AdminApp() {
   if (user)
     return (
       <AppShell user={user} onLogout={logout}>
-        {window.location.pathname === "/admin/workshop" ? (
+        {window.location.pathname === "/admin" ? (
+          <AdminDashboard />
+        ) : window.location.pathname === "/admin/products" ? (
+          <AdminProducts permissions={user.permissions} />
+        ) : window.location.pathname === "/admin/events" ? (
+          <AdminEvents permissions={user.permissions} />
+        ) : window.location.pathname === "/admin/requests" ? (
+          <AdminRequests permissions={user.permissions} />
+        ) : window.location.pathname === "/admin/workshop" ? (
           <Workshop permissions={user.permissions} />
         ) : window.location.pathname.startsWith("/admin/customers") ? (
           <Customers permissions={user.permissions} />
+        ) : window.location.pathname === "/admin/users" && user.role === "owner" ? (
+          <AdministrativeUsers currentUserId={user.id} />
         ) : window.location.pathname.endsWith("/loyalty") ? (
           <Loyalty permissions={user.permissions} />
         ) : window.location.pathname.endsWith("/deposits") ? (
@@ -176,7 +192,9 @@ function App() {
     workshop: ["Taller | Mi Bicla Querétaro", "Servicios de taller para mantener tu bicicleta lista para rodar."],
     loyalty: ["Fidelidad | Mi Bicla Querétaro", "Conoce el programa de fidelidad Mi Bicla."],
     brands: ["Marcas | Mi Bicla Querétaro", "Consulta las marcas disponibles en Mi Bicla Querétaro."],
-    deposits: ["Depósitos | Mi Bicla Querétaro", "Métodos de depósito activos de Mi Bicla Querétaro."],
+    products: ["Productos | Mi Bicla Querétaro", "Productos, accesorios y equipo disponible en Mi Bicla."],
+    events: ["Eventos | Mi Bicla Querétaro", "Rodadas y eventos de la comunidad Mi Bicla."],
+    deposits: ["Métodos de pago | Mi Bicla Querétaro", "Métodos de pago activos de Mi Bicla Querétaro."],
     "customer-card": ["Mi tarjeta | Mi Bicla Querétaro", "Tarjeta personal de fidelidad.", true],
     "workshop-tracking": ["Seguimiento de taller | Mi Bicla Querétaro", "Seguimiento privado de servicio.", true],
     "customer-register": ["Activar cuenta | Mi Bicla Querétaro", "Información para activar una cuenta de cliente."],
@@ -184,22 +202,47 @@ function App() {
     "customer-activation": ["Activar cuenta | Mi Bicla Querétaro", "Activación segura de cuenta.", true],
     "customer-recovery": ["Recuperar acceso | Mi Bicla Querétaro", "Recuperación segura de acceso.", true],
     "customer-home": ["Mi espacio | Mi Bicla Querétaro", "Portal privado de clientes.", true],
-    "customer-loyalty": ["Mi tarjeta | Mi Bicla Querétaro", "Vista demostrativa de la tarjeta del cliente."],
-    "customer-workshop": ["Mi taller | Mi Bicla Querétaro", "Vista demostrativa del taller del cliente."],
-    "customer-bikes": ["Mis bicicletas | Mi Bicla Querétaro", "Vista demostrativa de bicicletas del cliente."],
-    "customer-profile": ["Mi perfil | Mi Bicla Querétaro", "Vista demostrativa del perfil del cliente."],
+    "customer-loyalty": ["Mi tarjeta | Mi Bicla Querétaro", "Puntos y recompensas del cliente.", true],
+    "customer-workshop": ["Mi taller | Mi Bicla Querétaro", "Órdenes y seguimiento del cliente.", true],
+    "customer-bikes": ["Mis bicicletas | Mi Bicla Querétaro", "Bicicletas vinculadas con el cliente.", true],
+    "customer-profile": ["Mi perfil | Mi Bicla Querétaro", "Perfil privado del cliente.", true],
+    "customer-products": ["Productos | Mi Bicla Querétaro", "Catálogo para clientes Mi Bicla.", true],
+    "customer-events": ["Eventos | Mi Bicla Querétaro", "Eventos para clientes Mi Bicla.", true],
+    "customer-requests": ["Mis solicitudes | Mi Bicla Querétaro", "Cotizaciones y reservaciones del cliente.", true],
   };
   const routeMeta = meta[match.route] ?? ["Mi Bicla Querétaro", "Taller, equipo y comunidad MTB."];
+  const privateRoute = Boolean(routeMeta[2]) || [
+    "admin",
+    "customer-login",
+    "customer-register",
+    "customer-verify",
+    "workshop-request",
+    "not-found",
+  ].includes(match.route);
+  const canonicalUrl = `https://mibiclaqro.com${privateRoute ? "/" : window.location.pathname}`;
+  const setMeta = (selector: string, attribute: "name" | "property", key: string, content: string) => {
+    let element = document.querySelector<HTMLMetaElement>(selector);
+    if (!element) {
+      element = document.createElement("meta");
+      element.setAttribute(attribute, key);
+      document.head.append(element);
+    }
+    element.content = content;
+  };
   document.title = routeMeta[0];
-  document.querySelector('meta[name="description"]')?.setAttribute("content", routeMeta[1]);
-  let robots = document.querySelector('meta[name="robots"]');
-  if (!robots) { robots = document.createElement("meta"); robots.setAttribute("name", "robots"); document.head.append(robots); }
-  robots.setAttribute("content", routeMeta[2] ? "noindex, nofollow" : "index, follow");
+  setMeta('meta[name="description"]', "name", "description", routeMeta[1]);
+  setMeta('meta[name="robots"]', "name", "robots", privateRoute ? "noindex, nofollow" : "index, follow");
+  setMeta('meta[property="og:title"]', "property", "og:title", routeMeta[0]);
+  setMeta('meta[property="og:description"]', "property", "og:description", routeMeta[1]);
+  setMeta('meta[property="og:url"]', "property", "og:url", canonicalUrl);
+  document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.setAttribute("href", canonicalUrl);
   switch (match.route) {
     case "home": return <Landing />;
     case "workshop": return <WorkshopInfo />;
     case "loyalty": return <LoyaltyInfo />;
     case "brands": return <Brands />;
+    case "products": return <PublicProducts />;
+    case "events": return <PublicEvents />;
     case "workshop-request": return <WorkshopRequest />;
     case "workshop-tracking": return <WorkshopTracking token={match.token!} />;
     case "customer-card": return <CustomerCard token={match.token!} />;
@@ -213,9 +256,13 @@ function App() {
     case "customer-workshop":
     case "customer-bikes":
     case "customer-profile":
+    case "customer-products":
+    case "customer-events":
+    case "customer-requests":
       return <CustomerAuthProvider><CustomerPortal /></CustomerAuthProvider>;
     case "admin": return <AdminApp />;
     default: return <main className="login-page"><section className="login-card"><h1>Página no encontrada</h1><a href="/">Volver al inicio</a></section></main>;
   }
 }
 createRoot(document.getElementById("root")!).render(<App />);
+requestAnimationFrame(() => window.dispatchEvent(new Event("mb:app-ready")));

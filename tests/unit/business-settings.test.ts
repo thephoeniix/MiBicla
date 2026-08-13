@@ -98,6 +98,19 @@ describe("Business Settings", () => {
       cardNumber: undefined,
     });
   });
+  it("omite datos heredados cifrados con otra clave sin derribar la sección", () => {
+    process.env.APP_ENCRYPTION_KEY = "22".repeat(32);
+    expect(toPublicDeposit({
+      ...base,
+      showAccountNumber: true,
+      showClabe: true,
+      showCardNumber: true,
+    })).toMatchObject({
+      accountNumber: undefined,
+      clabe: undefined,
+      cardNumber: undefined,
+    });
+  });
   it("copia mediante Clipboard API", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     await copyText("CLABE", { clipboard: { writeText } as Clipboard });

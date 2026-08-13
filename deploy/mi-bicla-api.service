@@ -1,0 +1,29 @@
+[Unit]
+Description=Mi Bicla API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mibicla
+Group=mibicla
+WorkingDirectory=/opt/mibicla/current
+EnvironmentFile=/etc/mibicla/api.env
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=UPLOAD_DIR=/var/lib/mibicla/uploads
+ExecStart=/usr/local/bin/node artifacts/api/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mibicla
+
+[Install]
+WantedBy=multi-user.target

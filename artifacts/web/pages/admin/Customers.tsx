@@ -44,6 +44,10 @@ interface CustomerDetail {
     status: string;
     createdAt: string;
   }>;
+  loyaltyProgram: {
+    enabled: boolean;
+    allowManualAdjustments: boolean;
+  } | null;
   credentialStatus: string | null;
   activationExpiresAt: string | null;
   hasActiveActivation: boolean;
@@ -133,6 +137,7 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<CustomerField, string>>>({});
   const fieldRefs = useRef<Partial<Record<CustomerField, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null>>>({});
@@ -170,15 +175,42 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
       .finally(() => setLoading(false));
   };
 
+  const loadRegistrationRequests = () =>
+    apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests")
+      .then(setRegistrationRequests)
+      .catch((error) => {
+        setStatus(error instanceof ApiError ? error.message : "No fue posible actualizar las solicitudes.");
+      });
+
   useEffect(() => {
     void load();
-    if (canManage) {
-      void apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests")
-        .then(setRegistrationRequests)
-        .catch(() => setRegistrationRequests([]));
-      const reviewId = location.pathname.match(/^\/admin\/customers\/requests\/([a-f0-9]{64})$/)?.[1];
-      if (reviewId) void openRegistration(reviewId);
+    const customerId = new URLSearchParams(location.search).get("customer");
+    if (customerId) {
+      void view(customerId).catch((error) =>
+        setStatus(
+          error instanceof ApiError
+            ? error.message
+            : "No fue posible abrir el cliente escaneado.",
+        ),
+      );
     }
+    if (canManage) {
+      void loadRegistrationRequests();
+      const reviewId = location.pathname.match(/^\/admin\/customers\/requests\/([a-f0-9]{64})$/)?.[1];
+      if (reviewId) void openRegistration(reviewId).catch((error) => {
+        setStatus(error instanceof ApiError ? error.message : "No fue posible abrir la solicitud.");
+      });
+    }
+    const refresh = () => {
+      if (document.visibilityState === "visible" && canManage)
+        void loadRegistrationRequests();
+    };
+    window.addEventListener("focus", refresh);
+    const interval = window.setInterval(refresh, 30_000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(interval);
+    };
   }, []);
 
   async function openRegistration(reviewId: string) {
@@ -193,6 +225,8 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
     if (!confirm(action === "approve"
       ? "Confirmo que verifiqué manualmente este número y deseo preparar el enlace de activación."
       : "¿Confirmas que deseas rechazar esta solicitud?")) return;
+    const whatsappWindow = action === "approve" ? window.open("about:blank", "_blank") : null;
+    if (whatsappWindow) whatsappWindow.opener = null;
     setDeciding(true);
     try {
       const result = await apiFetch<
@@ -206,17 +240,18 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
         },
       );
       setRegistrationDetail(null);
-      const requests = await apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests");
-      setRegistrationRequests(requests);
+      await loadRegistrationRequests();
       if (action === "approve") {
         await load();
         if (result) {
           setAuthLinkNotice("");
           setAuthLink({ purpose: "activation", customerId: result.customerId, value: result });
+          if (whatsappWindow) whatsappWindow.location.replace(result.whatsappUrl);
         }
       }
       setStatus(action === "approve" ? "Cuenta aprobada" : "Solicitud rechazada");
     } catch (error) {
+      whatsappWindow?.close();
       setStatus(
         error instanceof ApiError
           ? error.message
@@ -293,34 +328,50 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
     });
   }
 
-  async function view(id: string) {
+  async function view(id: string, tab = "summary") {
     const [customer, bikes] = await Promise.all([
-      apiFetch<CustomerDetail>(`/api/admin/customers/${id}`),
-      apiFetch<BicycleSummary[]>(`/api/admin/customers/${id}/bicycles`),
+      apiFetch<CustomerDetail>(`/api/admin/customers/${id}`, { cache: "no-store" }),
+      apiFetch<BicycleSummary[]>(`/api/admin/customers/${id}/bicycles`, { cache: "no-store" }),
     ]);
     setDetail(customer);
     setBicycles(bikes);
-    setDetailTab("summary");
+    setDetailTab(tab);
   }
 
   async function adjust(event: FormEvent) {
     event.preventDefault();
-    if (!detail) return;
+    if (!detail || adjusting || adjustment.units === 0) return;
+    const customerId = detail.customer.id;
+    setAdjusting(true);
     try {
-      await apiFetch(
-        `/api/admin/customers/${detail.customer.id}/loyalty-adjustments`,
+      const result = await apiFetch<{ availableUnits: number; rewardsCreated: number }>(
+        `/api/admin/customers/${customerId}/loyalty-adjustments`,
         {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(adjustment),
         },
       );
+      setDetail((current) => current?.customer.id === customerId
+        ? {
+            ...current,
+            balance: {
+              ...current.balance,
+              availableUnits: result.availableUnits,
+              lifetimeUnits: current.balance.lifetimeUnits + Math.max(0, adjustment.units),
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        : current);
       setAdjustment({ units: 0, reason: "" });
-      await view(detail.customer.id);
-      setDetailTab("loyalty");
-      setStatus("Ajuste aplicado");
+      await view(customerId, "loyalty");
+      setStatus(result.rewardsCreated
+        ? `Ajuste aplicado. ${result.rewardsCreated} recompensa generada.`
+        : "Ajuste aplicado. Saldo actualizado.");
     } catch (error) {
-      setStatus(error instanceof ApiError ? error.message : "Error");
+      setStatus(error instanceof ApiError ? error.message : "No fue posible aplicar el ajuste.");
+    } finally {
+      setAdjusting(false);
     }
   }
 
@@ -379,6 +430,7 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
                   type="button"
                   variant="secondary"
                   onClick={() => {
+                    void loadRegistrationRequests();
                     const section = registrationSectionRef.current;
                     if (!section) return;
                     section.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -776,19 +828,26 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
               )}
               {detailTab === "loyalty" && (
                 <>
+                  <div className="summary-grid">
+                    <MetricCard label="Unidades disponibles" value={detail.balance.availableUnits} />
+                    <MetricCard label="Total acumulado" value={detail.balance.lifetimeUnits} />
+                  </div>
                   {detail.rewards.length ? detail.rewards.map((reward) => (
                     <Card key={reward.id} className="list-row">
                       <div><strong>{reward.rewardName}</strong><small>{new Date(reward.createdAt).toLocaleDateString("es-MX")}</small></div>
                       <StatusBadge status={reward.status} />
                     </Card>
                   )) : <EmptyState title="Sin recompensas" description="Las recompensas aparecerán aquí." />}
-                  {canAdjust && (
+                  {canAdjust && detail.loyaltyProgram?.allowManualAdjustments && (
                     <form className="inline-form" onSubmit={adjust}>
                       <h3>Ajuste manual</h3>
-                      <label>Unidades<Input type="number" value={adjustment.units} onChange={(event) => setAdjustment({ ...adjustment, units: Number(event.target.value) })} /></label>
+                      <label>Unidades<Input required type="number" step="1" value={adjustment.units} onChange={(event) => setAdjustment({ ...adjustment, units: Number(event.target.value) })} /></label>
                       <label>Motivo<Input required value={adjustment.reason} onChange={(event) => setAdjustment({ ...adjustment, reason: event.target.value })} /></label>
-                      <Button>Aplicar ajuste</Button>
+                      <Button disabled={adjusting || adjustment.units === 0}>{adjusting ? "Aplicando…" : "Aplicar ajuste"}</Button>
                     </form>
+                  )}
+                  {canAdjust && !detail.loyaltyProgram?.allowManualAdjustments && (
+                    <p className="form-notice">Los ajustes manuales están desactivados en la configuración de fidelidad.</p>
                   )}
                 </>
               )}

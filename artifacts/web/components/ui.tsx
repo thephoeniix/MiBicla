@@ -1,5 +1,6 @@
 import type {
   ButtonHTMLAttributes,
+  CSSProperties,
   DialogHTMLAttributes,
   HTMLAttributes,
   InputHTMLAttributes,
@@ -9,6 +10,15 @@ import type {
   Ref,
 } from "react";
 import { useEffect, useRef } from "react";
+import approvedIcon from "../../icons/approve.svg";
+import deliveredIcon from "../../icons/entregado.svg";
+import diagnosisIcon from "../../icons/dagnostico.svg";
+import pickupIcon from "../../icons/pickup.svg";
+import receivedIcon from "../../icons/receive-.svg";
+import repairIcon from "../../icons/reparacion.svg";
+
+let dialogLocks = 0;
+let bodyOverflowBeforeDialogs = "";
 
 export function Card({
   className = "",
@@ -105,10 +115,15 @@ export function Dialog({
     if (!open || !dialog) return;
     const previous = document.activeElement as HTMLElement | null;
     if (!dialog.open) dialog.showModal();
-    document.body.style.overflow = "hidden";
+    if (dialogLocks === 0) {
+      bodyOverflowBeforeDialogs = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    dialogLocks += 1;
     return () => {
       if (dialog.open) dialog.close();
-      document.body.style.overflow = "";
+      dialogLocks = Math.max(0, dialogLocks - 1);
+      if (dialogLocks === 0) document.body.style.overflow = bodyOverflowBeforeDialogs;
       previous?.focus();
     };
   }, [open]);
@@ -128,7 +143,7 @@ export function Dialog({
         event.preventDefault();
         dialogRef.current
           ?.querySelector<HTMLButtonElement>(
-            'button[aria-label="Cerrar"], button[aria-label^="Cerrar "]',
+            'button[data-dialog-close], button[aria-label="Cerrar"], button[aria-label^="Cerrar "]',
           )
           ?.click();
       }}
@@ -142,6 +157,18 @@ export function Modal(props: DialogHTMLAttributes<HTMLDialogElement>) {
     <Dialog
       {...props}
       className={`ui-modal ${props.className ?? ""}`.trim()}
+    />
+  );
+}
+
+export function FormDialog({
+  className = "",
+  ...props
+}: DialogHTMLAttributes<HTMLDialogElement>) {
+  return (
+    <Dialog
+      {...props}
+      className={`ui-modal ui-form-dialog ${className}`.trim()}
     />
   );
 }
@@ -187,10 +214,23 @@ const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
   completed: "Completado",
   planned: "Planeada",
+  requested: "Solicitada",
+  ordered: "Pedida",
+  installed: "Instalada",
   available: "Disponible",
   redeemed: "Canjeada",
   rejected: "Rechazada",
   expired: "Expirada",
+  published: "Publicado",
+  draft: "Borrador",
+  reviewing: "En revisión",
+  quoted: "Cotizada",
+  reserved: "Reservada",
+  fulfilled: "Entregada",
+  submitted: "Recibida",
+  confirmed: "Confirmada",
+  unavailable: "No disponible",
+  on_request: "Sobre pedido",
 };
 
 export function statusLabel(status: string) {
@@ -307,6 +347,15 @@ export const WORKSHOP_STEPS = [
   "delivered",
 ] as const;
 
+const WORKSHOP_STEP_ICONS: Record<(typeof WORKSHOP_STEPS)[number], string> = {
+  received: receivedIcon,
+  diagnosis: diagnosisIcon,
+  approved: approvedIcon,
+  in_progress: repairIcon,
+  ready: pickupIcon,
+  delivered: deliveredIcon,
+};
+
 function normalizedStep(status: string) {
   const translated: Record<string, string> = {
     recibida: "received",
@@ -347,7 +396,10 @@ export function Stepper({ status }: { status: string }) {
           aria-current={index === current ? "step" : undefined}
         >
           <i aria-hidden="true">
-            {index < current ? "✓" : index === current ? "●" : "○"}
+            <span
+              className="ui-stepper-icon"
+              style={{ "--step-icon": `url("${WORKSHOP_STEP_ICONS[step]}")` } as CSSProperties}
+            />
           </i>
           <span>{statusLabel(step)}</span>
         </li>

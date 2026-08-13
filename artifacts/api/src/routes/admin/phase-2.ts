@@ -153,7 +153,7 @@ export function createPhase2AdminRouter(
       const admin = res.locals.auth.administrator.id,
         id = String(req.params.id),
         input = loyaltyAdjustmentSchema.parse(req.body),
-        result = await loyalty.adjust(id, input.units, admin);
+        result = await loyalty.adjust(id, input.units, admin, input.reason);
       await audit(
         req,
         "loyalty.adjust",

@@ -5,6 +5,10 @@ const customerAuthComponentSource = readFileSync(
   "artifacts/web/pages/customer/CustomerAuth.tsx",
   "utf8",
 );
+const customerPortalSource = readFileSync(
+  "artifacts/web/pages/customer/CustomerPortal.tsx",
+  "utf8",
+);
 
 const storage = new Map<string, string>();
 Object.defineProperty(globalThis, "sessionStorage", {
@@ -229,12 +233,19 @@ describe("restauración de sesión tras bfcache (navegación atrás/adelante)", 
   });
 
   it("CustomerPortal redirige con replace (no push) cuando la sesión resulta anónima tras revalidar", () => {
-    const portalBody = customerAuthComponentSource.slice(
-      customerAuthComponentSource.indexOf("export function CustomerPortal"),
-      customerAuthComponentSource.indexOf("export function CustomerRegistrationInfo"),
+    const portalBody = customerPortalSource.slice(
+      customerPortalSource.indexOf("export function CustomerPortal"),
     );
     expect(portalBody).toContain('if (auth.state === "anonymous")');
     expect(portalBody).toContain("location.replace(`/iniciar-sesion?next=");
     expect(portalBody).not.toMatch(/if \(auth\.state === "anonymous"\)[\s\S]{0,120}location\.href/);
+  });
+
+  it("conecta cada sección privada con endpoints derivados de la sesión", () => {
+    expect(customerPortalSource).toContain("getMyLoyalty");
+    expect(customerPortalSource).toContain("getMyBicycles");
+    expect(customerPortalSource).toContain("getMyOrders");
+    expect(customerPortalSource).toContain("getMyOrder");
+    expect(customerPortalSource).not.toMatch(/customerId[=:]/);
   });
 });

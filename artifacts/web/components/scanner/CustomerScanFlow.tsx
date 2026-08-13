@@ -2,7 +2,10 @@ import { useState, type FormEvent } from "react";
 import { apiFetch, ApiError } from "../../lib/api-client";
 import { Button, StatusBadge } from "../ui";
 import { QrScanner } from "./QrScanner";
-import { extractCustomerToken } from "./scanner-utils";
+import {
+  customerAdminProfileUrl,
+  extractCustomerToken,
+} from "./scanner-utils";
 import "./scanner.css";
 
 interface ScanResult {
@@ -64,18 +67,21 @@ function ScanFallbackInput({
 function ScannerErrorState({
   message,
   onRetry,
+  onManual,
 }: {
   message: string;
   onRetry: () => void;
+  onManual: () => void;
 }) {
   return (
     <div className="scanner-error" role="alert">
       <span aria-hidden="true">!</span>
       <strong>No pudimos continuar</strong>
       <p>{message}</p>
-      <Button type="button" variant="secondary" onClick={onRetry}>
-        Intentar de nuevo
-      </Button>
+      <div className="scanner-actions">
+        <Button type="button" onClick={onManual}>Ingresar enlace manualmente</Button>
+        <Button type="button" variant="secondary" onClick={onRetry}>Reintentar cámara</Button>
+      </div>
     </div>
   );
 }
@@ -176,6 +182,12 @@ function CustomerScanResult({
         </div>
       )}
       <div className="scanner-actions">
+        <a
+          className="ui-button ui-button--secondary"
+          href={customerAdminProfileUrl(result.customer.id)}
+        >
+          Abrir perfil del cliente
+        </a>
         <Button
           type="button"
           onClick={onConfirm}
@@ -415,6 +427,11 @@ export function CustomerScanFlow({
               message={error.message}
               onRetry={() => {
                 setError(null);
+                setState("scanner");
+              }}
+              onManual={() => {
+                setError(null);
+                setManual(true);
                 setState("scanner");
               }}
             />

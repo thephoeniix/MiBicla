@@ -3,6 +3,8 @@ export type PublicRoute =
   | "workshop"
   | "loyalty"
   | "brands"
+  | "products"
+  | "events"
   | "deposits"
   | "workshop-request"
   | "workshop-tracking"
@@ -14,6 +16,9 @@ export type PublicRoute =
   | "customer-workshop"
   | "customer-bikes"
   | "customer-profile"
+  | "customer-products"
+  | "customer-events"
+  | "customer-requests"
   | "customer-recovery"
   | "customer-activation"
   | "customer-verify"
@@ -28,6 +33,8 @@ export function resolvePublicRoute(pathname: string): {
   if (pathname === "/taller") return { route: "workshop" };
   if (pathname === "/fidelidad") return { route: "loyalty" };
   if (pathname === "/marcas") return { route: "brands" };
+  if (pathname === "/productos") return { route: "products" };
+  if (pathname === "/eventos") return { route: "events" };
   if (pathname === "/depositos") return { route: "deposits" };
   if (pathname === "/registro") return { route: "customer-register" };
   if (pathname === "/registro/verificar") return { route: "customer-verify" };
@@ -38,8 +45,13 @@ export function resolvePublicRoute(pathname: string): {
   if (pathname === "/mi") return { route: "customer-home" };
   if (pathname === "/mi/tarjeta") return { route: "customer-loyalty" };
   if (pathname === "/mi/taller") return { route: "customer-workshop" };
+  if (pathname === "/mi/orden") return { route: "customer-workshop" };
+  if (pathname === "/mi/ordenes") return { route: "customer-workshop" };
   if (pathname === "/mi/bicicletas") return { route: "customer-bikes" };
   if (pathname === "/mi/perfil") return { route: "customer-profile" };
+  if (pathname === "/mi/productos") return { route: "customer-products" };
+  if (pathname === "/mi/eventos") return { route: "customer-events" };
+  if (pathname === "/mi/solicitudes") return { route: "customer-requests" };
   if (pathname.startsWith("/mi/")) return { route: "customer-home" };
   if (pathname === "/taller/solicitud") return { route: "workshop-request" };
   const workshop = pathname.match(/^\/taller\/([^/]+)$/);

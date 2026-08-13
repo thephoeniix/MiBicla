@@ -1,5 +1,6 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import path from "node:path";
 import express, {
   type Request,
   type Response,
@@ -54,12 +55,20 @@ import { CustomerAuthService } from "./services/customer-auth.service.js";
 import {
   createCustomerAuthAdminRouter,
   createCustomerAuthRouter,
+  createRequireCustomer,
 } from "./routes/customer-auth.js";
+import { createCustomerPortalRouter } from "./routes/customer-portal.js";
 import { CustomerRegistrationService } from "./services/customer-registration.service.js";
 import {
   createCustomerRegistrationAdminRouter,
   createCustomerRegistrationPublicRouter,
 } from "./routes/customer-registration.js";
+import { CommerceService } from "./services/commerce.service.js";
+import { createPublicCommerceRouter } from "./routes/public/commerce.js";
+import { createCustomerCommerceRouter } from "./routes/customer-commerce.js";
+import { createAdminCommerceRouter } from "./routes/admin/commerce.js";
+import { AdministratorsService } from "./services/administrators.service.js";
+import { createAdministratorsAdminRouter } from "./routes/admin/administrators.js";
 type Database = ReturnType<typeof createDatabase>["db"];
 
 export function createApp(
@@ -67,6 +76,7 @@ export function createApp(
   db: Database = createDatabase().db,
 ) {
 const app = express();
+const uploadDir = path.resolve(env.UPLOAD_DIR);
 app.set("trust proxy", Number(env.TRUST_PROXY));
 app.use(
   helmet(),
@@ -79,6 +89,27 @@ app.use((req, res, next) => {
   res.locals.requestId = id;
   res.setHeader("x-request-id", id);
   next();
+});
+app.use("/api/uploads", (_req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+}, express.static(uploadDir, { fallthrough: false, immutable: true, maxAge: "30d" }));
+app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
+app.get("/readyz", async (_req, res) => {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      db.execute(sql`select 1 from customers limit 1`),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("ready_timeout")), 3_000);
+      }),
+    ]);
+    res.json({ status: "ready" });
+  } catch {
+    res.status(503).json({ status: "unavailable" });
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 });
 const cookie = {
   httpOnly: true,
@@ -339,6 +370,11 @@ async function auth(req: Request, res: Response, next: NextFunction) {
 }
 app.get("/auth/session", auth, async (req, res) => {
   const a = res.locals.auth;
+  const csrfToken = generateCsrfToken();
+  await db
+    .update(sessions)
+    .set({ csrfTokenHash: hashSessionToken(csrfToken) })
+    .where(eq(sessions.id, a.session.id));
   const ps = await db
     .select({ name: permissions.name })
     .from(rolePermissions)
@@ -346,6 +382,7 @@ app.get("/auth/session", auth, async (req, res) => {
     .where(eq(rolePermissions.roleId, a.role.id));
   res.json({
     authenticated: true,
+    csrfToken,
     administrator: {
       id: a.administrator.id,
       name: a.administrator.name,
@@ -390,12 +427,34 @@ const requirePermission = (permission: string) => [
     next();
   },
 ];
+const requireOwner = [
+  auth,
+  (_req: Request, res: Response, next: NextFunction) => {
+    if (res.locals.auth.role.name !== "owner")
+      return res.status(403).json({
+        error: {
+          code: "FORBIDDEN",
+          message: "Acceso exclusivo para owner",
+          requestId: res.locals.requestId,
+        },
+      });
+    next();
+  },
+];
 const businessSettingsService = new BusinessSettingsService(db);
 const customersService = new CustomersService(db),
   loyaltyService = new LoyaltyService(db);
 const workshopService = new WorkshopService(db);
 const customerAuthService = new CustomerAuthService(db, env.APP_BASE_URL);
 const customerRegistrationService = new CustomerRegistrationService(db, env.APP_BASE_URL);
+const commerceService = new CommerceService(db, {
+  uploadDir,
+});
+const administratorsService = new AdministratorsService(db);
+app.use(
+  "/api/admin",
+  createAdministratorsAdminRouter(administratorsService, requireOwner, audit),
+);
 app.use(
   "/api/admin/settings",
   createAdminBusinessSettingsRouter(
@@ -441,6 +500,16 @@ app.use(
   ),
 );
 app.use(
+  "/api/customer",
+  createCustomerPortalRouter(
+    customersService,
+    workshopService,
+    customerAuthService,
+    env.APP_BASE_URL,
+    createRequireCustomer(customerAuthService),
+  ),
+);
+app.use(
   "/api/admin",
   createWorkshopAdminRouter(
     workshopService,
@@ -450,6 +519,18 @@ app.use(
   ),
 );
 app.use("/api/public", createWorkshopPublicRouter(workshopService));
+app.use("/api/public/commerce", createPublicCommerceRouter(commerceService));
+app.use(
+  "/api/customer/commerce",
+  createCustomerCommerceRouter(
+    commerceService,
+    createRequireCustomer(customerAuthService),
+  ),
+);
+app.use(
+  "/api/admin",
+  createAdminCommerceRouter(commerceService, requirePermission, uploadDir, env.API_BASE_URL),
+);
 app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
   void next;
   if (err instanceof ZodError) {
@@ -472,15 +553,17 @@ app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
     err && typeof err === "object" && "code" in err && typeof err.code === "string"
       ? err.code.slice(0, 32)
       : "UNEXPECTED_ERROR";
-  if (env.NODE_ENV === "development")
-    console.error({
-      event: "request_failed",
-      requestId: res.locals.requestId,
-      method: req.method,
-      route: req.route?.path ?? "unmatched",
-      errorType: err instanceof Error ? err.name : typeof err,
-      internalCode,
-    });
+  console.error({
+    event: "request_failed",
+    requestId: res.locals.requestId,
+    method: req.method,
+    route: req.route?.path ?? "unmatched",
+    errorType: err instanceof Error ? err.name : typeof err,
+    internalCode,
+    ...(env.NODE_ENV === "production" || !(err instanceof Error)
+      ? {}
+      : { errorMessage: err.message }),
+  });
   res.status(500).json({
     error: {
       code: "INTERNAL_ERROR",

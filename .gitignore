@@ -5,5 +5,8 @@ coverage/
 .env.*
 !.env.example
 *.log
+releases/
+playwright-report/
+test-results/
+uploads/
 .DS_Store
-

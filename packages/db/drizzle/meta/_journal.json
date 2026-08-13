@@ -71,6 +71,41 @@
       "when": 1785286800000,
       "tag": "0009_customer_registration_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785949200000,
+      "tag": "0010_loyalty_movements",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786467600000,
+      "tag": "0011_commerce",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786473600000,
+      "tag": "0012_event_info_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786477200000,
+      "tag": "0013_commerce_shipping_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786480800000,
+      "tag": "0014_product_discounts",
+      "breakpoints": true
     }
   ]
 }

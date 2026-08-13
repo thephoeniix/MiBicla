@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   customerLoyaltyBalance,
+  customerLoyaltyMovements,
   customerRewards,
   loyaltySettings,
   type createDatabase,
@@ -70,8 +71,11 @@ export class LoyaltyService {
       .returning();
     return row;
   }
-  async adjust(customerId: string, units: number, administratorId: string) {
+  async adjust(customerId: string, units: number, administratorId: string, reason: string) {
     return this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        select pg_advisory_xact_lock(hashtext(${customerId}), hashtext('loyalty-adjustment'))
+      `);
       const settings =
         (await tx.select().from(loyaltySettings).limit(1))[0] ?? null;
       if (!settings?.allowManualAdjustments)
@@ -118,6 +122,13 @@ export class LoyaltyService {
           requiredUnits: settings.rewardUnits,
           status: "available",
         });
+      await tx.insert(customerLoyaltyMovements).values({
+        customerId,
+        units,
+        balanceAfter: available,
+        reason,
+        createdBy: administratorId,
+      });
       return {
         availableUnits: available,
         rewardsCreated: rewards,

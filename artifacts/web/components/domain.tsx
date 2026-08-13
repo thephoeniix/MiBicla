@@ -101,7 +101,7 @@ export function Timeline({
   items: Array<{
     id: string;
     title: string;
-    message: string;
+    message?: string;
     createdAt: string;
   }>;
 }) {
@@ -112,7 +112,7 @@ export function Timeline({
           <i aria-hidden="true" />
           <div>
             <strong>{item.title}</strong>
-            <p>{item.message}</p>
+            {item.message && <p>{item.message}</p>}
             <small>
               {new Date(item.createdAt).toLocaleString("es-MX", {
                 dateStyle: "medium",

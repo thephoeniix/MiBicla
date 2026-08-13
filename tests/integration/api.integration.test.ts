@@ -12,13 +12,23 @@ import {
 import { and, eq, isNull, sql } from "drizzle-orm";
 import {
   auditLogs,
+  administrators,
   customerAuthTokens,
   customerCredentials,
   customerRegistrationRequests,
   customerSessions,
+  customerBicycles,
+  customerLoyaltyBalance,
+  customerLoyaltyMovements,
+  customerRewards,
   customers,
   paymentDepositSettings,
   rateLimits,
+  roles,
+  workshopCustomerUpdates,
+  workshopOrders,
+  workshopOrderServices,
+  workshopStatusHistory,
 } from "@mi-bicla/db";
 import { hashPassword, hashSessionToken, parseEnv, verifyPassword } from "@mi-bicla/shared";
 import { createApp } from "../../artifacts/api/src/app.js";
@@ -230,6 +240,15 @@ afterAll(async () => {
 });
 
 describe("infraestructura PostgreSQL", () => {
+  it("expone salud de proceso y disponibilidad de PostgreSQL", async () => {
+    const health = await request("/healthz", { origin: false });
+    const ready = await request("/readyz", { origin: false });
+    expect(health.status).toBe(200);
+    expect(await health.json()).toEqual({ status: "ok" });
+    expect(ready.status).toBe(200);
+    expect(await ready.json()).toEqual({ status: "ready" });
+  });
+
   it("aplica todas las migraciones desde una base vacía", async () => {
     const { db, client } = createTestDatabase();
     try {
@@ -241,7 +260,7 @@ describe("infraestructura PostgreSQL", () => {
         from information_schema.tables
         where table_schema = 'public'
       `);
-      expect(migrations[0]?.count).toBe(10);
+      expect(migrations[0]?.count).toBe(15);
       expect(tables.map(({ name }) => name)).toEqual(
         expect.arrayContaining([
           "administrators",
@@ -253,6 +272,7 @@ describe("infraestructura PostgreSQL", () => {
           "customer_sessions",
           "customer_auth_tokens",
           "customer_registration_requests",
+          "customer_loyalty_movements",
         ]),
       );
     } finally {
@@ -390,6 +410,108 @@ describe("registro pendiente → verificación manual → activación (flujo tra
 
     const session = await customerLogin(phone, "Fresh-Customer-Password1!");
     expect(session.cookie).toContain("mb_customer_session=");
+  });
+
+  it("completa registro, revisión, WhatsApp, activación, login, tarjeta, bicicleta y orden", async () => {
+    const phone = "442 700 0099";
+    const password = "Production-Flow-Password1!";
+    const admin = await login();
+
+    const registration = await request("/api/public/customer-registration", {
+      method: "POST",
+      body: minimalRegistration(phone, { firstName: "Flujo", lastName: "Integral" }),
+    });
+    expect(registration.status).toBe(202);
+    const { adminReviewUrl } = await registration.json() as { adminReviewUrl: string };
+    const reviewId = adminReviewUrl.split("/").at(-1)!;
+
+    const pending = await request("/api/admin/customer-registration-requests", { session: admin });
+    expect((await pending.json()).map((item: { reviewId: string }) => item.reviewId)).toContain(reviewId);
+
+    const approval = await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
+      method: "POST",
+      session: admin,
+    });
+    expect(approval.status).toBe(200);
+    const approved = await approval.json() as {
+      customerId: string;
+      link: string;
+      whatsappUrl: string;
+    };
+    expect(approved.whatsappUrl).toContain(`https://wa.me/52${phone.replace(/\D/g, "")}`);
+
+    const activationToken = new URL(approved.link).searchParams.get("token")!;
+    expect((await request("/api/customer/auth/activate", {
+      method: "POST",
+      body: { token: activationToken, password },
+    })).status).toBe(204);
+    const customer = await customerLogin(phone, password);
+
+    const loyalty = await request("/api/customer/loyalty", { session: customer });
+    expect(loyalty.status).toBe(200);
+    expect((await loyalty.json()).name).toBe("Flujo Integral");
+    expect((await request("/api/customer/card-link", {
+      method: "POST",
+      session: customer,
+    })).status).toBe(201);
+
+    const bicycle = await request("/api/customer/bicycles", {
+      method: "POST",
+      session: customer,
+      body: { nickname: "Bici integral", brand: "Trek", model: "Fuel EX", bikeType: "Montaña" },
+    });
+    expect(bicycle.status).toBe(201);
+    const bike = await bicycle.json() as { id: string; customerId: string };
+    expect(bike.customerId).toBe(approved.customerId);
+
+    const workshopRequest = await request("/api/customer/workshop-requests", {
+      method: "POST",
+      session: customer,
+      body: {
+        bicycleId: bike.id,
+        serviceName: "Servicio completo",
+        problemDescription: "Validación integral de una solicitud de servicio.",
+        preferredContactMethod: "whatsapp",
+      },
+    });
+    expect(workshopRequest.status).toBe(202);
+    const requestNumber = (await workshopRequest.json()).requestNumber as string;
+    const adminRequests = await request("/api/admin/workshop/requests", { session: admin });
+    const adminRequest = (await adminRequests.json()).find(
+      (item: { id: string; requestNumber: string }) => item.requestNumber === requestNumber,
+    );
+    const conversion = await request(`/api/admin/workshop/requests/${adminRequest.id}/convert`, {
+      method: "POST",
+      session: admin,
+      body: {},
+    });
+    expect(conversion.status).toBe(201);
+    const order = (await conversion.json()).order as {
+      id: string;
+      orderNumber: string;
+      customerId: string;
+      bicycleId: string;
+    };
+    expect(order).toMatchObject({ customerId: approved.customerId, bicycleId: bike.id });
+
+    expect((await request(`/api/admin/workshop/orders/${order.id}/updates`, {
+      method: "POST",
+      session: admin,
+      body: {
+        title: "Diagnóstico iniciado",
+        message: "El taller comenzó la revisión.",
+        progressPercent: 20,
+        photoUrl: null,
+        customerVisible: true,
+      },
+    })).status).toBe(201);
+    const orders = await request("/api/customer/orders", { session: customer });
+    expect((await orders.json()).map((item: { orderNumber: string }) => item.orderNumber)).toContain(order.orderNumber);
+    const tracking = await request(`/api/customer/orders/${order.orderNumber}`, { session: customer });
+    expect(tracking.status).toBe(200);
+    expect(await tracking.json()).toMatchObject({
+      updates: [{ title: "Diagnóstico iniciado", message: "El taller comenzó la revisión." }],
+    });
   });
 
   it("el token de activación es de un solo uso — reutilizarlo falla de forma comprensible", async () => {
@@ -691,6 +813,54 @@ describe("registro pendiente → verificación manual → activación (flujo tra
     expect((await request(`/api/admin/customer-registration-requests/${reviewId}/approve`, {
       method: "POST", session: admin,
     })).status).toBe(409);
+  });
+});
+
+describe("ajustes de fidelidad concurrentes", () => {
+  it("serializa el saldo y conserva un movimiento por ajuste", async () => {
+    const admin = await login();
+    const { customer } = await createCustomer(admin, "concurrencia");
+    const settings = await request("/api/admin/settings/loyalty", {
+      method: "PUT",
+      session: admin,
+      body: {
+        enabled: true,
+        currency: "MXN",
+        purchaseRules: [],
+        rewardUnits: 100,
+        rewardDiscountPercent: 10,
+        rewardName: "Recompensa de prueba",
+        rewardDescription: "Configuración para concurrencia",
+        allowManualAdjustments: true,
+        allowNegativeBalance: false,
+      },
+    });
+    expect(settings.status).toBe(200);
+
+    const adjustments = await Promise.all(
+      Array.from({ length: 8 }, (_, index) => request(
+        `/api/admin/customers/${customer.id}/loyalty-adjustments`,
+        {
+          method: "POST",
+          session: admin,
+          body: { units: 1, reason: `Ajuste concurrente ${index + 1}` },
+        },
+      )),
+    );
+    expect(adjustments.every(({ status }) => status === 200)).toBe(true);
+
+    const { db, client } = createTestDatabase();
+    try {
+      const [balance] = await db.select().from(customerLoyaltyBalance)
+        .where(eq(customerLoyaltyBalance.customerId, customer.id));
+      const movements = await db.select().from(customerLoyaltyMovements)
+        .where(eq(customerLoyaltyMovements.customerId, customer.id));
+      expect(balance?.availableUnits).toBe(8);
+      expect(movements).toHaveLength(8);
+      expect(movements.reduce((sum, movement) => sum + movement.units, 0)).toBe(8);
+    } finally {
+      await client.end();
+    }
   });
 });
 
@@ -1675,6 +1845,262 @@ describe("autenticación de clientes", () => {
       ).status,
     ).toBe(409);
   });
+
+  it("el portal expone solo puntos, bicicletas y órdenes pertenecientes a la sesión", async () => {
+    const admin = await login();
+    const first = await createCustomer(admin, "uno");
+    const second = await createCustomer(admin, "dos");
+    const firstActivation = await activateCustomer(admin, first.customer.id);
+    const secondActivation = await activateCustomer(admin, second.customer.id);
+    const firstSession = await customerLogin(first.customer.phone, firstActivation.password);
+    const secondSession = await customerLogin(second.customer.phone, secondActivation.password);
+    const { db, client } = createTestDatabase();
+    let firstBikeId = "";
+    let secondBikeId = "";
+    try {
+      await db.update(customerLoyaltyBalance).set({ availableUnits: 7, lifetimeUnits: 17 })
+        .where(eq(customerLoyaltyBalance.customerId, first.customer.id));
+      await db.update(customerLoyaltyBalance).set({ availableUnits: 99, lifetimeUnits: 99 })
+        .where(eq(customerLoyaltyBalance.customerId, second.customer.id));
+      await db.insert(customerRewards).values([
+        { customerId: first.customer.id, rewardName: "Recompensa A", rewardDiscountPercent: "10", requiredUnits: 10 },
+        { customerId: second.customer.id, rewardName: "Recompensa B", rewardDiscountPercent: "20", requiredUnits: 20 },
+      ]);
+      await db.insert(customerLoyaltyMovements).values({
+        customerId: first.customer.id,
+        units: 7,
+        balanceAfter: 7,
+        reason: "Compra participante",
+      });
+      const [firstBike, secondBike] = await db.insert(customerBicycles).values([
+        { customerId: first.customer.id, nickname: "Bicicleta A", brand: "Marca A", status: "active" },
+        { customerId: second.customer.id, nickname: "Bicicleta B", brand: "Marca B", status: "active" },
+      ]).returning();
+      firstBikeId = firstBike!.id;
+      secondBikeId = secondBike!.id;
+      const [firstOrder] = await db.insert(workshopOrders).values([
+        {
+          orderNumber: "OT-CLIENTE-A",
+          customerId: first.customer.id,
+          bicycleId: firstBikeId,
+          problemDescription: "Servicio A",
+          internalNotes: "NOTA INTERNA SECRETA",
+          customerVisibleSummary: "Diagnóstico visible",
+        },
+        {
+          orderNumber: "OT-CLIENTE-B",
+          customerId: second.customer.id,
+          bicycleId: secondBikeId,
+          problemDescription: "Servicio B",
+        },
+        {
+          orderNumber: "OT-DATO-INCONSISTENTE",
+          customerId: first.customer.id,
+          bicycleId: secondBikeId,
+          problemDescription: "No debe exponerse",
+        },
+      ]).returning();
+      await db.insert(workshopOrderServices).values([
+        { workshopOrderId: firstOrder!.id, serviceName: "Servicio visible", isCustomerVisible: true },
+        { workshopOrderId: firstOrder!.id, serviceName: "Servicio interno", isCustomerVisible: false },
+      ]);
+      await db.insert(workshopCustomerUpdates).values([
+        { workshopOrderId: firstOrder!.id, title: "Avance visible", message: "Mensaje visible", customerVisible: true },
+        { workshopOrderId: firstOrder!.id, title: "Avance interno", message: "Mensaje interno", customerVisible: false },
+      ]);
+      await db.insert(workshopStatusHistory).values([
+        { workshopOrderId: firstOrder!.id, newStatus: "received", publicMessage: "Recibida", internalReason: "RAZÓN INTERNA", customerVisible: true },
+        { workshopOrderId: firstOrder!.id, newStatus: "inspection", publicMessage: "Oculta", customerVisible: false },
+      ]);
+    } finally {
+      await client.end();
+    }
+
+    for (const path of ["/api/customer/loyalty", "/api/customer/bicycles", "/api/customer/orders"]) {
+      expect((await request(path)).status).toBe(401);
+      expect((await request(path, { session: admin })).status).toBe(401);
+    }
+
+    const loyalty = await request(`/api/customer/loyalty?customerId=${second.customer.id}`, { session: firstSession });
+    expect(loyalty.status).toBe(200);
+    expect(loyalty.headers.get("cache-control")).toContain("no-store");
+    const loyaltyBody = await loyalty.json();
+    expect(loyaltyBody.balance.availableUnits).toBe(7);
+    expect(loyaltyBody.memberCode).toBeUndefined();
+    expect(loyaltyBody.rewards.map((reward: { rewardName: string }) => reward.rewardName)).toEqual(["Recompensa A"]);
+    expect(loyaltyBody.movements[0].reason).toBe("Compra participante");
+
+    const firstCardLink = await request("/api/customer/card-link", {
+      method: "POST",
+      session: firstSession,
+    });
+    expect(firstCardLink.status).toBe(201);
+    const firstCardToken = new URL((await firstCardLink.json()).cardUrl).pathname.split("/").pop()!;
+    const secondCardLink = await request("/api/customer/card-link", {
+      method: "POST",
+      session: firstSession,
+    });
+    const secondCardToken = new URL((await secondCardLink.json()).cardUrl).pathname.split("/").pop()!;
+    expect((await request("/api/admin/customers/resolve-token", {
+      method: "POST",
+      session: admin,
+      body: { token: firstCardToken },
+    })).status).toBe(404);
+    const scannedCard = await request("/api/admin/customers/resolve-token", {
+      method: "POST",
+      session: admin,
+      body: { token: secondCardToken },
+    });
+    expect(scannedCard.status).toBe(200);
+    expect((await scannedCard.json()).customer.id).toBe(first.customer.id);
+
+    const bicycles = await request(`/api/customer/bicycles?customerId=${second.customer.id}`, { session: firstSession });
+    expect((await bicycles.json()).map((bike: { id: string }) => bike.id)).toEqual([firstBikeId]);
+
+    expect((await request("/api/customer/bicycles", {
+      method: "POST",
+      session: firstSession,
+      csrf: false,
+      body: { nickname: "Nueva bici" },
+    })).status).toBe(403);
+    const createdBike = await request("/api/customer/bicycles", {
+      method: "POST",
+      session: firstSession,
+      body: { nickname: "Nueva bici", brand: "Trek", wheelSize: "29" },
+    });
+    expect(createdBike.status).toBe(201);
+    const createdBikeBody = await createdBike.json();
+    expect(createdBikeBody.customerId).toBe(first.customer.id);
+    expect((await request(`/api/customer/bicycles/${secondBikeId}`, {
+      method: "PATCH",
+      session: firstSession,
+      body: { nickname: "No autorizada" },
+    })).status).toBe(404);
+
+    expect((await request("/api/customer/profile", {
+      method: "PATCH",
+      session: firstSession,
+      body: { firstName: "Cliente", lastName: "Actualizado", email: "nuevo@example.test", birthDate: null, phone: "+524420000099" },
+    })).status).toBe(400);
+    const profile = await request("/api/customer/profile", {
+      method: "PATCH",
+      session: firstSession,
+      body: { firstName: "Cliente", lastName: "Actualizado", email: "nuevo@example.test", birthDate: null },
+    });
+    expect(profile.status).toBe(200);
+    expect((await profile.json()).phone).toBe(first.customer.phone);
+
+    expect((await request("/api/customer/workshop-requests", {
+      method: "POST",
+      session: firstSession,
+      body: { bicycleId: secondBikeId, serviceName: "Servicio completo", problemDescription: "Solicitud con bicicleta ajena", preferredContactMethod: "whatsapp" },
+    })).status).toBe(404);
+    const ownRequest = await request("/api/customer/workshop-requests", {
+      method: "POST",
+      session: firstSession,
+      body: { bicycleId: firstBikeId, serviceName: "Servicio completo", problemDescription: "Necesita ajuste y diagnóstico completo", preferredContactMethod: "whatsapp" },
+    });
+    expect(ownRequest.status).toBe(202);
+    const ownRequestBody = await ownRequest.json();
+    expect(ownRequestBody.requestNumber).toMatch(/^SOL-/);
+    const listedRequests = await request("/api/customer/workshop-requests", { session: firstSession });
+    expect((await listedRequests.json()).map((item: { requestNumber: string }) => item.requestNumber)).toContain(ownRequestBody.requestNumber);
+
+    const adminRequests = await request("/api/admin/workshop/requests", { session: admin });
+    const ownAdminRequest = (await adminRequests.json()).find(
+      (item: { id: string; requestNumber: string }) => item.requestNumber === ownRequestBody.requestNumber,
+    );
+    const converted = await request(`/api/admin/workshop/requests/${ownAdminRequest.id}/convert`, {
+      method: "POST",
+      session: admin,
+      body: {},
+    });
+    expect(converted.status).toBe(201);
+    const convertedBody = await converted.json();
+    expect(convertedBody.order).toMatchObject({
+      customerId: first.customer.id,
+      bicycleId: firstBikeId,
+    });
+    await request(`/api/admin/workshop/orders/${convertedBody.order.id}/parts`, {
+      method: "POST",
+      session: admin,
+      body: {
+        partName: "Cadena visible",
+        brand: "Marca visible",
+        sku: null,
+        description: "Refacción publicada por el taller",
+        quantity: 1,
+        unitPriceCents: 45000,
+        isCustomerVisible: true,
+        status: "ordered",
+      },
+    });
+    await request(`/api/admin/workshop/orders/${convertedBody.order.id}/updates`, {
+      method: "POST",
+      session: admin,
+      body: {
+        title: "Diagnóstico terminado",
+        message: "La bicicleta está lista para reparación.",
+        progressPercent: 35,
+        photoUrl: null,
+        customerVisible: true,
+      },
+    });
+
+    const mismatchedCreation = await request("/api/admin/workshop/orders", {
+      method: "POST",
+      session: admin,
+      body: {
+        customerId: first.customer.id,
+        bicycleId: secondBikeId,
+        problemDescription: "Intento con bicicleta ajena",
+        priority: "normal",
+        discountCents: 0,
+      },
+    });
+    expect(mismatchedCreation.status).not.toBe(201);
+
+    const orders = await request(`/api/customer/orders?customerId=${second.customer.id}`, { session: firstSession });
+    const orderBody = await orders.json();
+    expect(orderBody.map((order: { orderNumber: string }) => order.orderNumber)).toEqual(
+      expect.arrayContaining(["OT-CLIENTE-A", convertedBody.order.orderNumber]),
+    );
+    const convertedDetail = await request(
+      `/api/customer/orders/${convertedBody.order.orderNumber}`,
+      { session: firstSession },
+    );
+    expect(convertedDetail.status).toBe(200);
+    expect(await convertedDetail.json()).toMatchObject({
+      visibleParts: [{ partName: "Cadena visible", brand: "Marca visible", status: "ordered" }],
+      updates: [{ title: "Diagnóstico terminado", message: "La bicicleta está lista para reparación." }],
+    });
+
+    const detail = await request("/api/customer/orders/OT-CLIENTE-A", { session: firstSession });
+    expect(detail.status).toBe(200);
+    const detailText = await detail.text();
+    expect(detailText).toContain("Servicio visible");
+    expect(detailText).toContain("Avance visible");
+    expect(detailText).not.toMatch(/Servicio interno|Avance interno|NOTA INTERNA|RAZÓN INTERNA|unitPriceCents/);
+
+    const foreign = await request("/api/customer/orders/OT-CLIENTE-B", { session: firstSession });
+    const missing = await request("/api/customer/orders/OT-NO-EXISTE", { session: firstSession });
+    expect(foreign.status).toBe(404);
+    expect(missing.status).toBe(404);
+    expect((await foreign.json()).error.code).toBe((await missing.json()).error.code);
+    expect((await request("/api/customer/orders/OT-CLIENTE-B", { session: secondSession })).status).toBe(200);
+
+    expect((await request("/api/customer/password", {
+      method: "POST",
+      session: firstSession,
+      body: { currentPassword: "Incorrecta-Password1!", newPassword: "Customer-New-Portal2!" },
+    })).status).toBe(400);
+    expect((await request("/api/customer/password", {
+      method: "POST",
+      session: firstSession,
+      body: { currentPassword: firstActivation.password, newPassword: "Customer-New-Portal2!" },
+    })).status).toBe(204);
+    expect((await request("/api/customer/session", { session: firstSession })).status).toBe(200);
+  });
 });
 
 describe("autenticación y autorización", () => {
@@ -1682,14 +2108,18 @@ describe("autenticación y autorización", () => {
     const session = await login();
     const current = await request("/auth/session", { session });
     expect(current.status).toBe(200);
-    expect(await current.json()).toMatchObject({
+    const currentBody = await current.json();
+    expect(currentBody).toMatchObject({
       authenticated: true,
       administrator: { email: TEST_OWNER.email, role: "owner" },
     });
+    expect(currentBody.csrfToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(currentBody.csrfToken).not.toBe(session.csrf);
 
     const logout = await request("/auth/logout", {
       method: "POST",
       session,
+      csrf: currentBody.csrfToken,
     });
     expect(logout.status).toBe(204);
     expect((await request("/auth/session", { session })).status).toBe(401);
@@ -1728,6 +2158,104 @@ describe("autenticación y autorización", () => {
       session: employee,
     });
     expect(forbidden.status).toBe(403);
+  });
+
+  it("permite al owner administrar cuentas sin exponer secretos", async () => {
+    const owner = await login();
+    expect((await request("/api/admin/administrators")).status).toBe(401);
+    const employee = await login(TEST_EMPLOYEE);
+    expect((await request("/api/admin/administrators", { session: employee })).status).toBe(403);
+
+    const createdResponse = await request("/api/admin/administrators", {
+      method: "POST",
+      session: owner,
+      body: {
+        name: "Integration Admin",
+        email: "Admin.Managed@Example.Test",
+        password: "Managed-Admin-Password1!",
+        role: "admin",
+      },
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = await createdResponse.json();
+    expect(created).toMatchObject({ role: "admin", isActive: true });
+    expect(JSON.stringify(created)).not.toMatch(/password|emailNormalized|failedLogin/i);
+
+    const duplicate = await request("/api/admin/administrators", {
+      method: "POST",
+      session: owner,
+      body: {
+        name: "Duplicate",
+        email: "admin.managed@example.test",
+        password: "Managed-Admin-Password1!",
+        role: "employee",
+      },
+    });
+    expect(duplicate.status).toBe(409);
+
+    const managedSession = await login({
+      email: "admin.managed@example.test",
+      password: "Managed-Admin-Password1!",
+    });
+    const roleChange = await request(`/api/admin/administrators/${created.id}/role`, {
+      method: "PATCH",
+      session: owner,
+      body: { role: "employee" },
+    });
+    expect(roleChange.status).toBe(200);
+    expect((await request("/auth/session", { session: managedSession })).status).toBe(401);
+
+    const reset = await request(`/api/admin/administrators/${created.id}/password/reset`, {
+      method: "POST",
+      session: owner,
+      body: { newPassword: "Managed-New-Password2!" },
+    });
+    expect(reset.status).toBe(200);
+    expect(JSON.stringify(await reset.json())).not.toMatch(/password|hash/i);
+    const { db } = createTestDatabase();
+    const [stored] = await db
+      .select({ passwordHash: administrators.passwordHash })
+      .from(administrators)
+      .where(eq(administrators.id, created.id))
+      .limit(1);
+    expect(await verifyPassword(stored!.passwordHash, "Managed-Admin-Password1!")).toBe(false);
+    expect(await verifyPassword(stored!.passwordHash, "Managed-New-Password2!")).toBe(true);
+    const newSession = await login({
+      email: "admin.managed@example.test",
+      password: "Managed-New-Password2!",
+    });
+
+    const status = await request(`/api/admin/administrators/${created.id}/status`, {
+      method: "PATCH",
+      session: owner,
+      body: { isActive: false },
+    });
+    expect(status.status).toBe(200);
+    expect((await request("/auth/session", { session: newSession })).status).toBe(401);
+  });
+
+  it("protege owners y la propia cuenta de acciones administrativas", async () => {
+    const owner = await login();
+    const { db } = createTestDatabase();
+    const [ownerRow] = await db
+      .select({ id: administrators.id })
+      .from(administrators)
+      .innerJoin(roles, eq(administrators.roleId, roles.id))
+      .where(eq(roles.name, "owner"))
+      .limit(1);
+    expect(ownerRow).toBeDefined();
+    for (const [path, body] of [
+      [`/api/admin/administrators/${ownerRow!.id}/role`, { role: "admin" }],
+      [`/api/admin/administrators/${ownerRow!.id}/status`, { isActive: false }],
+      [`/api/admin/administrators/${ownerRow!.id}/password/reset`, { newPassword: "Owner-New-Password2!" }],
+    ] as const) {
+      const response = await request(path, {
+        method: path.endsWith("reset") ? "POST" : "PATCH",
+        session: owner,
+        body,
+      });
+      expect(response.status).toBe(409);
+    }
   });
 });
 

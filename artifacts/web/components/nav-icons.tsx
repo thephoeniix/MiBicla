@@ -1,8 +1,35 @@
-// Iconos de la barra de navegación (cliente público y admin), adaptados de
+import type { CSSProperties } from "react";
+import fidelityAsset from "../../icons/fidelity.svg";
+import homeAsset from "../../icons/home-angle-svgrepo-com.svg";
+import tallerAsset from "../../icons/taller.svg";
+
+// Iconos de navegación y tarjetas, adaptados de
 // artifacts/icons/*.svg. El color original de cada SVG se reemplaza por
 // currentColor para heredar el color de texto normal/activo ya definido en
-// style.css (p. ej. .public-bottom-nav a[aria-current="page"] { color: ... }),
+// style.css (p. ej. .customer-bottom-nav [aria-current="page"] { color: ... }),
 // igual que ya hacen WhatsappIcon/InstagramIcon en PublicPages.tsx.
+
+function AssetIcon({ src }: { src: string }) {
+  return (
+    <span
+      className="nav-asset-icon"
+      style={{ "--nav-icon": `url("${src}")` } as CSSProperties}
+      aria-hidden="true"
+    />
+  );
+}
+
+export function HomeAssetIcon() {
+  return <AssetIcon src={homeAsset} />;
+}
+
+export function FidelityAssetIcon() {
+  return <AssetIcon src={fidelityAsset} />;
+}
+
+export function TallerAssetIcon() {
+  return <AssetIcon src={tallerAsset} />;
+}
 
 export function MoreIcon() {
   return (
@@ -79,6 +106,42 @@ export function DepositsIcon() {
   );
 }
 
+export function ProductsIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16l-1 14H5L4 7Z" /><path d="M8 9V6a4 4 0 0 1 8 0v3" /></svg>;
+}
+
+export function EventsIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4m10-4v4M3 10h18" /><path d="m8 15 2 2 5-5" /></svg>;
+}
+
+export function OrdersIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 3h10v3H7z" /><path d="M6 5H5a2 2 0 0 0-2 2v13h18V7a2 2 0 0 0-2-2h-1" /><path d="M7 11h10M7 15h7" /></svg>;
+}
+
+export function BicyclesIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="4" /><circle cx="18" cy="17" r="4" /><path d="m6 17 4-8 4 8H6m4-8h5l3 8M8 6h4" /></svg>;
+}
+
+export function RequestsIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
+}
+
+export function SettingsIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></svg>;
+}
+
+export function AdminHomeIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>;
+}
+
+export function LoyaltyAdminIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s8-4.6 8-11a4.5 4.5 0 0 0-8-2.8A4.5 4.5 0 0 0 4 10c0 6.4 8 11 8 11Z" /><path d="M9 12h6M12 9v6" /></svg>;
+}
+
+export function WorkshopAdminIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5-5L12 3.6 9.6 6 7.3 3.7a4 4 0 0 0 5 5L20 16.4a2.5 2.5 0 0 1-3.6 3.6l-7.7-7.7" /><path d="m5.5 13.5-3 3a2.1 2.1 0 0 0 3 3l3-3" /></svg>;
+}
+
 export function TallerIcon() {
   return (
     <svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">
@@ -92,9 +155,14 @@ export function TallerIcon() {
 
 export function ClientsIcon() {
   return (
-    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-      <path d="M8 7C9.65685 7 11 5.65685 11 4C11 2.34315 9.65685 1 8 1C6.34315 1 5 2.34315 5 4C5 5.65685 6.34315 7 8 7Z" />
-      <path d="M14 12C14 10.3431 12.6569 9 11 9H5C3.34315 9 2 10.3431 2 12V15H14V12Z" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="8" r="4" />
+      <path d="M2.5 21c.5-4.4 2.7-6.5 6.5-6.5s6 2.1 6.5 6.5" />
+      <path d="M16 4.6a4 4 0 0 1 0 6.8M17 14.8c2.7.8 4.1 2.9 4.5 6.2" />
     </svg>
   );
+}
+
+export function AdministrativeUsersIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3.5" /><path d="M2.5 20c.4-4 2.2-6 5.5-6s5.1 2 5.5 6" /><circle cx="17.5" cy="9" r="2.5" /><path d="M15.5 14.5c3.8-.7 5.8 1.1 6 5.5" /></svg>;
 }

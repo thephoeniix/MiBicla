@@ -5,7 +5,11 @@ import {
   SearchableCombobox,
   type ComboboxOption,
 } from "../../components/SearchableCombobox";
-import { WorkshopServices } from "../../components/WorkshopServices";
+import {
+  formatMxn,
+  parseMxnToCents,
+  WorkshopServices,
+} from "../../components/WorkshopServices";
 import {
   Button,
   Card,
@@ -45,6 +49,14 @@ interface Order {
   problemDescription: string;
   customerVisibleSummary: string | null;
 }
+interface OrderPart {
+  id: string;
+  partName: string;
+  quantity: number;
+  unitPriceCents?: number;
+  status: string;
+  isCustomerVisible: boolean;
+}
 const ORDER_EMPTY = {
   customerId: "",
   bicycleId: "",
@@ -58,16 +70,12 @@ const ORDER_EMPTY = {
   discountCents: 0,
 };
 const ORDER_STATES = [
-  "received", "inspection", "diagnosis", "waiting_approval", "approved",
-  "in_progress", "waiting_parts", "quality_check", "ready", "delivered",
-  "cancelled",
+  "received", "inspection", "in_progress", "waiting_parts", "quality_check",
+  "ready", "delivered",
 ] as const;
 const PRIMARY_TRANSITION: Record<string, string | undefined> = {
   received: "inspection",
-  inspection: "diagnosis",
-  diagnosis: "waiting_approval",
-  waiting_approval: "approved",
-  approved: "in_progress",
+  inspection: "in_progress",
   in_progress: "quality_check",
   waiting_parts: "in_progress",
   quality_check: "ready",
@@ -75,13 +83,19 @@ const PRIMARY_TRANSITION: Record<string, string | undefined> = {
 };
 const TRANSITION_LABEL: Record<string, string> = {
   inspection: "Iniciar inspección",
-  diagnosis: "Iniciar diagnóstico",
-  waiting_approval: "Solicitar aprobación",
-  approved: "Registrar aprobación",
   in_progress: "Iniciar reparación",
   quality_check: "Iniciar control de calidad",
   ready: "Marcar como lista",
   delivered: "Entregar bicicleta",
+};
+const STATUS_PROGRESS: Record<string, number> = {
+  received: 10,
+  inspection: 30,
+  in_progress: 65,
+  waiting_parts: 65,
+  quality_check: 80,
+  ready: 90,
+  delivered: 100,
 };
 export function Workshop({ permissions = [] }: { permissions?: string[] }) {
   const [requests, setRequests] = useState<RequestItem[]>([]),
@@ -94,7 +108,8 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
     [showBicycleForm, setShowBicycleForm] = useState(false),
     [detail, setDetail] = useState<any>(null),
     [orderForm, setOrderForm] = useState(ORDER_EMPTY),
-    [line, setLine] = useState({ name: "", quantity: 1, unitPriceCents: 0 }),
+    [line, setLine] = useState({ name: "", quantity: "1", price: "" }),
+    [editingPart, setEditingPart] = useState<OrderPart | null>(null),
     [update, setUpdate] = useState({
       title: "",
       message: "",
@@ -102,7 +117,8 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       photoUrl: null,
       customerVisible: true,
     }),
-    [status, setStatus] = useState("");
+    [status, setStatus] = useState(""),
+    [selectedStatus, setSelectedStatus] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [detailTab, setDetailTab] = useState("summary");
@@ -205,13 +221,17 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
     }
   }
   async function open(id: string) {
-    setDetail(
-      await apiFetch(
-        permissions.includes("view_workshop_financials")
-          ? `/api/admin/workshop/orders/${id}/financials`
-          : `/api/admin/workshop/orders/${id}`,
-      ),
+    const next: any = await apiFetch(
+      permissions.includes("view_workshop_financials")
+        ? `/api/admin/workshop/orders/${id}/financials`
+        : `/api/admin/workshop/orders/${id}`,
     );
+    setDetail(next);
+    setSelectedStatus(next.order.status);
+    setUpdate((current) => ({
+      ...current,
+      progressPercent: STATUS_PROGRESS[next.order.status] ?? 0,
+    }));
   }
   async function change(next: string) {
     if (!detail) return;
@@ -221,7 +241,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           status: next,
-          publicMessage: `Estado actualizado: ${next}`,
+          publicMessage: null,
           internalReason: null,
           customerVisible: true,
           force: false,
@@ -232,34 +252,83 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
       show(e);
     }
   }
-  async function add(kind: "services" | "parts") {
+  async function savePart(event: FormEvent) {
+    event.preventDefault();
     if (!detail) return;
-    const body =
-      kind === "services"
-        ? {
-            serviceName: line.name,
-            description: null,
-            quantity: line.quantity,
-            unitPriceCents: line.unitPriceCents,
-            isCustomerVisible: true,
-            status: "pending",
-          }
-        : {
-            partName: line.name,
-            brand: null,
-            sku: null,
-            description: null,
-            quantity: line.quantity,
-            unitPriceCents: line.unitPriceCents,
-            isCustomerVisible: true,
-            status: "planned",
-          };
+    const unitPriceCents = parseMxnToCents(line.price);
+    const quantity = Number(line.quantity);
+    if (!line.name.trim()) {
+      setStatus("Escribe el nombre de la pieza.");
+      return;
+    }
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      setStatus("La cantidad debe ser un número entero mayor a cero.");
+      return;
+    }
+    if (unitPriceCents === null) {
+      setStatus("Escribe el precio en pesos con máximo dos decimales.");
+      return;
+    }
     try {
-      await apiFetch(`/api/admin/workshop/orders/${detail.order.id}/${kind}`, {
-        method: "POST",
+      await apiFetch(
+        `/api/admin/workshop/orders/${detail.order.id}/parts${editingPart ? `/${editingPart.id}` : ""}`,
+        {
+        method: editingPart ? "PUT" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          partName: line.name.trim(),
+          ...(editingPart ? {} : { brand: null, sku: null, description: null }),
+          quantity,
+          unitPriceCents,
+          ...(editingPart ? {} : { isCustomerVisible: true, status: "planned" }),
+        }),
       });
+      setLine({ name: "", quantity: "1", price: "" });
+      setEditingPart(null);
+      setStatus(editingPart ? "Cambios de la pieza guardados." : "Pieza agregada a la orden.");
+      await open(detail.order.id);
+    } catch (e) {
+      show(e);
+    }
+  }
+  function editPart(part: OrderPart) {
+    setEditingPart(part);
+    setLine({
+      name: part.partName,
+      quantity: String(part.quantity),
+      price:
+        part.unitPriceCents === undefined
+          ? ""
+          : (part.unitPriceCents / 100).toFixed(2),
+    });
+  }
+  async function updatePartStatus(part: OrderPart, next: string) {
+    if (!detail) return;
+    try {
+      await apiFetch(
+        `/api/admin/workshop/orders/${detail.order.id}/parts/${part.id}`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status: next }),
+        },
+      );
+      await open(detail.order.id);
+    } catch (e) {
+      show(e);
+    }
+  }
+  async function removePart(part: OrderPart) {
+    if (!detail || !confirm(`¿Quitar "${part.partName}" de esta orden?`)) return;
+    try {
+      await apiFetch(
+        `/api/admin/workshop/orders/${detail.order.id}/parts/${part.id}`,
+        { method: "DELETE" },
+      );
+      if (editingPart?.id === part.id) {
+        setEditingPart(null);
+        setLine({ name: "", quantity: "1", price: "" });
+      }
       await open(detail.order.id);
     } catch (e) {
       show(e);
@@ -267,12 +336,22 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
   }
   async function publish() {
     if (!detail) return;
-    await apiFetch(`/api/admin/workshop/orders/${detail.order.id}/updates`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(update),
-    });
-    await open(detail.order.id);
+    try {
+      await apiFetch(`/api/admin/workshop/orders/${detail.order.id}/updates`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...update,
+          title: update.title.trim(),
+          message: update.message.trim(),
+        }),
+      });
+      setUpdate((current) => ({ ...current, title: "", message: "" }));
+      setStatus("Actualización enviada al cliente.");
+      await open(detail.order.id);
+    } catch (e) {
+      show(e);
+    }
   }
   async function token() {
     if (!detail) return;
@@ -524,7 +603,7 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
           Estado
           <select value={orderFilter} onChange={(event) => setOrderFilter(event.target.value)}>
             <option value="all">Todos los estados</option>
-            {["received", "diagnosis", "approved", "in_progress", "ready", "delivered"].map((item) => (
+            {ORDER_STATES.map((item) => (
               <option key={item} value={item}>{statusLabel(item)}</option>
             ))}
           </select>
@@ -573,11 +652,29 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
               <Card className="order-summary-next"><small>Próxima acción</small><strong>{PRIMARY_TRANSITION[detail.order.status] ? TRANSITION_LABEL[PRIMARY_TRANSITION[detail.order.status]!] : "Sin acciones pendientes"}</strong></Card>
             </div>
           </section>}
-          {detailTab === "status" && <section className="order-status-panel">
-            <div className="current-order-status"><small>Estado actual</small><StatusBadge status={detail.order.status} /></div>
-            <Stepper status={detail.order.status} />
-            <label>Actualizar estado<select value={detail.order.status} onChange={(event) => change(event.target.value)}>{ORDER_STATES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}</select></label>
-          </section>}
+          {detailTab === "status" && <div className="order-status-layout">
+            <section className="order-status-panel">
+              <div className="current-order-status"><div><small>Estado actual</small><strong>{statusLabel(detail.order.status)}</strong></div><StatusBadge status={detail.order.status} /></div>
+              <Stepper status={detail.order.status} />
+              {PRIMARY_TRANSITION[detail.order.status] && <div className="order-next-step"><small>Siguiente paso recomendado</small><strong>{TRANSITION_LABEL[PRIMARY_TRANSITION[detail.order.status]!]}</strong><p>Usa el botón principal de la parte inferior cuando la bicicleta esté lista para avanzar.</p></div>}
+              <details className="order-manual-status">
+                <summary>Cambiar a otro estado</summary>
+                <div>
+                  <label htmlFor="workshop-order-status">Nuevo estado</label>
+                  <select id="workshop-order-status" value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value)}>{ORDER_STATES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}</select>
+                  <Button type="button" variant="secondary" disabled={selectedStatus === detail.order.status} onClick={() => change(selectedStatus)}>Guardar cambio</Button>
+                </div>
+              </details>
+            </section>
+            <Card className="detail-section workshop-update-card">
+              <header><div><p className="page-eyebrow">Visible para el cliente</p><h3>Enviar actualización</h3></div><span>Opcional</span></header>
+              <p>Comparte una nota breve solo cuando haya algo importante que comunicar.</p>
+              <label>Título<input placeholder="Ej. Diagnóstico terminado" value={update.title} onChange={(e) => setUpdate({ ...update, title: e.target.value })} /></label>
+              <label>Mensaje<textarea placeholder="Explica el avance en palabras sencillas" value={update.message} onChange={(e) => setUpdate({ ...update, message: e.target.value })} /></label>
+              <label className="workshop-progress-field"><span>Progreso estimado <output>{update.progressPercent}%</output></span><input type="range" min="0" max="100" step="5" value={update.progressPercent} onChange={(e) => setUpdate({ ...update, progressPercent: Number(e.target.value) })} /></label>
+              <Button type="button" disabled={!update.title.trim() || !update.message.trim()} onClick={publish}>Enviar al cliente</Button>
+            </Card>
+          </div>}
           {detailTab === "services" && <WorkshopServices
             orderId={detail.order.id}
             services={detail.services}
@@ -591,81 +688,28 @@ export function Workshop({ permissions = [] }: { permissions?: string[] }) {
               {detail.order.discountCents > 0 && <div><dt>Descuento</dt><dd>−${(detail.order.discountCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}</dd></div>}
               <div className="order-cost-total"><dt>Total</dt><dd>{detail.order.totalCents === undefined ? "Restringido" : `$${(detail.order.totalCents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN`}</dd></div>
             </dl>
-          <Card className="detail-section"><h3>Agregar pieza</h3>
-          <label>
-            Nombre
-            <input
-              value={line.name}
-              onChange={(e) => setLine({ ...line, name: e.target.value })}
-            />
-          </label>
-          <label>
-            Cantidad
-            <input
-              type="number"
-              min="1"
-              value={line.quantity}
-              onChange={(e) =>
-                setLine({ ...line, quantity: Number(e.target.value) })
-              }
-            />
-          </label>
-          <label>
-            Precio centavos
-            <input
-              type="number"
-              min="0"
-              value={line.unitPriceCents}
-              onChange={(e) =>
-                setLine({ ...line, unitPriceCents: Number(e.target.value) })
-              }
-            />
-          </label>
-          <button type="button" onClick={() => add("parts")}>
-            Agregar pieza
-          </button>
-          </Card>
+          <section className="workshop-parts">
+            <div className="workshop-services-heading"><div><p className="page-eyebrow">Orden</p><h4>Piezas</h4></div><span>{detail.parts.length}</span></div>
+            {detail.parts.length > 0 && <div className="selected-services order-parts-list">
+              {detail.parts.map((part: OrderPart) => <article key={part.id}>
+                <span className={`service-state service-state--${part.status}`} aria-hidden="true" />
+                <div><h5>{part.partName}</h5><p>{part.quantity} × {part.unitPriceCents === undefined ? "Restringido" : formatMxn(part.unitPriceCents)}</p><small>{statusLabel(part.status)} · {part.isCustomerVisible ? "Visible para cliente" : "Uso interno"}</small></div>
+                <details className="service-actions-menu"><summary aria-label={`Acciones para ${part.partName}`}>•••</summary><div><button type="button" onClick={() => editPart(part)}>Editar</button><button type="button" onClick={() => updatePartStatus(part, "ordered")}>Marcar pedida</button><button type="button" onClick={() => updatePartStatus(part, "received")}>Marcar recibida</button><button type="button" onClick={() => updatePartStatus(part, "installed")}>Marcar instalada</button><button type="button" onClick={() => updatePartStatus(part, "cancelled")}>Cancelar</button><button type="button" onClick={() => removePart(part)}>Eliminar</button></div></details>
+              </article>)}
+            </div>}
+            <Card className="detail-section workshop-part-form"><h3>{editingPart ? "Editar pieza" : "Agregar pieza"}</h3>
+              <form onSubmit={savePart}>
+                <label>Nombre<input required placeholder="Ej. Desviador trasero" value={line.name} onChange={(e) => setLine({ ...line, name: e.target.value })} /></label>
+                <div className="workshop-part-fields"><label>Cantidad<input type="number" min="1" step="1" value={line.quantity} onChange={(e) => setLine({ ...line, quantity: e.target.value })} /></label><label>Precio unitario (MXN)<input required inputMode="decimal" placeholder="1672.00" value={line.price} onChange={(e) => setLine({ ...line, price: e.target.value })} onBlur={() => { const cents = parseMxnToCents(line.price); if (cents !== null) setLine({ ...line, price: (cents / 100).toFixed(2) }); }} /></label></div>
+                <div className="workshop-part-actions"><Button>{editingPart ? "Guardar cambios" : "Agregar pieza"}</Button>{editingPart && <Button type="button" variant="ghost" onClick={() => { setEditingPart(null); setLine({ name: "", quantity: "1", price: "" }); }}>Cancelar</Button>}</div>
+              </form>
+            </Card>
+          </section>
           </section>}
           {detailTab === "customer" && <section className="order-customer-panel">
             <Card><small>Cliente</small><h3>{detailCustomer?.firstName ?? "Cliente registrado"} {detailCustomer?.lastName ?? ""}</h3><p>{detailCustomer?.phone ?? "Teléfono no disponible en esta vista"}</p></Card>
             <div className="order-customer-actions"><Button type="button" variant="secondary" onClick={token}>Generar seguimiento</Button><Button type="button" onClick={whatsapp}>Preparar WhatsApp</Button></div>
           </section>}
-          {detailTab === "status" && <Card className="detail-section"><h3>Publicar avance</h3>
-          <label>
-            Título
-            <input
-              value={update.title}
-              onChange={(e) => setUpdate({ ...update, title: e.target.value })}
-            />
-          </label>
-          <label>
-            Mensaje
-            <textarea
-              value={update.message}
-              onChange={(e) =>
-                setUpdate({ ...update, message: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Progreso
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={update.progressPercent}
-              onChange={(e) =>
-                setUpdate({
-                  ...update,
-                  progressPercent: Number(e.target.value),
-                })
-              }
-            />
-          </label>
-          <button type="button" onClick={publish}>
-            Publicar
-          </button>
-          </Card>}
           </div>
           <footer className="workshop-detail-sticky">
             {PRIMARY_TRANSITION[detail.order.status] ? <Button type="button" onClick={() => change(PRIMARY_TRANSITION[detail.order.status]!)}>{TRANSITION_LABEL[PRIMARY_TRANSITION[detail.order.status]!]}</Button> : <span>{statusLabel(detail.order.status)}</span>}

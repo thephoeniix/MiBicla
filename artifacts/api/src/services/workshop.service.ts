@@ -1,7 +1,8 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   administrators,
   customerBicycles,
+  customerLoyaltyBalance,
   customerPublicTokens,
   customers,
   rateLimits,
@@ -25,6 +26,9 @@ import {
 } from "@mi-bicla/shared";
 import type { z } from "zod";
 import type {
+  CustomerBicycleInput,
+  CustomerBicycleUpdate,
+  CustomerWorkshopRequest,
   bicycleSchema,
   workshopOrderSchema,
   workshopPartSchema,
@@ -44,17 +48,13 @@ type Part = z.infer<typeof workshopPartSchema>;
 type Update = z.infer<typeof workshopUpdateSchema>;
 type Status = z.infer<typeof workshopStatusSchema>;
 export const STATUS_TRANSITIONS: Record<string, readonly string[]> = {
-  received: ["inspection", "cancelled"],
-  inspection: ["diagnosis", "cancelled"],
-  diagnosis: ["waiting_approval", "cancelled"],
-  waiting_approval: ["approved", "cancelled"],
-  approved: ["in_progress", "cancelled"],
-  in_progress: ["waiting_parts", "quality_check", "cancelled"],
-  waiting_parts: ["in_progress", "cancelled"],
-  quality_check: ["ready", "in_progress", "cancelled"],
+  received: ["inspection"],
+  inspection: ["in_progress"],
+  in_progress: ["waiting_parts", "quality_check"],
+  waiting_parts: ["in_progress"],
+  quality_check: ["ready", "in_progress"],
   ready: ["delivered"],
   delivered: [],
-  cancelled: [],
 };
 export function canTransition(from: string, to: string) {
   return STATUS_TRANSITIONS[from]?.includes(to) ?? false;
@@ -206,6 +206,106 @@ export class WorkshopService {
       )
       .orderBy(asc(customerBicycles.createdAt));
   }
+  listCustomerBicycles(customerId: string) {
+    return this.db.select({
+      id: customerBicycles.id,
+      nickname: customerBicycles.nickname,
+      brand: customerBicycles.brand,
+      model: customerBicycles.model,
+      year: customerBicycles.year,
+      bikeType: customerBicycles.bikeType,
+      color: customerBicycles.color,
+      wheelSize: customerBicycles.wheelSize,
+      brakeType: customerBicycles.brakeType,
+      suspensionType: customerBicycles.suspensionType,
+      drivetrain: customerBicycles.drivetrain,
+      generalCondition: customerBicycles.generalCondition,
+      serialNumber: customerBicycles.serialNumber,
+      frameNumber: customerBicycles.frameNumber,
+      photoUrl: customerBicycles.photoUrl,
+      status: customerBicycles.status,
+      updatedAt: customerBicycles.updatedAt,
+    }).from(customerBicycles).where(and(
+      eq(customerBicycles.customerId, customerId),
+      isNull(customerBicycles.deletedAt),
+    )).orderBy(asc(customerBicycles.createdAt));
+  }
+  async createCustomerBicycle(customerId: string, input: CustomerBicycleInput) {
+    const [row] = await this.db.insert(customerBicycles).values({
+      ...input,
+      customerId,
+      status: "active",
+    }).returning();
+    return row ?? null;
+  }
+  async updateCustomerBicycle(
+    customerId: string,
+    bicycleId: string,
+    input: CustomerBicycleUpdate,
+  ) {
+    const [row] = await this.db.update(customerBicycles).set({
+      ...input,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(customerBicycles.id, bicycleId),
+      eq(customerBicycles.customerId, customerId),
+      isNull(customerBicycles.deletedAt),
+    )).returning();
+    return row ?? null;
+  }
+  listCustomerRequests(customerId: string) {
+    return this.db.select({
+      requestNumber: workshopRequests.requestNumber,
+      bicycleId: workshopRequests.bicycleId,
+      problemDescription: workshopRequests.problemDescription,
+      status: workshopRequests.status,
+      createdAt: workshopRequests.createdAt,
+      convertedOrderId: workshopRequests.convertedOrderId,
+    }).from(workshopRequests).where(eq(workshopRequests.customerId, customerId))
+      .orderBy(desc(workshopRequests.createdAt));
+  }
+  async createCustomerWorkshopRequest(
+    customerId: string,
+    input: CustomerWorkshopRequest,
+  ) {
+    return this.db.transaction(async (tx) => {
+      const [[customer], [bike]] = await Promise.all([
+        tx.select().from(customers).where(and(
+          eq(customers.id, customerId),
+          eq(customers.status, "active"),
+          isNull(customers.deletedAt),
+        )).limit(1),
+        tx.select().from(customerBicycles).where(and(
+          eq(customerBicycles.id, input.bicycleId),
+          eq(customerBicycles.customerId, customerId),
+          isNull(customerBicycles.deletedAt),
+        )).limit(1),
+      ]);
+      if (!customer || !bike) return null;
+      const description = input.serviceName
+        ? `${input.serviceName}\n\n${input.problemDescription}`
+        : input.problemDescription;
+      const [request] = await tx.insert(workshopRequests).values({
+        requestNumber: num("SOL"),
+        customerId,
+        bicycleId: bike.id,
+        customerName: `${customer.firstName} ${customer.lastName}`,
+        customerPhone: customer.phone,
+        customerEmail: customer.email,
+        bikeBrand: bike.brand,
+        bikeModel: bike.model,
+        bikeType: bike.bikeType,
+        problemDescription: description,
+        preferredContactMethod: input.preferredContactMethod,
+        status: "pending",
+      }).returning({
+        requestNumber: workshopRequests.requestNumber,
+        status: workshopRequests.status,
+        createdAt: workshopRequests.createdAt,
+      });
+      return request ?? null;
+    });
+  }
   async createBicycle(input: Bicycle, admin: string) {
     const [row] = await this.db
       .insert(customerBicycles)
@@ -336,7 +436,7 @@ export class WorkshopService {
         .limit(1);
       if (!request || request.status === "converted")
         throw new Error("Solicitud no disponible");
-      let customerId = ids.customerId;
+      let customerId = ids.customerId ?? request.customerId ?? undefined;
       if (!customerId) {
         const names = request.customerName.trim().split(/\s+/),
           [customer] = await tx
@@ -354,11 +454,14 @@ export class WorkshopService {
         if (!customer) throw new Error("No se pudo crear cliente");
         customerId = customer.id;
         const customerToken = generateSessionToken();
+        await tx.insert(customerLoyaltyBalance).values({ customerId });
         await tx
           .insert(customerPublicTokens)
           .values({ customerId, publicTokenHash: sha256(customerToken) });
       }
-      let bicycleId = ids.bicycleId;
+      const requestBelongsToCustomer = customerId === request.customerId;
+      let bicycleId = ids.bicycleId ??
+        (requestBelongsToCustomer ? request.bicycleId ?? undefined : undefined);
       if (!bicycleId) {
         const [bike] = await tx
           .insert(customerBicycles)
@@ -374,6 +477,14 @@ export class WorkshopService {
           .returning();
         if (!bike) throw new Error("No se pudo crear bicicleta");
         bicycleId = bike.id;
+      } else {
+        const [ownedBicycle] = await tx.select({ id: customerBicycles.id })
+          .from(customerBicycles).where(and(
+            eq(customerBicycles.id, bicycleId),
+            eq(customerBicycles.customerId, customerId),
+            isNull(customerBicycles.deletedAt),
+          )).limit(1);
+        if (!ownedBicycle) throw new Error("La bicicleta no pertenece al cliente");
       }
       const [order] = await tx
         .insert(workshopOrders)
@@ -396,7 +507,7 @@ export class WorkshopService {
         workshopOrderId: order.id,
         newStatus: "received",
         changedBy: admin,
-        publicMessage: "Bicicleta recibida",
+        publicMessage: null,
       });
       await tx
         .update(workshopRequests)
@@ -415,6 +526,13 @@ export class WorkshopService {
   async createOrder(input: OrderInput, admin: string) {
     const token = generateSessionToken();
     return this.db.transaction(async (tx) => {
+      const [ownedBicycle] = await tx.select({ id: customerBicycles.id })
+        .from(customerBicycles).where(and(
+          eq(customerBicycles.id, input.bicycleId),
+          eq(customerBicycles.customerId, input.customerId),
+          isNull(customerBicycles.deletedAt),
+        )).limit(1);
+      if (!ownedBicycle) throw new Error("La bicicleta no pertenece al cliente");
       const [order] = await tx
         .insert(workshopOrders)
         .values({
@@ -436,7 +554,7 @@ export class WorkshopService {
         workshopOrderId: order.id,
         newStatus: "received",
         changedBy: admin,
-        publicMessage: "Bicicleta recibida",
+        publicMessage: null,
       });
       return { order, publicToken: token };
     });
@@ -446,6 +564,65 @@ export class WorkshopService {
       .select()
       .from(workshopOrders)
       .orderBy(asc(workshopOrders.createdAt));
+  }
+  async listCustomerOrders(customerId: string) {
+    const [settings] = await this.db.select().from(workshopSettings).limit(1);
+    const labels = settings?.publicStatusLabels ?? {};
+    const rows = await this.db.select({ order: workshopOrders, bike: customerBicycles })
+      .from(workshopOrders)
+      .innerJoin(customerBicycles, and(
+        eq(workshopOrders.bicycleId, customerBicycles.id),
+        eq(customerBicycles.customerId, customerId),
+        isNull(customerBicycles.deletedAt),
+      ))
+      .where(eq(workshopOrders.customerId, customerId))
+      .orderBy(desc(workshopOrders.updatedAt));
+    return rows.map(({ order, bike }) => ({
+      orderNumber: order.orderNumber,
+      bicycle: {
+        id: bike.id,
+        nickname: bike.nickname,
+        brand: bike.brand,
+        model: bike.model,
+        photoUrl: bike.photoUrl,
+      },
+      publicStatus: labels[order.status] ?? order.status,
+      customerVisibleSummary: order.customerVisibleSummary,
+      estimatedCompletionAt: order.estimatedCompletionAt,
+      readyAt: order.readyAt,
+      deliveredAt: order.deliveredAt,
+      totalCents: order.totalCents,
+      paymentStatus: order.paymentStatus,
+      isActive: !["delivered", "cancelled"].includes(order.status),
+      updatedAt: order.updatedAt,
+    }));
+  }
+  async getCustomerOrder(customerId: string, orderNumber: string) {
+    const [[match], [settings]] = await Promise.all([
+      this.db.select({ order: workshopOrders, bike: customerBicycles })
+        .from(workshopOrders)
+        .innerJoin(customerBicycles, and(
+          eq(workshopOrders.bicycleId, customerBicycles.id),
+          eq(customerBicycles.customerId, customerId),
+          isNull(customerBicycles.deletedAt),
+        ))
+        .where(and(
+          eq(workshopOrders.orderNumber, orderNumber),
+          eq(workshopOrders.customerId, customerId),
+        )).limit(1),
+      this.db.select().from(workshopSettings).limit(1),
+    ]);
+    if (!match) return null;
+    const detail = await this.customerOrderProjection(
+      match.order,
+      match.bike,
+      settings?.publicStatusLabels ?? {},
+    );
+    return detail ? {
+      ...detail,
+      totalCents: match.order.totalCents,
+      paymentStatus: match.order.paymentStatus,
+    } : null;
   }
   async getOrder(id: string, includeFinancial = false) {
     const [order] = await this.db
@@ -751,23 +928,33 @@ export class WorkshopService {
       .update(workshopPublicTokens)
       .set({ lastUsedAt: now })
       .where(eq(workshopPublicTokens.id, match.token.id));
-    const detail = await this.getOrder(match.order.id);
+    return this.customerOrderProjection(
+      match.order,
+      match.bike,
+      settings?.publicStatusLabels ?? {},
+    );
+  }
+  private async customerOrderProjection(
+    order: typeof workshopOrders.$inferSelect,
+    bike: typeof customerBicycles.$inferSelect,
+    labels: Record<string, string>,
+  ) {
+    const detail = await this.getOrder(order.id);
     if (!detail) return null;
-    const labels = settings?.publicStatusLabels ?? {};
     return {
-      orderNumber: match.order.orderNumber,
+      orderNumber: order.orderNumber,
       bicycle: {
-        nickname: match.bike.nickname,
-        brand: match.bike.brand,
-        model: match.bike.model,
-        bikeType: match.bike.bikeType,
-        color: match.bike.color,
-        photoUrl: match.bike.photoUrl,
+        nickname: bike.nickname,
+        brand: bike.brand,
+        model: bike.model,
+        bikeType: bike.bikeType,
+        color: bike.color,
+        photoUrl: bike.photoUrl,
       },
-      publicStatus: labels[match.order.status] ?? match.order.status,
-      customerVisibleSummary: match.order.customerVisibleSummary,
-      estimatedCompletionAt: match.order.estimatedCompletionAt,
-      readyAt: match.order.readyAt,
+      publicStatus: labels[order.status] ?? order.status,
+      customerVisibleSummary: order.customerVisibleSummary,
+      estimatedCompletionAt: order.estimatedCompletionAt,
+      readyAt: order.readyAt,
       updates: detail.updates
         .filter((x) => x.customerVisible)
         .map(
@@ -805,7 +992,7 @@ export class WorkshopService {
           publicMessage,
           createdAt,
         })),
-      updatedAt: match.order.updatedAt,
+      updatedAt: order.updatedAt,
     };
   }
   async whatsapp(orderId: string, admin: string, baseUrl: string) {
@@ -826,11 +1013,20 @@ export class WorkshopService {
       template =
         settings?.readyWhatsappTemplate ||
         "Hola {nombre}. Tu bicicleta {bicicleta} está {estado}. Orden: {orden}. Seguimiento: {url}";
+    const statusLabels: Record<string, string> = {
+      received: "recibida",
+      inspection: "en inspección",
+      in_progress: "en reparación",
+      waiting_parts: "esperando piezas",
+      quality_check: "en control de calidad",
+      ready: "lista para recoger",
+      delivered: "entregada",
+    };
     const url = workshopWhatsappUrl(customer?.phone ?? "", template, {
       nombre: customer?.firstName ?? "",
       bicicleta: bike?.nickname || bike?.brand || "bicicleta",
       orden: detail.order.orderNumber,
-      estado: detail.order.status,
+      estado: statusLabels[detail.order.status] ?? detail.order.status,
       total: (
         ("totalCents" in detail.order
           ? (detail.order.totalCents as number)

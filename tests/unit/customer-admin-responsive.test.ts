@@ -4,6 +4,8 @@ import { buildCustomerPayload } from "../../artifacts/web/pages/admin/Customers"
 
 const customersSource = readFileSync("artifacts/web/pages/admin/Customers.tsx", "utf8");
 const bicycleFormSource = readFileSync("artifacts/web/components/BicycleForm.tsx", "utf8");
+const portalSource = readFileSync("artifacts/web/pages/customer/CustomerPortal.tsx", "utf8");
+const uiSource = readFileSync("artifacts/web/components/ui.tsx", "utf8");
 const requestSource = readFileSync("artifacts/web/pages/public/WorkshopRequest.tsx", "utf8");
 const styles = readFileSync("artifacts/web/style.css", "utf8");
 
@@ -55,12 +57,35 @@ describe("errores comprensibles y presentación móvil", () => {
     expect(requestSource).not.toContain("customerName: String must contain");
   });
 
-  it("limita la tipografía y reserva espacio para navegación y safe areas", () => {
+  it("limita la tipografía y no reserva espacio para una barra pública", () => {
     expect(styles).toContain("-webkit-text-size-adjust: 100%");
-    expect(styles).toMatch(/\.public-hero h1\s*\{[^}]*font-size:\s*clamp\(3\.75rem, 16vw, 5\.25rem\)/);
-    expect(styles).toContain("min-height: max(520px, calc(100dvh - 80px))");
-    expect(styles).toContain("padding-bottom: calc(92px + env(safe-area-inset-bottom))");
-    expect(styles).toContain("right: max(8px, env(safe-area-inset-right))");
-    expect(styles).toContain("left: max(8px, env(safe-area-inset-left))");
+    expect(styles).toMatch(/@media \(max-width: 600px\)[\s\S]*\.public-hero h1\s*\{[^}]*font-size:\s*clamp\(3\.7rem, 19vw, 5\.3rem\)/);
+    expect(styles).toContain("min-height: 650px");
+    expect(styles).toMatch(/\.public-shell\s*\{[^}]*padding-bottom:\s*0/s);
+    expect(styles).toContain("env(safe-area-inset-bottom)");
+  });
+
+  it("mantiene formularios modales completos en cualquier celular", () => {
+    expect(uiSource).toContain("export function FormDialog");
+    expect(bicycleFormSource).toContain("<FormDialog");
+    expect(bicycleFormSource).toContain('className="form-dialog-body"');
+    expect(portalSource).toContain("<FormDialog");
+    expect(styles).toContain(".ui-form-dialog");
+    expect(styles).toContain("height: 100dvh");
+    expect(styles).toContain("grid-template-rows: auto minmax(0, 1fr) auto");
+    expect(styles).toContain("env(safe-area-inset-bottom)");
+  });
+
+  it("centra el estado activo y los iconos del seguimiento", () => {
+    expect(portalSource).toContain('className="customer-home-bike-copy"');
+    expect(styles).toContain(
+      ".customer-home-service .customer-home-bike-copy .status-badge",
+    );
+    expect(styles).toContain(
+      ".customer-order-detail .ui-stepper li > span",
+    );
+    expect(styles).toContain(
+      ".customer-order-detail .ui-stepper i > .ui-stepper-icon",
+    );
   });
 });

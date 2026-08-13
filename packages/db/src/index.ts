@@ -5,3 +5,4 @@ export * from "./schema/phase-2.js";
 export * from "./schema/workshop.js";
 export * from "./schema/customer-auth.js";
 export * from "./schema/customer-registration.js";
+export * from "./schema/commerce.js";

@@ -114,12 +114,22 @@ describe("panel de solicitudes de acceso — datos existentes, sin nuevos endpoi
       customersSource.indexOf("async function save"),
     );
     expect(approveBlock).toContain("setRegistrationDetail(null)");
-    expect(approveBlock).toContain(
-      'await apiFetch<RegistrationRequest[]>("/api/admin/customer-registration-requests")',
-    );
-    expect(approveBlock).toContain("setRegistrationRequests(requests)");
+    expect(approveBlock).toContain("await loadRegistrationRequests()");
     expect(approveBlock).toContain('if (action === "approve") {');
     expect(approveBlock).toContain("await load();");
+  });
+
+  it("actualiza solicitudes al cargar, volver a la pestaña y cada 30 segundos", () => {
+    expect(customersSource).toContain("void loadRegistrationRequests();");
+    expect(customersSource).toContain('window.addEventListener("focus", refresh)');
+    expect(customersSource).toContain("window.setInterval(refresh, 30_000)");
+    expect(customersSource).toContain('window.removeEventListener("focus", refresh)');
+  });
+
+  it("prepara una pestaña de WhatsApp y conserva el enlace como fallback", () => {
+    expect(decideRegistrationSource).toContain('window.open("about:blank", "_blank")');
+    expect(decideRegistrationSource).toContain("whatsappWindow.location.replace(result.whatsappUrl)");
+    expect(customersSource).toContain("Abrir WhatsApp");
   });
 
   it("no introduce OTP, SMS ni envío o activación automática", () => {
@@ -137,7 +147,7 @@ describe("panel de solicitudes de acceso — datos existentes, sin nuevos endpoi
     expect(loadCalls).toHaveLength(1);
     expect(decideRegistrationSource).toContain('if (action === "approve") {');
     // La rama de éxito refresca registrationRequests para ambas acciones.
-    expect(decideRegistrationSource).toContain("setRegistrationRequests(requests)");
+    expect(decideRegistrationSource).toContain("await loadRegistrationRequests()");
   });
 
   it("el enlace tel: solo aparece cuando la solicitud tiene teléfono", () => {

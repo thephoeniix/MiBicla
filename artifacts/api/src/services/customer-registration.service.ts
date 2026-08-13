@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import {
   customerCredentials,
   customerLoyaltyBalance,
@@ -64,7 +64,7 @@ export class CustomerRegistrationService {
       status: "expired", passwordHash: null, decidedAt: now, updatedAt: now,
     }).where(and(
       eq(customerRegistrationRequests.status, "pending"),
-      sql`${customerRegistrationRequests.expiresAt} <= ${now}`,
+      lte(customerRegistrationRequests.expiresAt, now),
     ));
     return this.db.select({
       reviewId: customerRegistrationRequests.reviewId,

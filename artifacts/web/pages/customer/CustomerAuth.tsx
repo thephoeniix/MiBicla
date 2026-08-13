@@ -121,7 +121,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext value={{ state, customer, restore, signIn, signOut }}>{children}</AuthContext>;
 }
 
-function useCustomerAuth() {
+export function useCustomerAuth() {
   const value = useContext(AuthContext);
   if (!value) throw new Error("CustomerAuthProvider requerido");
   return value;
@@ -352,58 +352,20 @@ function PasswordTokenForm({ purpose }: { purpose: "activation" | "recovery" }) 
 export const CustomerActivation = () => <PasswordTokenForm purpose="activation" />;
 export const CustomerRecovery = () => <PasswordTokenForm purpose="recovery" />;
 
-export function CustomerPortal() {
-  const auth = useCustomerAuth();
-  const [customer, setCustomer] = useState<CustomerIdentity | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let current = true;
-    if (auth.state === "anonymous") {
-      const next = `${location.pathname}${location.search}`;
-      location.replace(`/iniciar-sesion?next=${encodeURIComponent(next)}`);
-    }
-    if (auth.state === "authenticated")
-      getCustomerMe()
-        .then((identity) => {
-          if (current) setCustomer(identity);
-        })
-        .catch((caught) => {
-          if (!current) return;
-          if (caught instanceof ApiError && caught.status === 401)
-            void auth.restore();
-          else setError("No fue posible consultar tu cuenta.");
-        });
-    return () => {
-      current = false;
-    };
-  }, [auth.state]);
-  if (auth.state === "loading" || auth.state === "anonymous")
-    return <main className="customer-auth-page"><LoadingState label="Preparando tu cuenta…" /></main>;
-  if (auth.state === "error")
-    return <AuthFrame title="NO PUDIMOS CARGAR TU CUENTA" description="Intenta nuevamente más tarde."><Button onClick={() => void auth.restore()}>Reintentar</Button></AuthFrame>;
-  const identity = customer ?? auth.customer;
-  return <div className="customer-shell">
-    <header className="customer-topbar"><a href="/mi" className="app-brand"><BrandLogo variant="full" color="white" /></a><ThemeSelector compact /></header>
-    <Container as="main"><section className="customer-account">
-      <p className="page-eyebrow">PORTAL DEL CLIENTE</p>
-      <h1>Hola{identity?.name ? `, ${identity.name.split(" ")[0]}` : ""}</h1>
-      {error ? <p className="form-error" role="alert">{error}</p> : identity ? <Card>
-        <h2>Datos de tu cuenta</h2>
-        <dl><div><dt>Nombre</dt><dd>{identity.name}</dd></div><div><dt>Teléfono</dt><dd>{identity.phone}</dd></div><div><dt>Estado</dt><dd>Activa</dd></div></dl>
-      </Card> : <LoadingState label="Consultando tus datos…" />}
-      <Button variant="secondary" onClick={() => void auth.signOut().then(() => location.replace("/iniciar-sesion"))}>Cerrar sesión</Button>
-    </section></Container>
-  </div>;
-}
-
 export function CustomerRegistrationInfo() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({ firstName: "", lastName: "", phone: "" });
   const [result, setResult] = useState<null | {
     reference: string; adminReviewUrl: string; expiresAt: string; name: string;
   }>(null);
   const [whatsapp, setWhatsapp] = useState("");
+  const clearFieldError = (field: string) => setFieldErrors((current) => {
+    const next = { ...current };
+    delete next[field];
+    return next;
+  });
   useEffect(() => {
     apiFetch<{ primaryWhatsapp?: string }>("/api/public/business")
       .then((business) => setWhatsapp(business.primaryWhatsapp?.replace(/\D/g, "") ?? ""))
@@ -412,6 +374,16 @@ export function CustomerRegistrationInfo() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
+    const errors: Record<string, string> = {};
+    if (form.firstName.trim().length < 2) errors.firstName = "Escribe un nombre de al menos 2 caracteres.";
+    if (form.lastName.trim().length < 2) errors.lastName = "Escribe apellidos de al menos 2 caracteres.";
+    if (!isValidMexicanPhone(form.phone)) errors.phone = "Escribe un teléfono mexicano válido de 10 dígitos.";
+    setFieldErrors(errors);
+    const firstError = Object.keys(errors)[0];
+    if (firstError) {
+      event.currentTarget.querySelector<HTMLInputElement>(`[name="${firstError}"]`)?.focus();
+      return;
+    }
     if (!event.currentTarget.checkValidity()) {
       event.currentTarget.reportValidity();
       return;
@@ -449,9 +421,9 @@ export function CustomerRegistrationInfo() {
   }
   return <AuthFrame title="SOLICITA TU ACCESO" description="Completa tus datos. Mi Bicla verificará tu número antes de activar tu cuenta.">
     <form className="registration-form" onSubmit={submit} noValidate>
-      <label>Nombre<Input required maxLength={100} autoComplete="given-name" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></label>
-      <label>Apellidos<Input required maxLength={100} autoComplete="family-name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></label>
-      <label>Teléfono<Input required type="tel" inputMode="tel" autoComplete="tel" placeholder="442 000 0000" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+      <label>Nombre<Input name="firstName" required minLength={2} maxLength={100} aria-invalid={Boolean(fieldErrors.firstName)} aria-describedby={fieldErrors.firstName ? "registration-first-name-error" : undefined} autoComplete="given-name" value={form.firstName} onChange={(e) => { clearFieldError("firstName"); setForm({ ...form, firstName: e.target.value }); }} />{fieldErrors.firstName && <small className="field-error" id="registration-first-name-error">{fieldErrors.firstName}</small>}</label>
+      <label>Apellidos<Input name="lastName" required minLength={2} maxLength={100} aria-invalid={Boolean(fieldErrors.lastName)} aria-describedby={fieldErrors.lastName ? "registration-last-name-error" : undefined} autoComplete="family-name" value={form.lastName} onChange={(e) => { clearFieldError("lastName"); setForm({ ...form, lastName: e.target.value }); }} />{fieldErrors.lastName && <small className="field-error" id="registration-last-name-error">{fieldErrors.lastName}</small>}</label>
+      <label>Teléfono<Input name="phone" required type="tel" inputMode="tel" aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? "registration-phone-error" : undefined} autoComplete="tel" placeholder="442 000 0000" value={form.phone} onChange={(e) => { clearFieldError("phone"); setForm({ ...form, phone: e.target.value }); }} />{fieldErrors.phone && <small className="field-error" id="registration-phone-error">{fieldErrors.phone}</small>}</label>
       <label className="privacy-check"><input required type="checkbox" /> Confirmo que estos datos son míos y solicito que Mi Bicla los revise.</label>
       {message && <p className="form-error registration-server-error" role="alert">{message}</p>}
       <Button disabled={busy}>{busy ? "Enviando…" : "Solicitar cuenta"}</Button>

@@ -6,6 +6,9 @@ import {
 } from "@mi-bicla/shared";
 import { createDatabase } from "./client.js";
 import { permissions, rolePermissions, roles } from "./schema.js";
+if (process.env.NODE_ENV === "production" && process.env.SEED_CONFIRM !== "APPLY") {
+  throw new Error("Producción requiere SEED_CONFIRM=APPLY");
+}
 const { db, client } = createDatabase();
 await db.transaction(async (tx) => {
   for (const name of ROLE_NAMES)

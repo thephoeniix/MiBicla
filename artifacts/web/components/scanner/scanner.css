@@ -71,8 +71,11 @@
 .scanner-permission strong { margin-top: 20px; font-size: 20px; }
 .scanner-permission p { max-width: 300px; margin: 8px 0 22px; color: var(--mb-color-inverse-muted); }
 .scanner-permission button,
+.scanner-image-action,
 .scanner-controls button {
+  display: grid;
   min-height: 46px;
+  align-items: center;
   padding: 0 18px;
   color: #fff;
   background: var(--mb-color-brand-500);
@@ -80,6 +83,8 @@
   border-radius: 14px;
   font-weight: 700;
 }
+.scanner-image-action { margin-top: 10px; background: rgb(255 255 255 / .1); cursor: pointer; }
+.scanner-image-action input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .scanner-controls { display: flex; align-items: flex-end; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .scanner-controls label { display: grid; flex: 1; gap: 6px; color: var(--mb-color-inverse-muted); font-size: 11px; }
 .scanner-controls select,
