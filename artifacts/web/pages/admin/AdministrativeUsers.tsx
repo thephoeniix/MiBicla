@@ -172,9 +172,14 @@ export function AdministrativeUsers({ currentUserId }: { currentUserId: string }
         action={<Button type="button" onClick={() => { setFormError(""); setFieldErrors({}); setCreateOpen(true); }}>+ Nueva cuenta</Button>}
       />
       <div className="administrative-users-note">
-        <strong>Roles</strong>
-        <span><b>Administrador:</b> configura y opera todas las áreas del negocio.</span>
-        <span><b>Empleado:</b> atiende clientes y taller sin acceso a configuración sensible.</span>
+        <div>
+          <span className="administrative-role-icon" aria-hidden="true">A</span>
+          <span><b>Administrador</b><small>Configura y opera todas las áreas del negocio.</small></span>
+        </div>
+        <div>
+          <span className="administrative-role-icon" aria-hidden="true">E</span>
+          <span><b>Empleado</b><small>Atiende clientes y taller sin acceso sensible.</small></span>
+        </div>
       </div>
       {items.length ? (
         <div className="administrative-users-list">
@@ -188,11 +193,11 @@ export function AdministrativeUsers({ currentUserId }: { currentUserId: string }
                   <StatusBadge status={item.isActive ? "active" : "inactive"} />
                 </header>
                 <dl>
-                  <div><dt>Rol</dt><dd>{ROLE_LABELS[item.role]}</dd></div>
+                  <div><dt>Rol asignado</dt><dd>{ROLE_LABELS[item.role]}</dd></div>
                   <div><dt>Último acceso</dt><dd>{item.lastLoginAt ? new Date(item.lastLoginAt).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) : "Sin acceso todavía"}</dd></div>
                 </dl>
                 {protectedAccount ? (
-                  <p className="administrative-user-protected">Cuenta protegida. Se administra fuera de este módulo.</p>
+                  <p className="administrative-user-protected"><span aria-hidden="true">◆</span> Cuenta protegida. Se administra fuera de este módulo.</p>
                 ) : (
                   <footer>
                     <label>

@@ -446,58 +446,157 @@ select {
 
 .administrative-users-note {
   display: grid;
-  gap: var(--space-2);
-  margin-bottom: var(--space-5);
-  padding: var(--space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.administrative-users-note > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 16px;
   border: 1px solid var(--app-border);
-  border-left: 4px solid var(--app-primary);
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   background: var(--app-surface);
 }
-.administrative-users-note span { color: var(--app-text-muted); }
-.administrative-users-list { display: grid; gap: var(--space-4); }
+.administrative-role-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  color: var(--app-accent);
+  background: var(--app-accent-soft);
+  border-radius: 11px;
+  font-weight: 850;
+}
+.administrative-users-note b,
+.administrative-users-note small { display: block; }
+.administrative-users-note small {
+  margin-top: 3px;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.administrative-users-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
 .administrative-user-card {
   display: grid;
-  gap: var(--space-4);
-  padding: var(--space-5);
+  min-width: 0;
+  align-content: start;
+  gap: 18px;
+  padding: 22px;
   border: 1px solid var(--app-border);
-  border-radius: var(--radius-xl);
+  border-radius: 18px;
   background: var(--app-surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--app-shadow-sm);
 }
 .administrative-user-card > header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-3);
+  gap: 13px;
 }
-.administrative-user-card h2 { margin: 0; font-size: var(--text-lg); }
-.administrative-user-card header p { margin: .2rem 0 0; color: var(--app-text-muted); overflow-wrap: anywhere; }
+.administrative-user-card h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+.administrative-user-card header p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--app-muted);
+  font-size: 13px;
+}
 .administrative-user-avatar {
   display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 48px;
+  height: 48px;
   place-items: center;
-  border-radius: 50%;
-  background: var(--app-primary-soft);
-  color: var(--app-primary);
-  font-weight: 800;
+  color: var(--app-accent);
+  background: var(--app-accent-soft);
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 850;
 }
-.administrative-user-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: 0; }
-.administrative-user-card dl div { display: grid; gap: .2rem; }
-.administrative-user-card dt { color: var(--app-text-muted); font-size: var(--text-sm); }
-.administrative-user-card dd { margin: 0; font-weight: 700; }
-.administrative-user-card footer { display: flex; align-items: end; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--app-border); }
-.administrative-user-card footer label { display: grid; min-width: 12rem; gap: var(--space-1); font-weight: 700; }
-.administrative-user-protected { margin: 0; color: var(--app-text-muted); font-size: var(--text-sm); }
-.password-requirements { display: block; margin-top: var(--space-1); color: var(--app-text-muted); font-weight: 400; }
+.administrative-user-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.administrative-user-card dl div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 13px 14px;
+  background: var(--app-surface-muted);
+  border-radius: 12px;
+}
+.administrative-user-card dt {
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.administrative-user-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 750;
+}
+.administrative-user-card footer {
+  display: grid;
+  grid-template-columns: minmax(150px, .9fr) auto auto;
+  align-items: end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-border);
+}
+.administrative-user-card footer label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 750;
+}
+.administrative-user-card footer select { min-height: 46px; }
+.administrative-user-card footer .ui-button { padding-inline: 14px; }
+.administrative-user-protected {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 13px 14px;
+  color: var(--app-muted);
+  background: var(--app-surface-muted);
+  border-radius: 12px;
+  font-size: 13px;
+}
+.administrative-user-protected span { color: var(--app-accent); }
+.password-requirements {
+  display: block;
+  margin-top: 4px;
+  color: var(--app-muted);
+  font-weight: 400;
+}
+@media (max-width: 1100px) {
+  .administrative-users-list { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 640px) {
-  .administrative-user-card { padding: var(--space-4); }
+  .administrative-users-note { grid-template-columns: minmax(0, 1fr); }
+  .administrative-user-card { padding: 17px; }
   .administrative-user-card > header { grid-template-columns: auto minmax(0, 1fr); }
   .administrative-user-card > header .status-badge { grid-column: 1 / -1; justify-self: start; }
   .administrative-user-card dl { grid-template-columns: 1fr; }
-  .administrative-user-card footer { align-items: stretch; flex-direction: column; }
-  .administrative-user-card footer label { min-width: 0; }
+  .administrative-user-card footer { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .administrative-user-card footer .ui-button { width: 100%; }
 }
 .form-span {
   grid-column: 1 / -1;

@@ -75,3 +75,26 @@ test("admin workshop shell remains usable at narrow and landscape sizes", async 
     }
   }
 });
+
+test("administrative users keep clear cards and actions across viewports", async ({ page }, testInfo) => {
+  await page.route("**/auth/session", (route) => route.fulfill({ json: { csrfToken: "test", administrator: { id: "owner-1", name: "Kari Maldonado", email: "kari@example.com", role: "owner", permissions: ["manage_employees", "view_reports"] } } }));
+  await page.route("**/api/admin/administrators", (route) => route.fulfill({ json: [
+    { id: "admin-1", name: "Gio MalHer", email: "gio@example.com", role: "admin", isActive: true, lastLoginAt: "2026-08-13T17:46:00.000Z", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-08-13T17:46:00.000Z" },
+    { id: "employee-1", name: "Isbet Murillo", email: "isbet@example.com", role: "employee", isActive: true, lastLoginAt: "2026-08-13T17:21:00.000Z", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-08-13T17:21:00.000Z" },
+    { id: "owner-1", name: "Kari Maldonado", email: "kari@example.com", role: "owner", isActive: true, lastLoginAt: "2026-08-13T20:31:00.000Z", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-08-13T20:31:00.000Z" },
+  ] }));
+
+  for (const [width, height] of [[320, 568], [768, 1024], [1440, 900]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/admin/users");
+    await expect(page.getByRole("heading", { level: 1, name: "Usuarios administrativos" })).toBeVisible();
+    await expect(page.locator(".administrative-user-card")).toHaveCount(3);
+    await expect(page.getByRole("button", { name: "Cambiar contraseña" }).first()).toBeVisible();
+    await expect(page.getByText("Cuenta protegida.")).toBeVisible();
+    await expectViewportFit(page);
+    await testInfo.attach(`admin-users-${width}x${height}`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+  }
+});
