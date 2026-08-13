@@ -22,11 +22,11 @@ describe("acceso al portal del cliente", () => {
     expect(portal).toContain('location.pathname === "/mi/perfil"');
     expect(portal).toContain('"/mi/ordenes"');
     expect(portal).not.toContain("extractPublicToken");
-    expect(portal).toContain(">Inicio</a>");
-    expect(portal).toContain(">Mi tarjeta</a>");
+    expect(portal).toContain('"Inicio", <HomeAssetIcon');
+    expect(portal).toContain('"Mi tarjeta", <FidelityAssetIcon');
     expect(portal).toContain('"Órdenes"');
     expect(portal).toContain('"Bicicletas"');
-    expect(portal).toContain(">Mi perfil</a>");
+    expect(portal).toContain('"Mi perfil", <SettingsIcon');
   });
 
   it("reserva la navegación inferior para /mi y usa cinco accesos útiles", () => {
@@ -36,7 +36,8 @@ describe("acceso al portal del cliente", () => {
     expect(portal).toContain('["/mi/ordenes", "Órdenes"');
     expect(portal).toContain('["/mi/productos", "Productos"');
     expect(portal).toContain("<MoreIcon />");
-    expect(portal).toContain('aria-label="Más opciones del cliente"');
+    expect(portal).toContain('aria-label="Todos los destinos del cliente"');
+    expect(portal).toContain("CUSTOMER_MENU");
   });
 
   it("usa las imágenes gio como lenguaje visual del portal", () => {

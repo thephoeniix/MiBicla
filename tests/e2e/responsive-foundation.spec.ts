@@ -24,12 +24,13 @@ test("customer navigation and QR fit the supported viewport matrix", async ({ pa
     await expect(page.getByRole("heading", { level: 1, name: "Mi tarjeta" })).toBeVisible();
     await expectViewportFit(page);
 
-    await page.getByRole("button", { name: "Más" }).click();
-    const more = page.getByRole("navigation", { name: "Más opciones del cliente" });
-    await expect(more).toBeVisible();
+    await page.getByRole("button", { name: "Menú" }).click();
+    const menu = page.getByRole("dialog", { name: "Menú" });
+    await expect(menu.getByRole("navigation", { name: "Todos los destinos del cliente" }).getByRole("link")).toHaveCount(8);
+    await expect(menu.getByRole("heading", { name: "Taller" })).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(more).toBeHidden();
-    await expect(page.getByRole("button", { name: "Más" })).toBeFocused();
+    await expect(menu).toBeHidden();
+    await expect(page.getByRole("button", { name: "Menú" })).toBeFocused();
 
     await page.getByRole("button", { name: "Ver mi QR" }).click();
     const dialog = page.getByRole("dialog", { name: "Tu código QR" });
@@ -50,7 +51,7 @@ test("customer navigation and QR fit the supported viewport matrix", async ({ pa
 });
 
 test("admin workshop shell remains usable at narrow and landscape sizes", async ({ page }, testInfo) => {
-  await page.route("**/auth/session", (route) => route.fulfill({ json: { csrfToken: "test", administrator: { id: "admin-1", name: "Admin Mi Bicla", email: "admin@example.com", role: "owner", permissions: ["view_workshop_orders", "view_workshop_requests", "manage_workshop_orders", "view_customers"] } } }));
+  await page.route("**/auth/session", (route) => route.fulfill({ json: { csrfToken: "test", administrator: { id: "admin-1", name: "Admin Mi Bicla", email: "admin@example.com", role: "owner", permissions: ["view_reports", "view_customers", "view_loyalty", "view_workshop_orders", "view_workshop_requests", "manage_workshop_orders", "manage_workshop_agreements", "manage_events", "manage_products", "manage_catalog_requests", "view_deposit_settings", "manage_employees", "view_business_settings"] } } }));
   await page.route("**/api/admin/customers**", (route) => route.fulfill({ json: { items: [] } }));
   await page.route("**/api/admin/workshop/requests", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/admin/workshop/orders", (route) => route.fulfill({ json: [{ id: "order-1", orderNumber: "MB-2026-000000000001", status: "waiting_parts", customerId: "customer-1", bicycleId: "bike-1", problemDescription: "Ajuste completo de transmisión y revisión de frenos", customerVisibleSummary: null }] }));
@@ -68,10 +69,34 @@ test("admin workshop shell remains usable at narrow and landscape sizes", async 
       contentType: "image/png",
     });
     if (width < 1024) {
-      await page.getByRole("button", { name: "Más" }).click();
-      await expect(page.getByRole("navigation", { name: "Más secciones" })).toBeVisible();
-      await page.locator("main").click({ position: { x: 1, y: 1 } });
-      await expect(page.getByRole("navigation", { name: "Más secciones" })).toBeHidden();
+      const menuButton = page.getByRole("button", { name: "Abrir navegación administrativa" });
+      await menuButton.click();
+      const drawer = page.getByRole("dialog", { name: "Navegación administrativa" });
+      await expect(drawer).toBeVisible();
+      await expect(drawer.getByRole("link")).toHaveCount(11);
+      await expect(drawer.getByRole("heading", { name: "Operación" })).toBeVisible();
+      await expect(drawer.getByRole("heading", { name: "Comunidad" })).toBeVisible();
+      await expect(drawer.getByRole("heading", { name: "Administración" })).toBeVisible();
+      await expect(drawer.getByRole("heading", { name: "Configuración" })).toBeVisible();
+      await expect(drawer.getByText("Admin Mi Bicla", { exact: true })).toBeVisible();
+      await expect(drawer.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("hidden");
+      await page.keyboard.press("Escape");
+      await expect(drawer).toBeHidden();
+      await expect(menuButton).toBeFocused();
+
+      await menuButton.click();
+      await page.mouse.click(width - 4, height / 2);
+      await expect(drawer).toBeHidden();
+    } else {
+      const sidebar = page.getByRole("complementary", { name: "Panel administrativo" });
+      const toggle = sidebar.getByRole("button", { name: "Contraer navegación" });
+      await expect(toggle).toBeVisible();
+      await toggle.click();
+      await expect(sidebar.getByRole("button", { name: "Expandir navegación" })).toBeVisible();
+      await page.reload();
+      await expect(sidebar.getByRole("button", { name: "Expandir navegación" })).toBeVisible();
+      expect(await page.evaluate(() => localStorage.getItem("mb_admin_sidebar_collapsed"))).toBe("true");
     }
   }
 });

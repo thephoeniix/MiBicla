@@ -9,7 +9,9 @@ import {
 } from "../../artifacts/web/lib/theme";
 import {
   isMobileNavigationActive,
-  MOBILE_NAV,
+  persistSidebarCollapsed,
+  readSidebarCollapsed,
+  SIDEBAR_STORAGE_KEY,
 } from "../../artifacts/web/components/AppShell";
 
 describe("tema global", () => {
@@ -51,12 +53,14 @@ describe("tema global", () => {
 });
 
 describe("navegación móvil autenticada", () => {
-  it("mantiene tres destinos fijos y deja el cuarto control para Más", () => {
-    expect(MOBILE_NAV.map((item) => item.short)).toEqual([
-      "Inicio",
-      "Clientes",
-      "Taller",
-    ]);
+  it("inicia expandida y persiste la preferencia del sidebar", () => {
+    expect(readSidebarCollapsed({ getItem: () => null })).toBe(false);
+    expect(readSidebarCollapsed({ getItem: () => "true" })).toBe(true);
+    const values = new Map<string, string>();
+    persistSidebarCollapsed(true, {
+      setItem: (key, value) => values.set(key, value),
+    });
+    expect([...values.entries()]).toEqual([[SIDEBAR_STORAGE_KEY, "true"]]);
   });
 
   it("activa destinos fijos y vistas hijas sin activar Inicio en todo admin", () => {
@@ -83,13 +87,16 @@ describe("navegación móvil autenticada", () => {
     ).toBe(true);
   });
 
-  it("usa un menú Más para conservar cuatro controles móviles", () => {
+  it("agrupa todos los destinos disponibles en un drawer", () => {
     const source = readFileSync(
       new URL("../../artifacts/web/components/AppShell.tsx", import.meta.url),
       "utf8",
     );
-    expect(source).toContain('aria-label="Más secciones"');
-    expect(source).toContain("<MoreIcon />");
+    expect(source).toContain('aria-label="Navegación principal"');
+    expect(source).toContain('group: "Operación"');
+    expect(source).toContain('group: "Comunidad"');
+    expect(source).toContain('group: "Administración"');
+    expect(source).toContain('group: "Configuración"');
     expect(source).toContain('label: "Solicitudes y cotizaciones"');
   });
 

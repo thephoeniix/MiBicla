@@ -7,10 +7,13 @@ import { ThemeSelector } from "../../components/ThemeSelector";
 import {
   BicyclesIcon,
   EventsIcon,
+  FidelityAssetIcon,
+  HomeAssetIcon,
   MoreIcon,
   OrdersIcon,
   ProductsIcon,
   RequestsIcon,
+  SettingsIcon,
 } from "../../components/nav-icons";
 import { FeatureCard } from "../../components/brand";
 import {
@@ -24,7 +27,6 @@ import {
   StatusBadge,
   Stepper,
   statusLabel,
-  useDismissiblePopover,
 } from "../../components/ui";
 import {
   getMyBicycles,
@@ -75,7 +77,22 @@ const NAV = [
   ["/mi/productos", "Productos", <ProductsIcon key="productos" />],
 ] as const;
 
-const MORE_PATHS = ["/mi", "/mi/tarjeta", "/mi/solicitudes", "/mi/perfil"];
+const CUSTOMER_MENU = [
+  ["Tu cuenta", [
+    ["/mi", "Inicio", <HomeAssetIcon key="inicio" />],
+    ["/mi/tarjeta", "Mi tarjeta", <FidelityAssetIcon key="tarjeta" />],
+    ["/mi/perfil", "Mi perfil", <SettingsIcon key="perfil" />],
+  ]],
+  ["Taller", [
+    ["/mi/bicicletas", "Mis bicicletas", <BicyclesIcon key="bicicletas" />],
+    ["/mi/ordenes", "Órdenes", <OrdersIcon key="ordenes" />],
+    ["/mi/solicitudes", "Solicitudes", <RequestsIcon key="solicitudes" />],
+  ]],
+  ["Descubre", [
+    ["/mi/productos", "Productos", <ProductsIcon key="productos" />],
+    ["/mi/eventos", "Eventos", <EventsIcon key="eventos" />],
+  ]],
+] as const;
 
 function usePortalData<T>(key: string, loader: (signal: AbortSignal) => Promise<T>) {
   const [data, setData] = useState<T | null>(null);
@@ -100,11 +117,38 @@ export function CustomerPortalShell({ identity, title, section, description, chi
   description: string;
   children: ReactNode;
 }) {
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreButton = useRef<HTMLButtonElement>(null);
-  const moreMenu = useRef<HTMLElement>(null);
-  const closeMore = () => setMoreOpen(false);
-  useDismissiblePopover({ open: moreOpen, onClose: closeMore, triggerRef: moreButton, popoverRef: moreMenu });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const menuSheet = useRef<HTMLElement>(null);
+  const closeMenu = () => setMenuOpen(false);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const overflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMenu();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = menuSheet.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if (!focusable?.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    requestAnimationFrame(() => menuSheet.current?.querySelector<HTMLElement>("button")?.focus());
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      menuButton.current?.focus();
+    };
+  }, [menuOpen]);
   const activePath = ["/mi/taller", "/mi/orden"].includes(location.pathname)
     ? "/mi/ordenes"
     : location.pathname;
@@ -118,15 +162,17 @@ export function CustomerPortalShell({ identity, title, section, description, chi
       <header className={`customer-portal-hero customer-portal-hero--${section}`}><div>{section === "home" && <time dateTime={today.toISOString().slice(0, 10)}>{today.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}<span>{today.toLocaleDateString("es-MX", { weekday: "long" })}</span></time>}<p className="page-eyebrow">PORTAL DEL CLIENTE</p><h1>{title}</h1><p>{description}</p></div></header>
       {children}
     </Container>
-    {moreOpen && <nav ref={moreMenu} id="customer-more-menu" className="customer-more-menu" aria-label="Más opciones del cliente" onClick={(event) => { if ((event.target as Element).closest("a")) closeMore(); }}>
-      <a href="/mi" aria-current={activePath === "/mi" ? "page" : undefined}>Inicio</a>
-      <a href="/mi/tarjeta" aria-current={activePath === "/mi/tarjeta" ? "page" : undefined}>Mi tarjeta</a>
-      <a href="/mi/solicitudes" aria-current={activePath === "/mi/solicitudes" ? "page" : undefined}><RequestsIcon />Solicitudes</a>
-      <a href="/mi/perfil" aria-current={activePath === "/mi/perfil" ? "page" : undefined}>Mi perfil</a>
-    </nav>}
+    {menuOpen && <div className="customer-menu-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) closeMenu(); }}>
+      <section ref={menuSheet} id="customer-menu" className="customer-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="customer-menu-title">
+        <header><div><p className="page-eyebrow">PORTAL DEL CLIENTE</p><h2 id="customer-menu-title">Menú</h2></div><button type="button" aria-label="Cerrar menú" onClick={closeMenu}>×</button></header>
+        <nav aria-label="Todos los destinos del cliente" onClick={(event) => { if ((event.target as Element).closest("a")) closeMenu(); }}>
+          {CUSTOMER_MENU.map(([group, links]) => <section key={group} aria-labelledby={`customer-menu-${group.toLowerCase().replace(" ", "-")}`}><h3 id={`customer-menu-${group.toLowerCase().replace(" ", "-")}`}>{group}</h3>{links.map(([href, label, icon]) => <a key={href} href={href} aria-current={activePath === href ? "page" : undefined}><i aria-hidden="true">{icon}</i><span>{label}</span></a>)}</section>)}
+        </nav>
+      </section>
+    </div>}
     <nav className="customer-bottom-nav" aria-label="Navegación del cliente">
       {NAV.map(([href, label, icon]) => <a key={href} href={href} aria-current={activePath === href ? "page" : undefined}><i aria-hidden="true">{icon}</i>{label}</a>)}
-      <button ref={moreButton} type="button" aria-expanded={moreOpen} aria-controls="customer-more-menu" aria-haspopup="menu" aria-current={MORE_PATHS.includes(activePath) ? "page" : undefined} onClick={() => setMoreOpen((current) => !current)}><i aria-hidden="true"><MoreIcon /></i>Más</button>
+      <button ref={menuButton} type="button" aria-expanded={menuOpen} aria-controls="customer-menu" aria-haspopup="dialog" onClick={() => setMenuOpen((current) => !current)}><i aria-hidden="true"><MoreIcon /></i>Menú</button>
     </nav>
   </div>;
 }
