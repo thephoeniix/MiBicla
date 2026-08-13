@@ -1,14 +1,18 @@
-const TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
+const LEGACY_TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
+const SHORT_CODE_PATTERN = /^[A-Za-z0-9_-]{16}$/;
 
 export function extractCustomerToken(value: string): string | null {
   const candidate = value.trim();
-  if (TOKEN_PATTERN.test(candidate)) return candidate.toLowerCase();
+  if (SHORT_CODE_PATTERN.test(candidate)) return candidate;
+  if (LEGACY_TOKEN_PATTERN.test(candidate)) return candidate.toLowerCase();
   try {
     const url = new URL(candidate, "https://scanner.mibicla.invalid");
     if (!["http:", "https:"].includes(url.protocol)) return null;
-    const match = url.pathname.match(/^\/c\/([^/]+)\/?$/);
-    if (!match || !TOKEN_PATTERN.test(match[1] ?? "")) return null;
-    return match[1]!.toLowerCase();
+    const short = url.pathname.match(/^\/l\/([^/]+)\/?$/)?.[1];
+    if (short && SHORT_CODE_PATTERN.test(short)) return short;
+    const legacy = url.pathname.match(/^\/c\/([^/]+)\/?$/)?.[1];
+    if (legacy && LEGACY_TOKEN_PATTERN.test(legacy)) return legacy.toLowerCase();
+    return null;
   } catch {
     return null;
   }

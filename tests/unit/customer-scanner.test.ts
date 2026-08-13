@@ -11,6 +11,7 @@ import {
 import { customerScanTokenSchema } from "@mi-bicla/api-contract";
 
 const TOKEN = "a".repeat(64);
+const SHORT_CODE = "AbCdEf0123456789";
 
 describe("escáner administrativo de clientes", () => {
   it("extrae el token desde una URL pública completa", () => {
@@ -22,6 +23,13 @@ describe("escáner administrativo de clientes", () => {
   it("extrae la tarjeta pública real aunque sea relativa o incluya query/hash", () => {
     expect(extractCustomerToken(`/c/${TOKEN}`)).toBe(TOKEN);
     expect(extractCustomerToken(`https://mibicla.mx/c/${TOKEN}/?source=card#qr`)).toBe(TOKEN);
+  });
+
+  it("extrae enlaces universales preservando mayúsculas", () => {
+    expect(extractCustomerToken(`/l/${SHORT_CODE}`)).toBe(SHORT_CODE);
+    expect(extractCustomerToken(`https://mibiclaqro.com/l/${SHORT_CODE}?source=qr`)).toBe(SHORT_CODE);
+    expect(extractCustomerToken(SHORT_CODE)).toBe(SHORT_CODE);
+    expect(customerScanTokenSchema.parse({ token: SHORT_CODE })).toEqual({ token: SHORT_CODE });
   });
 
   it("construye la ruta del perfil administrativo identificado", () => {
@@ -41,6 +49,7 @@ describe("escáner administrativo de clientes", () => {
     "https://mibicla.example/client/not-valid",
     "javascript:alert(1)",
     "https://mibicla.example/c/short",
+    "https://mibicla.example/l/short",
     `https://mibicla.example/c/${TOKEN}/extra`,
   ])("rechaza un valor inválido: %s", (value) => {
     expect(extractCustomerToken(value)).toBeNull();
