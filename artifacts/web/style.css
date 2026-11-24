@@ -4936,6 +4936,7 @@ select {
   --brand-photo-loyalty-card: url("../../recursos/webp/ASN03155.webp");
   --brand-photo-bikes-card: url("../../recursos/webp/gio1.webp");
   --brand-photo-community: url("../../recursos/webp/13.webp");
+  --brand-photo-uniforms-card: url("../../recursos/webp/13.webp");
   --brand-photo-products-card: url("../../recursos/webp/14.webp");
   --brand-photo-payments-card: url("../../recursos/webp/12.webp");
 }
@@ -5491,6 +5492,11 @@ select {
   background:
     linear-gradient(0deg, rgb(0 0 0 / 0.88), rgb(0 0 0 / 0.28)),
     var(--brand-photo-community) center 38% / cover no-repeat;
+}
+.feature-uniforms-photo {
+  background:
+    linear-gradient(0deg, rgb(0 0 0 / 0.9), rgb(0 0 0 / 0.2)),
+    var(--brand-photo-uniforms-card) center 42% / cover no-repeat;
 }
 .feature-products-photo {
   background:
@@ -8896,6 +8902,133 @@ dt {
 }
 .public-header .theme-selector {
   color: #f8f8fa;
+}
+
+/* Jerseys y uniformes personalizados */
+.jerseys-photo-hero {
+  background:
+    linear-gradient(90deg, rgb(7 7 9 / 0.96), rgb(7 7 9 / 0.5) 64%, rgb(7 7 9 / 0.18)),
+    var(--brand-photo-uniforms-card) center 42% / cover no-repeat;
+}
+.jerseys-photo-hero > div {
+  max-width: 760px;
+}
+.jerseys-photo-hero .ui-button svg {
+  width: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
+.jerseys-process ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: jersey-step;
+}
+.jerseys-process li {
+  min-height: 230px;
+  padding: 28px;
+  color: var(--mb-color-white);
+  background: #101014;
+  border: 1px solid var(--mb-color-neutral-800);
+  border-radius: 12px;
+}
+.jerseys-process li > span {
+  color: var(--mb-color-brand-400);
+  font-family: var(--brand-display);
+  font-size: 3.2rem;
+  font-style: italic;
+  font-weight: 900;
+}
+.jerseys-process h3 {
+  margin: 18px 0 8px;
+  font-family: var(--brand-display);
+  font-size: 1.8rem;
+  text-transform: uppercase;
+}
+.jerseys-process p {
+  margin: 0;
+  color: #c9c9d0;
+}
+.jerseys-gallery > div {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 14px;
+}
+.jerseys-gallery figure {
+  position: relative;
+  min-height: 430px;
+  margin: 0;
+  overflow: hidden;
+  background: #101014;
+  border-radius: 12px;
+}
+.jerseys-gallery img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.jerseys-gallery figcaption {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  padding: 14px 16px;
+  color: #fff;
+  background: rgb(7 7 9 / 0.82);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 10px;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+}
+.jerseys-faq > div {
+  display: grid;
+  max-width: 900px;
+  margin-inline: auto;
+  gap: 10px;
+}
+.jerseys-faq details {
+  padding-inline: 22px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+}
+.jerseys-faq summary {
+  padding-block: 20px;
+  cursor: pointer;
+  font-weight: 800;
+}
+.jerseys-faq details p {
+  margin: 0;
+  padding: 0 0 20px;
+  color: var(--app-muted);
+}
+.footer-brand > a {
+  color: var(--mb-color-brand-400);
+  font-weight: 800;
+}
+@media (max-width: 900px) {
+  .jerseys-process ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jerseys-gallery > div { grid-template-columns: 1fr 1fr; }
+  .jerseys-gallery figure:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .jerseys-photo-hero {
+    background-position: 62% center;
+  }
+  .jerseys-process ol,
+  .jerseys-gallery > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jerseys-process li { min-height: 0; padding: 22px; }
+  .jerseys-gallery figure,
+  .jerseys-gallery figure:first-child {
+    grid-column: auto;
+    min-height: 360px;
+  }
 }
 .public-header .theme-selector select {
   color: #f8f8fa;

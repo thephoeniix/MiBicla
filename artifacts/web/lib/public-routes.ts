@@ -5,6 +5,7 @@ export type PublicRoute =
   | "brands"
   | "products"
   | "events"
+  | "jerseys"
   | "deposits"
   | "workshop-request"
   | "workshop-tracking"
@@ -36,6 +37,8 @@ export function resolvePublicRoute(pathname: string): {
   if (pathname === "/marcas") return { route: "brands" };
   if (pathname === "/productos") return { route: "products" };
   if (pathname === "/eventos") return { route: "events" };
+  if (pathname === "/uniformes")
+    return { route: "jerseys" };
   if (pathname === "/depositos") return { route: "deposits" };
   if (pathname === "/registro") return { route: "customer-register" };
   if (pathname === "/registro/verificar") return { route: "customer-verify" };

@@ -13,7 +13,7 @@ import chainImage from "../../../logo/cadena.png";
 export function ChainDivider({ className = "" }: { className?: string }) {
   return (
     <div className={`brand-chain ${className}`.trim()} aria-hidden="true">
-      <img src={chainImage} alt="" width={2048} height={65} />
+      <img src={chainImage} alt="" width={2048} height={65} loading="lazy" />
     </div>
   );
 }

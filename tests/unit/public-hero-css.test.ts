@@ -30,8 +30,8 @@ describe("identidad editorial del hero público", () => {
   });
 
   it("presenta el mensaje y las acciones de la página informativa", () => {
-    expect(source).toContain("Tu bicicleta.");
-    expect(source).toContain("Tu aventura.");
+    expect(source).toContain("Tienda de ciclismo y taller de bicicletas");
+    expect(source).toContain("Rodamos contigo, desde el primer pedalazo.");
     expect(source).toContain("Hablar por WhatsApp");
     expect(source).toContain("Llamar ahora");
   });
