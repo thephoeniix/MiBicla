@@ -26,7 +26,7 @@ describe("SEO e identidad inicial", () => {
     expect(robots).toContain("Disallow: /admin");
     expect(robots).toContain("Disallow: /mi");
     expect(sitemap).toContain("https://mibiclaqro.com/productos");
-    expect(sitemap).toContain("https://mibiclaqro.com/uniformes-ciclismo-personalizados");
+    expect(sitemap).toContain("https://mibiclaqro.com/uniformes");
     expect(sitemap).toContain("<lastmod>2026-11-24</lastmod>");
     expect(sitemap).not.toContain("/admin");
     expect(sitemap).not.toContain("mibiclaqro.com/mi");

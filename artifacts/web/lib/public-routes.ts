@@ -37,7 +37,7 @@ export function resolvePublicRoute(pathname: string): {
   if (pathname === "/marcas") return { route: "brands" };
   if (pathname === "/productos") return { route: "products" };
   if (pathname === "/eventos") return { route: "events" };
-  if (pathname === "/uniformes-ciclismo-personalizados")
+  if (pathname === "/uniformes")
     return { route: "jerseys" };
   if (pathname === "/depositos") return { route: "deposits" };
   if (pathname === "/registro") return { route: "customer-register" };

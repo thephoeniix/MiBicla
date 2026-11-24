@@ -129,7 +129,7 @@ export function Landing() {
         <BrandCarousel brands={AUTHORIZED_BRANDS} />
       </div>
       <div className="brand-feature-grid">
-        <FeatureCard className="feature-uniforms-photo" tone="photo" icon={<UniformsIcon />} title="JERSEYS PERSONALIZADOS" description="Diseña uniformes de ciclismo para tu equipo o club desde 12 piezas." href="/uniformes-ciclismo-personalizados" />
+        <FeatureCard className="feature-uniforms-photo" tone="photo" icon={<UniformsIcon />} title="JERSEYS PERSONALIZADOS" description="Diseña uniformes de ciclismo para tu equipo o club desde 12 piezas." href="/uniformes" />
         <FeatureCard className="feature-workshop-photo" tone="photo" icon={<TallerAssetIcon />} title="TALLER MECÁNICO" description="Servicio preventivo, reparaciones y mantenimiento profesional." href="/taller" />
         <FeatureCard tone="pink" icon={<FidelityAssetIcon />} title="MI TARJETA" description="Acumula puntos, consigue beneficios y recompensas." href="/fidelidad" />
         <FeatureCard tone="black" icon={<BicyclesIcon />} title="MIS BICICLETAS" description="Registra, administra y da seguimiento a tus bicis." href="/mi/bicicletas" />
@@ -166,12 +166,12 @@ export function CustomJerseys() {
       "@graph": [
         {
           "@type": "Service",
-          "@id": "https://mibiclaqro.com/uniformes-ciclismo-personalizados#servicio",
+          "@id": "https://mibiclaqro.com/uniformes#servicio",
           name: "Jerseys y uniformes de ciclismo personalizados",
           description: "Diseño y producción de jerseys y uniformes de ciclismo personalizados para equipos y clubes desde 12 piezas.",
           provider: { "@id": "https://mibiclaqro.com/#negocio" },
           areaServed: ["Querétaro", "El Marqués", "Corregidora"],
-          url: "https://mibiclaqro.com/uniformes-ciclismo-personalizados",
+          url: "https://mibiclaqro.com/uniformes",
         },
         {
           "@type": "FAQPage",

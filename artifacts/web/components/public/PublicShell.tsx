@@ -56,7 +56,7 @@ function PublicFooter() {
           <BrandLogo variant="full" color="white" />
           <strong>QUERÉTARO · MÉXICO</strong>
           <p>Taller, comunidad y recompensas para seguir rodando.</p>
-          <a href="/uniformes-ciclismo-personalizados">Jerseys personalizados</a>
+          <a href="/uniformes">Jerseys personalizados</a>
         </section>
         <FooterChainDivider />
         <div className="footer-legal">
@@ -133,7 +133,7 @@ export function PublicShell({
         </button>
         <nav aria-label="Navegación pública">
           {NAV.map(([href, label]) => <a key={href} href={href} aria-current={isPublicNavigationActive(path, href) ? "page" : undefined}>{label}</a>)}
-          <a href="/uniformes-ciclismo-personalizados" aria-current={path === "/uniformes-ciclismo-personalizados" ? "page" : undefined}>Jerseys personalizados</a>
+          <a href="/uniformes" aria-current={path === "/uniformes" ? "page" : undefined}>Jerseys personalizados</a>
           <a href="/productos" aria-current={path === "/productos" ? "page" : undefined}>Productos</a>
           <a href="/eventos" aria-current={path === "/eventos" ? "page" : undefined}>Eventos</a>
           <a href="/depositos">Métodos de pago</a>
@@ -150,7 +150,7 @@ export function PublicShell({
             <nav aria-label="Menú público" onClick={(event) => { if ((event.target as Element).closest("a")) setMenuOpen(false); }}>
               <section aria-labelledby="public-menu-explore"><h2 id="public-menu-explore">Explorar</h2>
                 {NAV.map(([href, label]) => <a key={href} href={href} aria-current={isPublicNavigationActive(path, href) ? "page" : undefined}>{label}</a>)}
-                <a href="/uniformes-ciclismo-personalizados" aria-current={path === "/uniformes-ciclismo-personalizados" ? "page" : undefined}>Jerseys personalizados</a>
+                <a href="/uniformes" aria-current={path === "/uniformes" ? "page" : undefined}>Jerseys personalizados</a>
                 <a href="/productos" aria-current={path === "/productos" ? "page" : undefined}>Productos</a>
                 <a href="/eventos" aria-current={path === "/eventos" ? "page" : undefined}>Eventos</a>
               </section>
