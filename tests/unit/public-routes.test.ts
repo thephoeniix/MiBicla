@@ -11,6 +11,9 @@ describe("rutas públicas", () => {
     expect(resolvePublicRoute("/admin/workshop")).toEqual({ route: "admin" });
     expect(resolvePublicRoute("/productos")).toEqual({ route: "products" });
     expect(resolvePublicRoute("/eventos")).toEqual({ route: "events" });
+    expect(resolvePublicRoute("/uniformes-ciclismo-personalizados")).toEqual({
+      route: "jerseys",
+    });
   });
 
   it("conserva rutas públicas con token", () => {

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit && vite build"
+    "build": "tsc --noEmit && vite build",
+    "postbuild": "node ../../scripts/prerender-public.mjs"
   },
   "dependencies": {
     "@zxing/browser": "0.1.5",
