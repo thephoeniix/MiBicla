@@ -32,7 +32,7 @@ server {
         try_files $uri $uri/index.html /index.html;
     }
 
-  location = /catalogo.html { return 301 /uniformes; }
-  location = /catalogo/ { return 301 /uniformes; }
-  location = /uniformes-ciclismo-personalizados { return 301 /uniformes; }
+  location = /catalogo.html { return 301 https://mibiclaqro.com/uniformes; }
+  location = /catalogo/ { return 301 https://mibiclaqro.com/uniformes; }
+  location = /uniformes-ciclismo-personalizados { return 301 https://mibiclaqro.com/uniformes; }
 }
