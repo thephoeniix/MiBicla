@@ -69,6 +69,8 @@ import { createCustomerCommerceRouter } from "./routes/customer-commerce.js";
 import { createAdminCommerceRouter } from "./routes/admin/commerce.js";
 import { AdministratorsService } from "./services/administrators.service.js";
 import { createAdministratorsAdminRouter } from "./routes/admin/administrators.js";
+import { PublicLinksService } from "./services/public-links.service.js";
+import { createPublicLinksRouter } from "./routes/public-links.js";
 type Database = ReturnType<typeof createDatabase>["db"];
 
 export function createApp(
@@ -442,11 +444,12 @@ const requireOwner = [
   },
 ];
 const businessSettingsService = new BusinessSettingsService(db);
-const customersService = new CustomersService(db),
+const publicLinksService = new PublicLinksService(db, env.APP_ENCRYPTION_KEY, env.APP_BASE_URL);
+const customersService = new CustomersService(db, publicLinksService),
   loyaltyService = new LoyaltyService(db);
-const workshopService = new WorkshopService(db);
-const customerAuthService = new CustomerAuthService(db, env.APP_BASE_URL);
-const customerRegistrationService = new CustomerRegistrationService(db, env.APP_BASE_URL);
+const workshopService = new WorkshopService(db, publicLinksService);
+const customerAuthService = new CustomerAuthService(db, env.APP_BASE_URL, undefined, publicLinksService);
+const customerRegistrationService = new CustomerRegistrationService(db, env.APP_BASE_URL, publicLinksService);
 const commerceService = new CommerceService(db, {
   uploadDir,
 });
@@ -478,6 +481,7 @@ app.use(
   ),
 );
 app.use("/api/public", createPublicCustomerRouter(customersService));
+app.use("/api/public", createPublicLinksRouter(publicLinksService, customersService, workshopService, customerAuthService));
 app.use(
   "/api/admin",
   createCustomerAuthAdminRouter(customerAuthService, requirePermission, audit),

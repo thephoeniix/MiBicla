@@ -24,7 +24,7 @@ export async function issueCustomerAuthToken(
     purpose: CustomerAuthPurpose;
     administratorId: string;
   },
-): Promise<{ token: string; expiresAt: Date }> {
+): Promise<{ id: string; token: string; expiresAt: Date }> {
   const now = new Date();
   await tx
     .update(customerAuthTokens)
@@ -42,13 +42,14 @@ export async function issueCustomerAuthToken(
     now.getTime() +
       (params.purpose === "activation" ? ACTIVATION_TTL_MS : RECOVERY_TTL_MS),
   );
-  await tx.insert(customerAuthTokens).values({
+  const [created] = await tx.insert(customerAuthTokens).values({
     credentialId: params.credentialId,
     purpose: params.purpose,
     tokenHash: hashSessionToken(token),
     expiresAt,
     createdBy: params.administratorId,
     createdAt: now,
-  });
-  return { token, expiresAt };
+  }).returning({ id: customerAuthTokens.id });
+  if (!created) throw new Error("No se pudo crear el enlace de acceso");
+  return { id: created.id, token, expiresAt };
 }

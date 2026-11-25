@@ -5,6 +5,7 @@ import {
   customerProfileUpdateSchema,
   customerPasswordChangeSchema,
   customerWorkshopRequestSchema,
+  affiliationRequestSchema,
 } from "@mi-bicla/api-contract";
 import type { CustomersService } from "../services/customers.service.js";
 import type { WorkshopService } from "../services/workshop.service.js";
@@ -35,8 +36,8 @@ export function createCustomerPortalRouter(
   });
   router.post("/card-link", async (_req, res, next) => {
     try {
-      const token = await customers.regenerateToken(customerId(res));
-      const cardUrl = new URL(`/c/${token}`, appBaseUrl).toString();
+      const token = await customers.getOrCreatePublicLink(customerId(res));
+      const cardUrl = new URL(`/l/${token}`, appBaseUrl).toString();
       res.status(201).json({ cardUrl });
     } catch (error) { next(error); }
   });
@@ -89,6 +90,12 @@ export function createCustomerPortalRouter(
     try { res.json(await workshop.listCustomerRequests(customerId(res))); }
     catch (error) { next(error); }
   });
+  router.get("/workshop-catalog", async (_req, res, next) => {
+    try { res.json(await workshop.publicCatalog()); } catch (error) { next(error); }
+  });
+  router.get("/workshop-availability", async (_req, res, next) => {
+    try { res.json(await workshop.availability()); } catch (error) { next(error); }
+  });
   router.post("/workshop-requests", async (req, res, next) => {
     try {
       const result = await workshop.createCustomerWorkshopRequest(
@@ -101,6 +108,18 @@ export function createCustomerPortalRouter(
   router.get("/orders", async (_req, res, next) => {
     try { res.json(await workshop.listCustomerOrders(customerId(res))); }
     catch (error) { next(error); }
+  });
+  router.get("/workshop-financials", async (_req, res, next) => {
+    try { res.json(await workshop.customerFinancials(customerId(res))); } catch (error) { next(error); }
+  });
+  router.get("/teams", async (_req, res, next) => {
+    try { res.json(await workshop.listTeams()); } catch (error) { next(error); }
+  });
+  router.get("/team-affiliation", async (_req, res, next) => {
+    try { res.json(await workshop.getCustomerAffiliation(customerId(res))); } catch (error) { next(error); }
+  });
+  router.post("/team-affiliation", async (req, res, next) => {
+    try { res.status(201).json(await workshop.requestAffiliation(customerId(res), affiliationRequestSchema.parse(req.body))); } catch (error) { next(error); }
   });
   router.get("/orders/:orderNumber", async (req, res, next) => {
     try {

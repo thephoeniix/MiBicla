@@ -894,7 +894,7 @@ function RequestResponse({
             <a
               className="ui-button ui-button--secondary commerce-full-field"
               href={whatsappMessageUrl(
-                `https://wa.me/${request.customerPhone.replace(/\D/g, "")}`,
+                request.customerPhone,
                 `Hola, te contactamos de Mi Bicla sobre tu solicitud ${request.requestNumber}. ${form.adminMessage}`.trim(),
               )}
               target="_blank"

@@ -129,6 +129,6 @@ describe("Business Settings", () => {
       },
     );
     expect(url).toContain("https://wa.me/52442?text=");
-    expect(decodeURIComponent(url)).toContain("Hola Ana: 100 Bici 42");
+    expect(new URL(url).searchParams.get("text")).toBe("Hola Ana: 100 Bici 42");
   });
 });

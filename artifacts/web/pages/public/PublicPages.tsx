@@ -25,7 +25,10 @@ import {
   FeatureCard,
 } from "../../components/brand";
 import contactPhoto from "../../../../recursos/webp/car3.webp";
-import { BicyclesIcon, DepositsIcon, EventsIcon, FidelityAssetIcon, ProductsIcon, TallerAssetIcon } from "../../components/nav-icons";
+import jerseyCommunityPhoto from "../../../../recursos/webp/13.webp";
+import jerseyRacePhoto from "../../../../recursos/webp/ASN03155.webp";
+import jerseyTrailPhoto from "../../../../recursos/webp/gio1.webp";
+import { BicyclesIcon, DepositsIcon, EventsIcon, FidelityAssetIcon, ProductsIcon, TallerAssetIcon, UniformsIcon } from "../../components/nav-icons";
 
 function useBusiness() {
   const [business, setBusiness] = useState<PublicBusiness | null>(null);
@@ -126,6 +129,7 @@ export function Landing() {
         <BrandCarousel brands={AUTHORIZED_BRANDS} />
       </div>
       <div className="brand-feature-grid">
+        <FeatureCard className="feature-uniforms-photo" tone="photo" icon={<UniformsIcon />} title="JERSEYS PERSONALIZADOS" description="Diseña uniformes de ciclismo para tu equipo o club desde 12 piezas." href="/uniformes" />
         <FeatureCard className="feature-workshop-photo" tone="photo" icon={<TallerAssetIcon />} title="TALLER MECÁNICO" description="Servicio preventivo, reparaciones y mantenimiento profesional." href="/taller" />
         <FeatureCard tone="pink" icon={<FidelityAssetIcon />} title="MI TARJETA" description="Acumula puntos, consigue beneficios y recompensas." href="/fidelidad" />
         <FeatureCard tone="black" icon={<BicyclesIcon />} title="MIS BICICLETAS" description="Registra, administra y da seguimiento a tus bicis." href="/mi/bicicletas" />
@@ -144,9 +148,89 @@ export function WorkshopInfo() {
   return <PublicShell business={business}><Container><BrandPageHero className="workshop-photo-hero" eyebrow="TALLER MI BICLA" title="TU BICI MERECE LA MEJOR RUTA" description="Servicio profesional para mantenerla segura, precisa y lista para rodar."><div className="public-actions"><a className="ui-button" href="/taller/solicitud">Solicitar servicio</a><DialogButton kind="workshop">Consultar mi orden</DialogButton></div></BrandPageHero><section className="public-section"><BrandSectionHeading eyebrow="SERVICIO PROFESIONAL" title="TODO LO QUE TU BICI NECESITA" /><div className="service-grid">{WORKSHOP_SERVICES.map((service, i) => <a className="service-card" key={service} href={workshopServiceHref(service)} aria-label={`Solicitar servicio: ${service}`}><span>{String(i + 1).padStart(2, "0")}</span><h3>{service}</h3><small>Solicitar este servicio <span aria-hidden="true">→</span></small></a>)}</div><small>Selecciona un servicio para preparar tu solicitud. Podrás revisarla antes de enviarla.</small></section></Container></PublicShell>;
 }
 
+const JERSEY_FAQS = [
+  ["¿Cuál es el pedido mínimo?", "El pedido mínimo es de 12 piezas."],
+  ["¿Cuánto anticipo se necesita?", "Para comenzar la producción se solicita el 50% de anticipo."],
+  ["¿Pueden hacer el diseño?", "Sí. Si no tienes diseño, podemos prepararlo por $700 adicionales."],
+  ["¿Qué tallas manejan?", "Manejamos tallas de dama y caballero. Las tallas 2XL y 3XL están disponibles únicamente en corte de caballero."],
+] as const;
+
+export function CustomJerseys() {
+  const business = useBusiness();
+  useEffect(() => {
+    const structuredData = document.createElement("script");
+    structuredData.id = "jerseys-structured-data";
+    structuredData.type = "application/ld+json";
+    structuredData.text = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Service",
+          "@id": "https://mibiclaqro.com/uniformes#servicio",
+          name: "Jerseys y uniformes de ciclismo personalizados",
+          description: "Diseño y producción de jerseys y uniformes de ciclismo personalizados para equipos y clubes desde 12 piezas.",
+          provider: { "@id": "https://mibiclaqro.com/#negocio" },
+          areaServed: ["Querétaro", "El Marqués", "Corregidora"],
+          url: "https://mibiclaqro.com/uniformes",
+        },
+        {
+          "@type": "FAQPage",
+          mainEntity: JERSEY_FAQS.map(([name, text]) => ({
+            "@type": "Question",
+            name,
+            acceptedAnswer: { "@type": "Answer", text },
+          })),
+        },
+      ],
+    });
+    document.head.append(structuredData);
+    return () => structuredData.remove();
+  }, []);
+
+  return <PublicShell business={business}>
+    <Container className="jerseys-page">
+      <BrandPageHero
+        className="jerseys-photo-hero"
+        eyebrow="UNIFORMES MI BICLA"
+        title="UNIFORMES Y JERSEYS DE CICLISMO PERSONALIZADOS EN QUERÉTARO"
+        description="Creamos jerseys para equipos y clubes desde 12 piezas. Envíanos tu diseño o deja que lo preparemos contigo."
+      >
+        <a className="ui-button" href="https://wa.me/524427496410?text=Hola%2C%20quiero%20cotizar%20jerseys%20personalizados" target="_blank" rel="noopener noreferrer"><WhatsappIcon />Cotizar por WhatsApp</a>
+      </BrandPageHero>
+
+      <section className="public-section jerseys-process" aria-labelledby="jerseys-process-title">
+        <BrandSectionHeading eyebrow="ASÍ DE FÁCIL" title="ARMA EL UNIFORME DE TU EQUIPO" />
+        <h2 className="mb-sr-only" id="jerseys-process-title">Pasos para pedir jerseys personalizados</h2>
+        <ol>
+          <li><span>01</span><h3>Escríbenos</h3><p>Cuéntanos qué necesita tu equipo o club.</p></li>
+          <li><span>02</span><h3>Manda tu diseño</h3><p>Envíalo por WhatsApp o lo hacemos contigo por $700 adicionales.</p></li>
+          <li><span>03</span><h3>Define tallas</h3><p>Confirma modelos, tallas y cantidades. El mínimo es de 12 piezas.</p></li>
+          <li><span>04</span><h3>Aparta con 50%</h3><p>Con el anticipo aprobado comenzamos la producción de tu pedido.</p></li>
+        </ol>
+      </section>
+
+      <section className="public-section jerseys-gallery" aria-labelledby="jerseys-gallery-title">
+        <BrandSectionHeading eyebrow="HECHOS PARA RODAR" title="TU EQUIPO, TU IDENTIDAD" />
+        <h2 className="mb-sr-only" id="jerseys-gallery-title">Galería de jerseys de ciclismo personalizados</h2>
+        <div>
+          <figure><img src={jerseyCommunityPhoto} alt="Jersey de ciclismo personalizado Mi Bicla Querétaro usado por un equipo ciclista" loading="lazy" /><figcaption>Diseño para equipos y clubes</figcaption></figure>
+          <figure><img src={jerseyRacePhoto} alt="Jersey de ciclismo personalizado para competencia MTB en Querétaro" loading="lazy" /><figcaption>Uniformes para competencia</figcaption></figure>
+          <figure><img src={jerseyTrailPhoto} alt="Ciclista con jersey personalizado Mi Bicla en una ruta de montaña" loading="lazy" /><figcaption>Listos para montaña y ruta</figcaption></figure>
+        </div>
+      </section>
+
+      <section className="public-section jerseys-faq" aria-labelledby="jerseys-faq-title">
+        <BrandSectionHeading eyebrow="ANTES DE PEDIR" title="PREGUNTAS FRECUENTES" />
+        <h2 className="mb-sr-only" id="jerseys-faq-title">Preguntas frecuentes sobre jerseys personalizados</h2>
+        <div>{JERSEY_FAQS.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</div>
+      </section>
+    </Container>
+  </PublicShell>;
+}
+
 export function LoyaltyInfo() {
   const business = useBusiness();
-  return <PublicShell business={business}><Container><BrandPageHero className="loyalty-photo-hero" eyebrow="FIDELIDAD MI BICLA" title="CADA RODADA CUENTA" description="Acumula bicicletas con tus compras y obtén recompensas."><DialogButton kind="card">Mi tarjeta</DialogButton></BrandPageHero><section className="demo-wallet"><div><small>MIEMBRO MI BICLA</small><h2>Tu próxima recompensa</h2><p>Una experiencia demostrativa del programa.</p></div><img src="/pink-simple.png" alt="" /><div className="demo-points">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < 6 ? "earned" : ""}><img src="/pink-simple.png" alt="" /></i>)}</div></section><section className="public-section"><h2>¿Cómo funciona?</h2><div className="public-card-grid"><Card><span>01</span><h3>Compra y acumula</h3><p>Tus compras participantes suman bicicletas a tu tarjeta.</p></Card><Card><span>02</span><h3>Sigue tu progreso</h3><p>Inicia sesión y consulta tu tarjeta cuando quieras.</p></Card><Card><span>03</span><h3>Obtén recompensas</h3><p>Las condiciones dependen del programa vigente en tienda.</p></Card></div></section></Container></PublicShell>;
+  return <PublicShell business={business}><Container><BrandPageHero className="loyalty-photo-hero" eyebrow="FIDELIDAD MI BICLA" title="CADA RODADA CUENTA" description="Acumula bicicletas con tus compras y obtén recompensas."><DialogButton kind="card">Mi tarjeta</DialogButton></BrandPageHero><section className="demo-wallet"><div><small>MIEMBRO MI BICLA</small><h2>Tu próxima recompensa</h2><p>Una experiencia demostrativa del programa.</p></div><img src="/pink-simple.png" alt="" loading="lazy" /><div className="demo-points">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < 6 ? "earned" : ""}><img src="/pink-simple.png" alt="" loading="lazy" /></i>)}</div></section><section className="public-section"><h2>¿Cómo funciona?</h2><div className="public-card-grid"><Card><span>01</span><h3>Compra y acumula</h3><p>Tus compras participantes suman bicicletas a tu tarjeta.</p></Card><Card><span>02</span><h3>Sigue tu progreso</h3><p>Inicia sesión y consulta tu tarjeta cuando quieras.</p></Card><Card><span>03</span><h3>Obtén recompensas</h3><p>Las condiciones dependen del programa vigente en tienda.</p></Card></div></section></Container></PublicShell>;
 }
 
 export function Brands() {

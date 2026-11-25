@@ -12,7 +12,7 @@ import {
 } from "../../artifacts/web/lib/workshop-request-validation";
 import { workshopRequestSchema } from "../../packages/api-contract/src/workshop.schema";
 
-const requestSource = readFileSync("artifacts/web/pages/public/WorkshopRequest.tsx", "utf8");
+const requestSource = readFileSync("artifacts/web/components/WorkshopRequestFlow.tsx", "utf8");
 
 function validRequest(overrides: Partial<WorkshopRequestFields> = {}): WorkshopRequestFields {
   return {
@@ -123,35 +123,21 @@ describe("validación local — misma regla que workshopRequestSchema", () => {
   });
 });
 
-describe("integración en WorkshopRequest.tsx — bloqueo real del envío", () => {
-  it("valida los 7 campos con la función compartida antes de cualquier fetch", () => {
-    const submitBody = requestSource.slice(
-      requestSource.indexOf("async function submit"),
-      requestSource.indexOf("async function submit") +
-        requestSource.slice(requestSource.indexOf("async function submit")).indexOf("setFieldErrors({});"),
-    );
-    expect(submitBody).toContain("findInvalidWorkshopFields(data)");
-    expect(submitBody).toContain("if (invalidFields.length) {");
-    expect(submitBody).toContain("return;");
-    expect(submitBody).not.toContain("apiFetch");
+describe("integración en WorkshopRequestFlow — validación por pasos", () => {
+  it("valida identidad, bicicleta, servicio y agenda antes de avanzar", () => {
+    expect(requestSource).toContain("isValidMexicanPhone(draft.customerPhone)");
+    expect(requestSource).toContain("authenticated ? !draft.bicycleId : !draft.bikeBrand || !draft.bikeType");
+    expect(requestSource).toContain("draft.problemDescription.trim().length < 10");
+    expect(requestSource).toContain("availability?.configured && (!draft.requestedDate || !draft.requestedTime)");
   });
 
-  it("solo limpia el formulario tras una respuesta exitosa, nunca en la ruta de error local", () => {
-    const successBlock = requestSource.slice(
-      requestSource.indexOf("const x = await apiFetch"),
-      requestSource.indexOf("} catch (e)"),
-    );
-    expect(successBlock).toContain("setData(EMPTY);");
-    const localErrorBlock = requestSource.slice(
-      requestSource.indexOf("if (invalidFields.length) {"),
-      requestSource.indexOf("setFieldErrors({});"),
-    );
-    expect(localErrorBlock).not.toContain("setData(EMPTY)");
+  it("conserva el borrador y sólo lo limpia tras enviar correctamente", () => {
+    expect(requestSource).toContain("sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft))");
+    expect(requestSource).toContain("await onSubmit(draft); if (!authenticated) sessionStorage.removeItem(STORAGE_KEY)");
   });
 
-  it("limpia el error de un campo específico al corregirlo, sin afectar a los demás", () => {
-    expect(requestSource).toContain(
-      'if (fieldErrors[k]) setFieldErrors((current) => ({ ...current, [k]: undefined }));',
-    );
+  it("enfoca el título al cambiar de paso y advierte antes de abandonar", () => {
+    expect(requestSource).toContain("heading.current?.focus()");
+    expect(requestSource).toContain('window.addEventListener("beforeunload", warn)');
   });
 });

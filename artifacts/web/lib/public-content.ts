@@ -16,7 +16,7 @@ export function workshopServiceHref(
 
 export function resolveRequestedWorkshopService(search: string): string {
   const selected = new URLSearchParams(search).get("servicio");
-  return WORKSHOP_SERVICES.find((service) => service === selected) ?? "";
+  return selected?.trim().slice(0, 200) ?? "";
 }
 
 export interface AuthorizedBrand {

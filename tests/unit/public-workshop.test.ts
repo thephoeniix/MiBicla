@@ -14,6 +14,10 @@ const workshopRequestSource = readFileSync(
   "artifacts/web/pages/public/WorkshopRequest.tsx",
   "utf8",
 );
+const workshopFlowSource = readFileSync(
+  "artifacts/web/components/WorkshopRequestFlow.tsx",
+  "utf8",
+);
 const styles = readFileSync("artifacts/web/style.css", "utf8");
 
 describe("taller público recuperado", () => {
@@ -29,7 +33,7 @@ describe("taller público recuperado", () => {
     ]);
   });
 
-  it("genera enlaces y preselección solo para servicios conocidos", () => {
+  it("genera enlaces y delega la preselección al catálogo real", () => {
     for (const service of WORKSHOP_SERVICES) {
       const href = workshopServiceHref(service);
       expect(href).toBe(
@@ -41,12 +45,11 @@ describe("taller público recuperado", () => {
         ),
       ).toBe(service);
     }
-    expect(
-      resolveRequestedWorkshopService("?servicio=Servicio%20inventado"),
-    ).toBe("");
+    expect(resolveRequestedWorkshopService("?servicio=Servicio%20inventado")).toBe("Servicio inventado");
     expect(
       resolveRequestedWorkshopService("?servicio=Bike%20wash%20"),
-    ).toBe("");
+    ).toBe("Bike wash");
+    expect(workshopFlowSource).toContain('match?.name ?? "Otro / necesito diagnóstico"');
   });
 
   it("renderiza tarjetas accesibles solamente dentro de WorkshopInfo", () => {
@@ -57,9 +60,8 @@ describe("taller público recuperado", () => {
     expect(publicPagesSource).toContain(
       "aria-label={`Solicitar servicio: ${service}`}",
     );
-    expect(workshopRequestSource).toContain(
-      "resolveRequestedWorkshopService",
-    );
+    expect(workshopRequestSource).toContain("WorkshopRequestFlow");
+    expect(workshopFlowSource).toContain("getWorkshopCatalog()");
   });
 
   it("recupera estilos responsive y de teclado sin overflow forzado", () => {

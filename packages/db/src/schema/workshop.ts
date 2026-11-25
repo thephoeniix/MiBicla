@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -70,7 +72,27 @@ export const workshopRequests = pgTable(
     bikeBrand: text("bike_brand"),
     bikeModel: text("bike_model"),
     bikeType: text("bike_type"),
+    bikeColor: text("bike_color"),
+    bikeWheelSize: text("bike_wheel_size"),
+    bikeYear: integer("bike_year"),
+    bikeBrakeType: text("bike_brake_type"),
+    bikeSuspensionType: text("bike_suspension_type"),
+    bikeDrivetrain: text("bike_drivetrain"),
+    bikeGeneralCondition: text("bike_general_condition"),
+    bikeSerialNumber: text("bike_serial_number"),
+    bikeFrameNumber: text("bike_frame_number"),
+    bikeNotes: text("bike_notes"),
+    bikeAccessories: text("bike_accessories"),
+    catalogServiceId: uuid("catalog_service_id"),
+    serviceName: text("service_name"),
     problemDescription: text("problem_description").notNull(),
+    symptoms: text("symptoms"),
+    visibleDamage: text("visible_damage"),
+    additionalComments: text("additional_comments"),
+    requestedDate: date("requested_date"),
+    requestedTime: varchar("requested_time", { length: 20 }),
+    desiredDeliveryDate: date("desired_delivery_date"),
+    urgency: varchar("urgency", { length: 20 }),
     preferredContactMethod: varchar("preferred_contact_method", {
       length: 20,
     }).notNull(),
@@ -82,6 +104,7 @@ export const workshopRequests = pgTable(
     }),
     convertedOrderId: uuid("converted_order_id"),
     rejectionReason: text("rejection_reason"),
+    updatedAt: u(),
   },
   (t) => [index("workshop_requests_status_idx").on(t.status)],
 );
@@ -137,6 +160,114 @@ export const workshopOrders = pgTable(
   (t) => [
     index("workshop_orders_status_idx").on(t.status),
     index("workshop_orders_customer_idx").on(t.customerId),
+  ],
+);
+export const teams = pgTable(
+  "teams",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 200 }).notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: c(),
+    updatedAt: u(),
+    createdBy: uuid("created_by").references(() => administrators.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => administrators.id, { onDelete: "set null" }),
+  },
+  (t) => [uniqueIndex("teams_name_unique").on(sql`lower(${t.name})`)],
+);
+export const agreements = pgTable(
+  "agreements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamId: uuid("team_id").notNull().references(() => teams.id, { onDelete: "restrict" }),
+    discountType: varchar("discount_type", { length: 20 }).notNull(),
+    value: integer("value").notNull(),
+    validFrom: date("valid_from").notNull(),
+    validUntil: date("valid_until"),
+    conditions: text("conditions"),
+    active: boolean("active").default(true).notNull(),
+    combinable: boolean("combinable").default(false).notNull(),
+    createdAt: c(),
+    updatedAt: u(),
+    createdBy: uuid("created_by").references(() => administrators.id, { onDelete: "set null" }),
+    updatedBy: uuid("updated_by").references(() => administrators.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    index("agreements_team_idx").on(t.teamId),
+    check("agreements_type", sql`${t.discountType} IN ('percentage','fixed')`),
+    check("agreements_value", sql`${t.value}>0 AND (${t.discountType}<>'percentage' OR ${t.value}<=10000)`),
+    check("agreements_validity", sql`${t.validUntil} IS NULL OR ${t.validUntil}>=${t.validFrom}`),
+  ],
+);
+export const customerTeamAffiliations = pgTable(
+  "customer_team_affiliations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id").references(() => teams.id, { onDelete: "restrict" }),
+    proposedTeamName: varchar("proposed_team_name", { length: 200 }),
+    status: varchar("status", { length: 20 }).default("pending").notNull(),
+    verificationDate: timestamp("verification_date", { withTimezone: true }),
+    evidenceNote: text("evidence_note"),
+    verifiedBy: uuid("verified_by").references(() => administrators.id, { onDelete: "set null" }),
+    createdAt: c(),
+    updatedAt: u(),
+  },
+  (t) => [
+    index("customer_team_affiliations_customer_idx").on(t.customerId),
+    uniqueIndex("customer_team_affiliations_current_unique").on(t.customerId).where(sql`${t.status} IN ('pending','verified')`),
+    check("customer_team_affiliations_status", sql`${t.status} IN ('pending','verified','rejected','expired')`),
+    check("customer_team_affiliations_team", sql`num_nonnulls(${t.teamId}, ${t.proposedTeamName})=1`),
+  ],
+);
+export const workshopOrderAgreementApplications = pgTable(
+  "workshop_order_agreement_applications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workshopOrderId: uuid("workshop_order_id").notNull().references(() => workshopOrders.id, { onDelete: "restrict" }),
+    agreementId: uuid("agreement_id").notNull().references(() => agreements.id, { onDelete: "restrict" }),
+    teamId: uuid("team_id").notNull().references(() => teams.id, { onDelete: "restrict" }),
+    teamName: varchar("team_name", { length: 200 }).notNull(),
+    discountType: varchar("discount_type", { length: 20 }).notNull(),
+    agreementValue: integer("agreement_value").notNull(),
+    discountCents: integer("discount_cents").notNull(),
+    conditions: text("conditions"),
+    combinable: boolean("combinable").notNull(),
+    appliedBy: uuid("applied_by").references(() => administrators.id, { onDelete: "set null" }),
+    createdAt: c(),
+  },
+  (t) => [
+    uniqueIndex("workshop_order_agreement_unique").on(t.workshopOrderId),
+    check("workshop_order_agreement_discount", sql`${t.discountCents}>0`),
+  ],
+);
+export const workshopFinancialMovements = pgTable(
+  "workshop_financial_movements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    workshopOrderId: uuid("workshop_order_id").notNull().references(() => workshopOrders.id, { onDelete: "restrict" }),
+    customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "restrict" }),
+    type: varchar("type", { length: 30 }).notNull(),
+    // Positive amounts credit value toward the order; negative amounts remove value.
+    amountCents: integer("amount_cents").notNull(),
+    paymentMethod: varchar("payment_method", { length: 30 }),
+    reference: varchar("reference", { length: 300 }),
+    note: text("note"),
+    occurredDate: date("occurred_date").notNull(),
+    responsibleAdminId: uuid("responsible_admin_id").references(() => administrators.id, { onDelete: "restrict" }),
+    correctedMovementId: uuid("corrected_movement_id").references((): AnyPgColumn => workshopFinancialMovements.id, { onDelete: "restrict" }),
+    agreementApplicationId: uuid("agreement_application_id").references(() => workshopOrderAgreementApplications.id, { onDelete: "restrict" }),
+    createdAt: c(),
+  },
+  (t) => [
+    index("workshop_financial_movements_order_idx").on(t.workshopOrderId, t.createdAt),
+    index("workshop_financial_movements_customer_idx").on(t.customerId, t.createdAt),
+    uniqueIndex("workshop_financial_movement_reversal_unique").on(t.correctedMovementId).where(sql`${t.correctedMovementId} IS NOT NULL`),
+    check("workshop_financial_movement_type", sql`${t.type} IN ('advance','payment','discount','credit_applied','charge','refund','correction')`),
+    check("workshop_financial_movement_amount", sql`${t.amountCents}<>0`),
+    check("workshop_financial_payment_method", sql`${t.paymentMethod} IS NULL OR ${t.paymentMethod} IN ('cash','card','transfer','customer_credit','agreement','other')`),
+    check("workshop_financial_other_note", sql`${t.paymentMethod}<>'other' OR length(trim(coalesce(${t.note}, '')))>0`),
+    check("workshop_financial_correction_link", sql`(${t.type}='correction')=(${t.correctedMovementId} IS NOT NULL)`),
   ],
 );
 export const workshopServiceCatalog = pgTable(
@@ -330,6 +461,11 @@ export const workshopSettings = pgTable(
       .default(false)
       .notNull(),
     defaultEstimatedDays: integer("default_estimated_days"),
+    scheduleTimezone: varchar("schedule_timezone", { length: 64 }).default("America/Mexico_City").notNull(),
+    minimumNoticeMinutes: integer("minimum_notice_minutes").default(120).notNull(),
+    bookingHorizonDays: integer("booking_horizon_days").default(30).notNull(),
+    dailyCapacity: integer("daily_capacity"),
+    schedule: jsonb("schedule").$type<Record<string, string[]>>().default({}).notNull(),
     readyWhatsappTemplate: text("ready_whatsapp_template").notNull(),
     statusWhatsappTemplates: jsonb("status_whatsapp_templates")
       .$type<Record<string, string>>()

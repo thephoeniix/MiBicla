@@ -20,8 +20,10 @@ import {
 } from "@mi-bicla/shared";
 import type { CustomerAuthPurpose } from "@mi-bicla/api-contract";
 import { issueCustomerAuthToken } from "./customer-auth-tokens.js";
+import { buildWhatsappMessage, buildWhatsappUrl, type PublicLinksService } from "./public-links.service.js";
 
 type Db = ReturnType<typeof createDatabase>["db"];
+const LEGACY_LINK_END = new Date("2026-11-11T00:00:00Z");
 const defaultPasswordCrypto = {
   hash: hashPassword,
   verify: verifyPassword,
@@ -39,6 +41,7 @@ export class CustomerAuthService {
     private db: Db,
     private appBaseUrl: string,
     private passwordCrypto: PasswordCrypto = defaultPasswordCrypto,
+    private publicLinks?: PublicLinksService,
   ) {}
   async changePassword(
     credentialId: string,
@@ -154,34 +157,45 @@ export class CustomerAuthService {
           .returning();
       }
       if (!row) return null;
-      const { token, expiresAt } = await issueCustomerAuthToken(tx, {
+       const { id, token, expiresAt } = await issueCustomerAuthToken(tx, {
         credentialId: row.id,
         purpose,
         administratorId,
       });
-      return { credential: row, expiresAt, token };
+       return { credential: row, expiresAt, token, authTokenId: id };
     });
     if (!generated) return null;
 
+    const short = this.publicLinks
+      ? await this.publicLinks.getOrCreateActiveLink(
+          purpose === "activation" ? "customer_activation" : "password_recovery",
+          { customerAuthTokenId: generated.authTokenId },
+          generated.expiresAt,
+        )
+      : null;
     const page = purpose === "activation" ? "activar" : "recuperar";
-    const link = new URL(`/cuenta/${page}`, this.appBaseUrl);
-    link.searchParams.set("token", generated.token);
-    const message =
-      purpose === "activation"
-        ? `Activa tu cuenta Mi Bicla: ${link.toString()}`
-        : `Restablece tu contraseña Mi Bicla: ${link.toString()}`;
-    const whatsappUrl = new URL(
-      `https://wa.me/${generated.credential.phoneNormalized.replace(/\D/g, "")}`,
+    const legacy = new URL(`/cuenta/${page}`, this.appBaseUrl);
+    legacy.searchParams.set("token", generated.token);
+    const link = short?.url ?? legacy.toString();
+    const message = buildWhatsappMessage(
+      purpose === "activation" ? "Activa tu cuenta Mi Bicla: {url}" : "Restablece tu contraseña Mi Bicla: {url}",
+      { url: link },
     );
-    whatsappUrl.searchParams.set("text", message);
     return {
       expiresAt: generated.expiresAt,
-      link: link.toString(),
-      whatsappUrl: whatsappUrl.toString(),
+      link,
+      whatsappUrl: buildWhatsappUrl(generated.credential.phoneNormalized, message),
     };
   }
 
   async validateToken(token: string, purpose: CustomerAuthPurpose) {
+    if (/^[A-Za-z0-9_-]{16}$/.test(token) && this.publicLinks) {
+      const resolved = await this.publicLinks.resolveLink(token);
+      if (resolved.state !== "active" || !resolved.link?.customerAuthTokenId) return false;
+      const allowed = purpose === "recovery" ? resolved.link.purpose === "password_recovery" : ["customer_activation", "customer_verification"].includes(resolved.link.purpose);
+      return allowed && this.validateTokenId(resolved.link.customerAuthTokenId, purpose);
+    }
+    if (new Date() >= LEGACY_LINK_END) return false;
     const expectedStatus = purpose === "activation" ? "pending" : "active";
     const [row] = await this.db
       .select({ id: customerAuthTokens.id })
@@ -208,11 +222,40 @@ export class CustomerAuthService {
     return !!row;
   }
 
+  async validateTokenId(id: string, purpose: CustomerAuthPurpose) {
+    const expectedStatus = purpose === "activation" ? "pending" : "active";
+    const [row] = await this.db.select({ id: customerAuthTokens.id }).from(customerAuthTokens)
+      .innerJoin(customerCredentials, eq(customerAuthTokens.credentialId, customerCredentials.id))
+      .innerJoin(customers, eq(customerCredentials.customerId, customers.id))
+      .where(and(eq(customerAuthTokens.id, id), eq(customerAuthTokens.purpose, purpose), gt(customerAuthTokens.expiresAt, new Date()), isNull(customerAuthTokens.consumedAt), isNull(customerAuthTokens.revokedAt), eq(customerCredentials.status, expectedStatus), eq(customerCredentials.phoneNormalized, customers.phone), eq(customers.status, "active"), isNull(customers.deletedAt))).limit(1);
+    return !!row;
+  }
+
+  async consumePasswordTokenId(id: string, password: string, purpose: CustomerAuthPurpose) {
+    const [token] = await this.db.select({ tokenHash: customerAuthTokens.tokenHash }).from(customerAuthTokens).where(eq(customerAuthTokens.id, id)).limit(1);
+    if (!token) return null;
+    return this.consumePasswordTokenHash(token.tokenHash, password, purpose);
+  }
+
   async consumePasswordToken(
     token: string,
     password: string,
     purpose: CustomerAuthPurpose,
   ) {
+    if (/^[A-Za-z0-9_-]{16}$/.test(token) && this.publicLinks) {
+      const resolved = await this.publicLinks.resolveLink(token);
+      if (resolved.state !== "active" || !resolved.link?.customerAuthTokenId) return null;
+      const allowed = purpose === "recovery" ? resolved.link.purpose === "password_recovery" : ["customer_activation", "customer_verification"].includes(resolved.link.purpose);
+      if (!allowed) return null;
+      const consumed = await this.consumePasswordTokenId(resolved.link.customerAuthTokenId, password, purpose);
+      if (consumed) await this.publicLinks.consume(resolved.link.id);
+      return consumed;
+    }
+    if (new Date() >= LEGACY_LINK_END) return null;
+    return this.consumePasswordTokenHash(hashSessionToken(token), password, purpose);
+  }
+
+  private async consumePasswordTokenHash(tokenHash: string, password: string, purpose: CustomerAuthPurpose) {
     return this.db.transaction(async (tx) => {
       const [match] = await tx
         .select({
@@ -228,7 +271,7 @@ export class CustomerAuthService {
         .innerJoin(customers, eq(customerCredentials.customerId, customers.id))
         .where(
           and(
-            eq(customerAuthTokens.tokenHash, hashSessionToken(token)),
+            eq(customerAuthTokens.tokenHash, tokenHash),
             eq(customerAuthTokens.purpose, purpose),
           ),
         )

@@ -23,7 +23,7 @@ export function configuredWhatsappUrl(
 
 export function whatsappContactUrl(phone: string): string {
   const base = configuredWhatsappUrl(phone)!;
-  return `${base}?text=${encodeURIComponent("Hola Mi Bicla, quisiera información.")}`;
+  return buildWhatsappUrl(base, "Hola Mi Bicla, quisiera información.");
 }
 
 function vcardValue(value: string): string {
@@ -66,3 +66,4 @@ export function openingHoursEntries(
 ): Array<[string, string]> {
   return openingHours ? Object.entries(openingHours) : [];
 }
+import { buildWhatsappUrl } from "./whatsapp";

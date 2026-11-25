@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { apiFetch, ApiError } from "../../lib/api-client";
-import { Button, StatusBadge } from "../ui";
+import { Button, Modal, StatusBadge } from "../ui";
 import { QrScanner } from "./QrScanner";
 import {
   customerAdminProfileUrl,
@@ -368,18 +368,18 @@ export function CustomerScanFlow({
   }
 
   return (
-    <dialog
+    <Modal
       open
       className="scanner-modal"
-      aria-modal="true"
       aria-labelledby="scanner-title"
+      onCancel={(event) => { event.preventDefault(); close(); }}
     >
       <header className="scanner-header">
         <div>
           <p>Mi Bicla</p>
           <h1 id="scanner-title">Escanear cliente</h1>
         </div>
-        <button type="button" aria-label="Cerrar escáner" onClick={close}>×</button>
+        <button type="button" data-dialog-close aria-label="Cerrar escáner" onClick={close}>×</button>
       </header>
       <div className="scanner-body">
         {state === "scanner" && !manual && (
@@ -488,6 +488,6 @@ export function CustomerScanFlow({
           </section>
         )}
       </div>
-    </dialog>
+    </Modal>
   );
 }

@@ -11,6 +11,11 @@ describe("rutas públicas", () => {
     expect(resolvePublicRoute("/admin/workshop")).toEqual({ route: "admin" });
     expect(resolvePublicRoute("/productos")).toEqual({ route: "products" });
     expect(resolvePublicRoute("/eventos")).toEqual({ route: "events" });
+    expect(resolvePublicRoute("/uniformes")).toEqual({
+      route: "jerseys",
+    });
+    // Nginx/Vite sirven primero public/uniformes/index.html; esta ruta React
+    // permanece como respaldo para entornos sin archivos estáticos anidados.
   });
 
   it("conserva rutas públicas con token", () => {

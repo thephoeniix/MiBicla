@@ -36,7 +36,7 @@ function isPublicNavigationActive(pathname: string, href: string) {
 function FooterChainDivider() {
   return (
     <div className="footer-chain-divider" aria-hidden="true">
-      <img src={footerChain} alt="" width={2048} height={65} />
+      <img src={footerChain} alt="" width={2048} height={65} loading="lazy" />
     </div>
   );
 }
@@ -56,6 +56,7 @@ function PublicFooter() {
           <BrandLogo variant="full" color="white" />
           <strong>QUERÉTARO · MÉXICO</strong>
           <p>Taller, comunidad y recompensas para seguir rodando.</p>
+          <a href="/uniformes">Jerseys personalizados</a>
         </section>
         <FooterChainDivider />
         <div className="footer-legal">
@@ -79,6 +80,7 @@ export function PublicShell({
   const path = window.location.pathname;
   useEffect(() => {
     if (!menuOpen) return;
+    const overflow = document.body.style.overflow;
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setMenuOpen(false);
@@ -105,7 +107,7 @@ export function PublicShell({
       mobileMenu.current?.querySelector<HTMLElement>("a[href]")?.focus(),
     );
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = overflow;
       window.removeEventListener("keydown", close);
       menuButton.current?.focus();
     };
@@ -121,15 +123,17 @@ export function PublicShell({
           ref={menuButton}
           className="public-menu-toggle"
           type="button"
-          aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+          aria-label={menuOpen ? "Cerrar menú" : "Menú"}
           aria-expanded={menuOpen}
           aria-controls="public-mobile-menu"
           onClick={() => setMenuOpen((current) => !current)}
         >
-          <span /><span /><span />
+          <span className="public-menu-icon" aria-hidden="true"><i /><i /><i /></span>
+          <span className="public-menu-label">{menuOpen ? "Cerrar" : "Menú"}</span>
         </button>
         <nav aria-label="Navegación pública">
           {NAV.map(([href, label]) => <a key={href} href={href} aria-current={isPublicNavigationActive(path, href) ? "page" : undefined}>{label}</a>)}
+          <a href="/uniformes" aria-current={path === "/uniformes" ? "page" : undefined}>Jerseys personalizados</a>
           <a href="/productos" aria-current={path === "/productos" ? "page" : undefined}>Productos</a>
           <a href="/eventos" aria-current={path === "/eventos" ? "page" : undefined}>Eventos</a>
           <a href="/depositos">Métodos de pago</a>
@@ -141,25 +145,27 @@ export function PublicShell({
         </div>
       </header>
       {menuOpen && (
-        <div
-          ref={mobileMenu}
-          className="public-mobile-menu"
-          id="public-mobile-menu"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menú principal"
-        >
-          <nav aria-label="Menú público">
-            {NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
-            <a href="/productos">Productos</a>
-            <a href="/eventos">Eventos</a>
-            <a href="/depositos">Métodos de pago</a>
-            <a href="/#contacto">Contacto</a>
-            <a href="/mi/taller">Consultar orden</a>
-            <a href="/mi/tarjeta">Mi tarjeta</a>
-            <a href="/iniciar-sesion">Iniciar sesión</a>
-            <a className="ui-button" href="/registro">Crear mi cuenta</a>
-          </nav>
+        <div className="public-menu-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setMenuOpen(false); }}>
+          <div ref={mobileMenu} className="public-mobile-menu" id="public-mobile-menu" role="dialog" aria-modal="true" aria-label="Menú principal">
+            <nav aria-label="Menú público" onClick={(event) => { if ((event.target as Element).closest("a")) setMenuOpen(false); }}>
+              <section aria-labelledby="public-menu-explore"><h2 id="public-menu-explore">Explorar</h2>
+                {NAV.map(([href, label]) => <a key={href} href={href} aria-current={isPublicNavigationActive(path, href) ? "page" : undefined}>{label}</a>)}
+                <a href="/uniformes" aria-current={path === "/uniformes" ? "page" : undefined}>Jerseys personalizados</a>
+                <a href="/productos" aria-current={path === "/productos" ? "page" : undefined}>Productos</a>
+                <a href="/eventos" aria-current={path === "/eventos" ? "page" : undefined}>Eventos</a>
+              </section>
+              <section aria-labelledby="public-menu-account"><h2 id="public-menu-account">Tu cuenta</h2>
+                <a href="/mi/taller" aria-current={isPublicNavigationActive(path, "/mi/taller") ? "page" : undefined}>Consultar orden</a>
+                <a href="/mi/tarjeta" aria-current={isPublicNavigationActive(path, "/mi/tarjeta") ? "page" : undefined}>Mi tarjeta</a>
+                <a href="/iniciar-sesion" aria-current={path === "/iniciar-sesion" ? "page" : undefined}>Iniciar sesión</a>
+                <a className="ui-button" href="/registro" aria-current={path === "/registro" ? "page" : undefined}>Crear mi cuenta</a>
+              </section>
+              <section aria-labelledby="public-menu-help"><h2 id="public-menu-help">Ayuda</h2>
+                <a href="/depositos" aria-current={path === "/depositos" ? "page" : undefined}>Métodos de pago</a>
+                <a href="/#contacto">Contacto</a>
+              </section>
+            </nav>
+          </div>
         </div>
       )}
       <main id="public-content">{children}</main>

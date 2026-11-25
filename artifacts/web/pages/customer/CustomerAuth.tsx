@@ -221,8 +221,8 @@ export function CustomerLogin() {
   </AuthFrame>;
 }
 
-function PasswordTokenForm({ purpose }: { purpose: "activation" | "recovery" }) {
-  const [token] = useState(() => takeTokenFromLocation(location, history));
+export function PasswordTokenForm({ purpose, linkCode }: { purpose: "activation" | "recovery"; linkCode?: string }) {
+  const [token] = useState(() => linkCode ?? takeTokenFromLocation(location, history));
   const [valid, setValid] = useState(purpose === "recovery" ? Boolean(token) : false);
   const [checking, setChecking] = useState(purpose === "activation" && Boolean(token));
   const [busy, setBusy] = useState(false);
@@ -239,7 +239,7 @@ function PasswordTokenForm({ purpose }: { purpose: "activation" | "recovery" }) 
   useEffect(() => {
     if (purpose !== "activation" || !token) return;
     const controller = new AbortController();
-    validateActivation(token, controller.signal)
+    (linkCode ? Promise.resolve({ valid: true }) : validateActivation(token, controller.signal))
       .then(({ valid: result }) => {
         setValid(result);
         if (!result) setMessage("El enlace no es válido o ya no está disponible.");
@@ -269,7 +269,8 @@ function PasswordTokenForm({ purpose }: { purpose: "activation" | "recovery" }) 
     busyRef.current = true;
     setBusy(true); setMessage("");
     try {
-      if (purpose === "activation") await activateCustomer(token, password);
+      if (linkCode) await apiFetch<void>(`/api/public/links/${encodeURIComponent(linkCode)}/password`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
+      else if (purpose === "activation") await activateCustomer(token, password);
       else await recoverCustomer(token, password);
       location.replace(`/iniciar-sesion?result=${purpose}`);
     } catch (error) {

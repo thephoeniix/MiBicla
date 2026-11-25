@@ -5,6 +5,7 @@ import type {
   HTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
+  RefObject,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
   Ref,
@@ -19,6 +20,47 @@ import repairIcon from "../../icons/reparacion.svg";
 
 let dialogLocks = 0;
 let bodyOverflowBeforeDialogs = "";
+
+export function useDismissiblePopover({
+  open,
+  onClose,
+  triggerRef,
+  popoverRef,
+}: {
+  open: boolean;
+  onClose: () => void;
+  triggerRef: RefObject<HTMLElement | null>;
+  popoverRef: RefObject<HTMLElement | null>;
+}) {
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const trigger = triggerRef.current;
+    const dismissOutside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!popoverRef.current?.contains(target) && !trigger?.contains(target)) closeRef.current();
+    };
+    const dismissKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeRef.current();
+      trigger?.focus();
+    };
+    const dismissNavigation = () => closeRef.current();
+    document.addEventListener("pointerdown", dismissOutside);
+    window.addEventListener("keydown", dismissKey);
+    window.addEventListener("popstate", dismissNavigation);
+    window.addEventListener("hashchange", dismissNavigation);
+    requestAnimationFrame(() => popoverRef.current?.querySelector<HTMLElement>("a[href], button:not([disabled])")?.focus());
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      window.removeEventListener("keydown", dismissKey);
+      window.removeEventListener("popstate", dismissNavigation);
+      window.removeEventListener("hashchange", dismissNavigation);
+    };
+  }, [open, popoverRef, triggerRef]);
+}
 
 export function Card({
   className = "",
@@ -104,6 +146,7 @@ export function Dialog({
   className = "",
   open,
   onCancel,
+  onClick,
   ref: forwardedRef,
   ...props
 }: DialogHTMLAttributes<HTMLDialogElement> & {
@@ -124,7 +167,7 @@ export function Dialog({
       if (dialog.open) dialog.close();
       dialogLocks = Math.max(0, dialogLocks - 1);
       if (dialogLocks === 0) document.body.style.overflow = bodyOverflowBeforeDialogs;
-      previous?.focus();
+      if (previous?.isConnected) previous.focus();
     };
   }, [open]);
   return (
@@ -141,6 +184,15 @@ export function Dialog({
           return;
         }
         event.preventDefault();
+        dialogRef.current
+          ?.querySelector<HTMLButtonElement>(
+            'button[data-dialog-close], button[aria-label="Cerrar"], button[aria-label^="Cerrar "]',
+          )
+          ?.click();
+      }}
+      onClick={(event) => {
+        onClick?.(event);
+        if (event.defaultPrevented || event.target !== event.currentTarget) return;
         dialogRef.current
           ?.querySelector<HTMLButtonElement>(
             'button[data-dialog-close], button[aria-label="Cerrar"], button[aria-label^="Cerrar "]',

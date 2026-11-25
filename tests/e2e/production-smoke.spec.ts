@@ -22,11 +22,14 @@ test("loads and navigates without horizontal overflow", async ({ page }, testInf
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
   if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "Abrir menú" }).click();
+    await page.getByRole("button", { name: "Menú" }).click();
     const menu = page.getByRole("dialog", { name: "Menú principal" });
     await expect(menu).toBeVisible();
     await expect(menu.getByRole("link", { name: "Mi Tarjeta", exact: true })).toBeVisible();
     await expect(menu.getByRole("link", { name: "Contacto", exact: true })).toBeVisible();
+    await expect(menu.getByRole("heading", { name: "Explorar" })).toBeVisible();
+    await expect(menu.getByRole("heading", { name: "Tu cuenta" })).toBeVisible();
+    await expect(menu.getByRole("heading", { name: "Ayuda" })).toBeVisible();
     await menu.getByRole("link", { name: "Taller", exact: true }).click();
   } else {
     const navigation = page.getByRole("navigation", { name: "Navegación pública" });

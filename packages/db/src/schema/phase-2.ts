@@ -26,6 +26,7 @@ export const customers = pgTable(
     email: varchar("email", { length: 254 }),
     birthDate: date("birth_date"),
     notes: text("notes"),
+    creditLimitCents: integer("credit_limit_cents").default(0).notNull(),
     status: varchar("status", { length: 20 }).default("active").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -45,6 +46,7 @@ export const customers = pgTable(
     index("customers_name_idx").on(t.lastName, t.firstName),
     index("customers_phone_idx").on(t.phone),
     index("customers_status_idx").on(t.status),
+    check("customers_credit_limit_nonnegative", sql`${t.creditLimitCents}>=0`),
   ],
 );
 export const customerPublicTokens = pgTable(

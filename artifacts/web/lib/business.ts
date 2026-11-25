@@ -18,9 +18,6 @@ export function whatsappUrl(
   template: string,
   values: Record<"nombre" | "monto" | "concepto" | "pedido" | "banco", string>,
 ): string {
-  const message = template.replace(
-    /\{(nombre|monto|concepto|pedido|banco)\}/g,
-    (_, key: keyof typeof values) => values[key] ?? "",
-  );
-  return `https://wa.me/${number.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
+  return buildWhatsappUrl(number, buildWhatsappMessage(template, values));
 }
+import { buildWhatsappMessage, buildWhatsappUrl } from "./whatsapp";

@@ -321,7 +321,7 @@ export function Customers({ permissions = [] }: { permissions?: string[] }) {
   }
 
   async function showQr(publicToken: string) {
-    const url = `${location.origin}/c/${publicToken}`;
+    const url = `${location.origin}/l/${publicToken}`;
     setQr({
       url,
       image: await QRCode.toDataURL(url, { width: 300, margin: 1 }),

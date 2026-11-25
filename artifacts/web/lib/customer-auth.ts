@@ -74,6 +74,19 @@ export interface CustomerWorkshopRequestSummary {
   createdAt: string;
   convertedOrderId?: string | null;
 }
+export interface CustomerTeam {
+  id: string;
+  name: string;
+  active: boolean;
+}
+export interface CustomerTeamAffiliation {
+  affiliation: { id: string; teamId: string | null; proposedTeamName: string | null; status: string; evidenceNote: string | null; createdAt: string };
+  team: CustomerTeam | null;
+}
+export interface CustomerWorkshopFinancials {
+  summaries: Array<{ orderNumber: string; totalCents: number; paidCents: number; discountCents: number; creditAppliedCents: number; pendingCents: number; favorCents: number; paymentStatus: string }>;
+  movements: Array<{ id: string; orderNumber: string; type: string; amountCents: number; paymentMethod: string | null; reference: string | null; occurredDate: string; correctedMovementId: string | null; createdAt: string }>;
+}
 export type CustomerBicyclePayload = Omit<CustomerBicycle, "id" | "status" | "updatedAt">;
 
 export interface CustomerSession {
@@ -236,6 +249,16 @@ export const getMyOrder = (orderNumber: string, signal?: AbortSignal) =>
   );
 export const getMyWorkshopRequests = (signal?: AbortSignal) =>
   customerFetch<CustomerWorkshopRequestSummary[]>("/api/customer/workshop-requests", { signal });
+export const getMyWorkshopFinancials = (signal?: AbortSignal) =>
+  customerFetch<CustomerWorkshopFinancials>("/api/customer/workshop-financials", { signal });
+export const getCustomerTeams = (signal?: AbortSignal) =>
+  customerFetch<CustomerTeam[]>("/api/customer/teams", { signal });
+export const getMyTeamAffiliation = (signal?: AbortSignal) =>
+  customerFetch<CustomerTeamAffiliation | null>("/api/customer/team-affiliation", { signal });
+export const requestMyTeamAffiliation = (input: { teamId?: string; proposedTeamName?: string }) =>
+  customerFetch<CustomerTeamAffiliation["affiliation"]>("/api/customer/team-affiliation", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input),
+  }, true);
 export const createMyBicycle = (input: CustomerBicyclePayload) =>
   customerFetch<CustomerBicycle>("/api/customer/bicycles", {
     method: "POST",
@@ -266,8 +289,16 @@ export const changeMyPassword = (currentPassword: string, newPassword: string) =
   }, true);
 export const createMyWorkshopRequest = (input: {
   bicycleId: string;
+  catalogServiceId?: string | null;
   serviceName: string | null;
   problemDescription: string;
+  symptoms?: string | null;
+  visibleDamage?: string | null;
+  additionalComments?: string | null;
+  requestedDate?: string | null;
+  requestedTime?: string | null;
+  desiredDeliveryDate?: string | null;
+  urgency?: "normal" | "soon" | "urgent" | null;
   preferredContactMethod: "whatsapp" | "phone" | "email";
 }) => customerFetch<{ requestNumber: string; status: string; createdAt: string }>(
   "/api/customer/workshop-requests",

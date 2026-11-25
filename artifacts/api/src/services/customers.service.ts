@@ -16,9 +16,11 @@ import type {
   CustomerCreateInput,
   CustomerUpdateInput,
 } from "@mi-bicla/api-contract";
+import type { PublicLinksService } from "./public-links.service.js";
 type Db = ReturnType<typeof createDatabase>["db"];
+const LEGACY_LINK_END = new Date("2026-11-11T00:00:00Z");
 export class CustomersService {
-  constructor(private db: Db) {}
+  constructor(private db: Db, private publicLinks?: PublicLinksService) {}
   async list(query: {
     search: string;
     status: string;
@@ -57,7 +59,6 @@ export class CustomersService {
     };
   }
   async create(input: CustomerCreateInput, administratorId: string) {
-    const token = generateSessionToken();
     const customer = await this.db.transaction(async (tx) => {
       const [row] = await tx
         .insert(customers)
@@ -69,11 +70,14 @@ export class CustomersService {
         .returning();
       if (!row) throw new Error("No se pudo crear el cliente");
       await tx.insert(customerLoyaltyBalance).values({ customerId: row.id });
-      await tx
-        .insert(customerPublicTokens)
-        .values({ customerId: row.id, publicTokenHash: sha256(token) });
       return row;
     });
+    const link = this.publicLinks
+      ? await this.publicLinks.getOrCreateActiveLink("customer_card", { customerId: customer.id })
+      : null;
+    if (link) return { customer, publicToken: link.code };
+    const token = generateSessionToken();
+    await this.db.insert(customerPublicTokens).values({ customerId: customer.id, publicTokenHash: sha256(token) });
     return { customer, publicToken: token };
   }
   async get(id: string) {
@@ -179,6 +183,10 @@ export class CustomersService {
     });
     return row ? { ...row, name: `${row.firstName} ${row.lastName}`, accountStatus: "active" as const } : null;
   }
+  async updateCreditLimit(customerId: string, creditLimitCents: number, administratorId: string) {
+    const [row] = await this.db.update(customers).set({ creditLimitCents, updatedAt: new Date(), updatedBy: administratorId }).where(and(eq(customers.id, customerId), isNull(customers.deletedAt))).returning({ id: customers.id, creditLimitCents: customers.creditLimitCents });
+    return row ?? null;
+  }
   async remove(id: string, administratorId: string) {
     const [row] = await this.db
       .update(customers)
@@ -193,6 +201,7 @@ export class CustomersService {
     return !!row;
   }
   async regenerateToken(customerId: string) {
+    if (this.publicLinks) return (await this.publicLinks.regenerateLink("customer_card", { customerId })).code;
     const token = generateSessionToken();
     await this.db.transaction(async (tx) => {
       await tx
@@ -205,7 +214,22 @@ export class CustomersService {
     });
     return token;
   }
+  async getOrCreatePublicLink(customerId: string) {
+    if (!this.publicLinks) return this.regenerateToken(customerId);
+    return (await this.publicLinks.getOrCreateActiveLink("customer_card", { customerId })).code;
+  }
+  async getPublicById(customerId: string) {
+    const [customer] = await this.db.select({ id: customers.id }).from(customers)
+      .where(and(eq(customers.id, customerId), eq(customers.status, "active"), isNull(customers.deletedAt))).limit(1);
+    if (!customer) return null;
+    const loyalty = await this.getLoyalty(customer.id);
+    if (!loyalty) return null;
+    const { movements, ...publicCard } = loyalty;
+    void movements;
+    return publicCard;
+  }
   async getPublic(token: string) {
+    if (new Date() >= LEGACY_LINK_END) return null;
     const hash = sha256(token),
       now = new Date();
     const [row] = await this.db
@@ -298,6 +322,15 @@ export class CustomersService {
     };
   }
   async resolvePublicToken(token: string) {
+    if (/^[A-Za-z0-9_-]{16}$/.test(token) && this.publicLinks) {
+      const resolved = await this.publicLinks.resolveLink(token);
+      if (resolved.state !== "active" || resolved.link?.purpose !== "customer_card" || !resolved.link.customerId) return null;
+      const detail = await this.get(resolved.link.customerId);
+      if (!detail) return null;
+      const [program] = await this.db.select().from(loyaltySettings).limit(1);
+      return { customer: { id: detail.customer.id, name: `${detail.customer.firstName} ${detail.customer.lastName}` }, balance: detail.balance, rewards: detail.rewards.filter((reward) => reward.status === "available"), loyaltyProgram: program ? { enabled: program.enabled, rewardUnits: program.rewardUnits, rewardName: program.rewardName, allowManualAdjustments: program.allowManualAdjustments } : null };
+    }
+    if (new Date() >= LEGACY_LINK_END) return null;
     const now = new Date();
     const [match] = await this.db
       .select({ token: customerPublicTokens, customer: customers })

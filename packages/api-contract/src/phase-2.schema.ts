@@ -37,6 +37,9 @@ export const customerCreateSchema = z
   })
   .strict();
 export const customerUpdateSchema = customerCreateSchema.partial().strict();
+export const customerCreditLimitSchema = z.object({
+  creditLimitCents: z.number().int().nonnegative(),
+}).strict();
 export const customerListQuerySchema = z.object({
   search: z.string().trim().max(100).default(""),
   status: z.enum(["active", "inactive", "all"]).default("all"),
@@ -90,7 +93,7 @@ export const loyaltyAdjustmentSchema = z
   .strict();
 export const customerScanTokenSchema = z
   .object({
-    token: z.string().trim().regex(/^[a-f0-9]{64}$/, "Token inválido"),
+    token: z.string().trim().regex(/^(?:[a-f0-9]{64}|[A-Za-z0-9_-]{16})$/, "Token inválido"),
   })
   .strict();
 export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;

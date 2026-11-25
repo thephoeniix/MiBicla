@@ -10,12 +10,13 @@ import { Customers } from "./pages/admin/Customers";
 import { Loyalty } from "./pages/admin/settings/Loyalty";
 import { Workshop } from "./pages/admin/Workshop";
 import { WorkshopRequest } from "./pages/public/WorkshopRequest";
+import { PublicLink } from "./pages/public/PublicLink";
 import { WorkshopTracking } from "./pages/public/WorkshopTracking";
 import { apiFetch, ApiError } from "./lib/api-client";
 import { AppShell } from "./components/AppShell";
 import { Button, Input, LoadingState } from "./components/ui";
 import { BrandLogo } from "./components/brand";
-import { Brands, Landing, LoyaltyInfo, WorkshopInfo } from "./pages/public/PublicPages";
+import { Brands, CustomJerseys, Landing, LoyaltyInfo, WorkshopInfo } from "./pages/public/PublicPages";
 import { resolvePublicRoute } from "./lib/public-routes";
 import {
   CustomerActivation,
@@ -28,6 +29,7 @@ import { CustomerPortal } from "./pages/customer/CustomerPortal";
 import { PublicEvents, PublicProducts } from "./pages/public/Commerce";
 import { AdminDashboard, AdminEvents, AdminProducts, AdminRequests } from "./pages/admin/CommerceAdmin";
 import { AdministrativeUsers } from "./pages/admin/AdministrativeUsers";
+import { Agreements } from "./pages/admin/Agreements";
 interface Administrator {
   id: string;
   name: string;
@@ -114,6 +116,8 @@ function AdminApp() {
           <AdminRequests permissions={user.permissions} />
         ) : window.location.pathname === "/admin/workshop" ? (
           <Workshop permissions={user.permissions} />
+        ) : window.location.pathname === "/admin/agreements" ? (
+          <Agreements permissions={user.permissions} />
         ) : window.location.pathname.startsWith("/admin/customers") ? (
           <Customers permissions={user.permissions} />
         ) : window.location.pathname === "/admin/users" && user.role === "owner" ? (
@@ -188,12 +192,13 @@ function AdminApp() {
 function App() {
   const match = resolvePublicRoute(window.location.pathname);
   const meta: Record<string, [string, string, boolean?]> = {
-    home: ["Mi Bicla Querétaro | Taller, equipo y comunidad MTB", "Taller, equipo y beneficios para disfrutar cada rodada."],
+    home: ["Mi Bicla Querétaro | Tienda de Ciclismo, Taller de Bicicletas y Jerseys Personalizados", "Tienda de ciclismo y taller de bicicletas en La Cañada, El Marqués, Querétaro. Bicis KRBO, refacciones, ropa, geles GU, SIS y Ruts, y uniformes de ciclismo personalizados para equipos."],
     workshop: ["Taller | Mi Bicla Querétaro", "Servicios de taller para mantener tu bicicleta lista para rodar."],
     loyalty: ["Fidelidad | Mi Bicla Querétaro", "Conoce el programa de fidelidad Mi Bicla."],
     brands: ["Marcas | Mi Bicla Querétaro", "Consulta las marcas disponibles en Mi Bicla Querétaro."],
     products: ["Productos | Mi Bicla Querétaro", "Productos, accesorios y equipo disponible en Mi Bicla."],
     events: ["Eventos | Mi Bicla Querétaro", "Rodadas y eventos de la comunidad Mi Bicla."],
+    jerseys: ["Uniformes y Jerseys de Ciclismo Personalizados en Querétaro | Mi Bicla", "Hacemos jerseys y uniformes de ciclismo personalizados para equipos y clubes. Desde 12 piezas, diseño opcional. Cotiza por WhatsApp 442 749 6410."],
     deposits: ["Métodos de pago | Mi Bicla Querétaro", "Métodos de pago activos de Mi Bicla Querétaro."],
     "customer-card": ["Mi tarjeta | Mi Bicla Querétaro", "Tarjeta personal de fidelidad.", true],
     "workshop-tracking": ["Seguimiento de taller | Mi Bicla Querétaro", "Seguimiento privado de servicio.", true],
@@ -201,6 +206,7 @@ function App() {
     "customer-login": ["Iniciar sesión | Mi Bicla Querétaro", "Acceso de clientes de Mi Bicla."],
     "customer-activation": ["Activar cuenta | Mi Bicla Querétaro", "Activación segura de cuenta.", true],
     "customer-recovery": ["Recuperar acceso | Mi Bicla Querétaro", "Recuperación segura de acceso.", true],
+    "public-link": ["Enlace seguro | Mi Bicla Querétaro", "Acceso privado de Mi Bicla.", true],
     "customer-home": ["Mi espacio | Mi Bicla Querétaro", "Portal privado de clientes.", true],
     "customer-loyalty": ["Mi tarjeta | Mi Bicla Querétaro", "Puntos y recompensas del cliente.", true],
     "customer-workshop": ["Mi taller | Mi Bicla Querétaro", "Órdenes y seguimiento del cliente.", true],
@@ -235,6 +241,8 @@ function App() {
   setMeta('meta[property="og:title"]', "property", "og:title", routeMeta[0]);
   setMeta('meta[property="og:description"]', "property", "og:description", routeMeta[1]);
   setMeta('meta[property="og:url"]', "property", "og:url", canonicalUrl);
+  setMeta('meta[name="twitter:title"]', "name", "twitter:title", routeMeta[0]);
+  setMeta('meta[name="twitter:description"]', "name", "twitter:description", routeMeta[1]);
   document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.setAttribute("href", canonicalUrl);
   switch (match.route) {
     case "home": return <Landing />;
@@ -243,7 +251,9 @@ function App() {
     case "brands": return <Brands />;
     case "products": return <PublicProducts />;
     case "events": return <PublicEvents />;
+    case "jerseys": return <CustomJerseys />;
     case "workshop-request": return <WorkshopRequest />;
+    case "public-link": return <PublicLink code={match.token!} />;
     case "workshop-tracking": return <WorkshopTracking token={match.token!} />;
     case "customer-card": return <CustomerCard token={match.token!} />;
     case "deposits": return <Depositos />;
