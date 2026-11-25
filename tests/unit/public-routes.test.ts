@@ -14,6 +14,8 @@ describe("rutas públicas", () => {
     expect(resolvePublicRoute("/uniformes")).toEqual({
       route: "jerseys",
     });
+    // Nginx/Vite sirven primero public/uniformes/index.html; esta ruta React
+    // permanece como respaldo para entornos sin archivos estáticos anidados.
   });
 
   it("conserva rutas públicas con token", () => {

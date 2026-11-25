@@ -17,7 +17,6 @@ const routes = [
   "/productos",
   "/marcas",
   "/eventos",
-  "/uniformes",
 ];
 
 const preview = spawn(
@@ -66,8 +65,6 @@ try {
     await page.waitForFunction(() => window.__MB_APP_READY__ === true, null, {
       timeout: 10_000,
     });
-    if (route === "/uniformes")
-      await page.waitForSelector("#jerseys-structured-data", { state: "attached" });
     await page.evaluate(() => document.getElementById("brand-preloader")?.remove());
     const html = await page.content();
     const outputDirectory = route === "/"

@@ -5,6 +5,7 @@ describe("SEO e identidad inicial", () => {
   const html = readFileSync("artifacts/web/index.html", "utf8");
   const robots = readFileSync("artifacts/web/public/robots.txt", "utf8");
   const sitemap = readFileSync("artifacts/web/public/sitemap.xml", "utf8");
+  const uniforms = readFileSync("artifacts/web/public/uniformes/index.html", "utf8");
   const shell = readFileSync("artifacts/web/components/public/PublicShell.tsx", "utf8");
 
   it("declara logo simple pink, canonical y metadata rastreable", () => {
@@ -19,6 +20,17 @@ describe("SEO e identidad inicial", () => {
     expect(html).toContain('content="summary_large_image"');
     expect(html).toContain("/og-mi-bicla-queretaro.jpg");
     expect(shell).toContain('<BrandLogo variant="symbol" color="pink" />');
+  });
+
+  it("publica el catálogo estático de uniformes con SEO y sin imágenes embebidas", () => {
+    expect(Buffer.byteLength(uniforms)).toBeLessThan(150_000);
+    expect(uniforms).toContain('<html lang="es-MX">');
+    expect(uniforms).toContain("Uniformes y Jerseys de Ciclismo Personalizados en Querétaro | Mi Bicla");
+    expect(uniforms).toContain('<link rel="canonical" href="https://mibiclaqro.com/uniformes">');
+    expect(uniforms).toContain('"@type":"FAQPage"');
+    expect(uniforms).toContain('"@type":"Service"');
+    expect(uniforms).toContain("Jerseys de ciclismo personalizados");
+    expect(uniforms).not.toContain("data:image/");
   });
 
   it("publica sitemap y excluye áreas privadas del rastreo", () => {
