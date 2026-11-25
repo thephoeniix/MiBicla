@@ -118,7 +118,7 @@ export function Landing() {
   const primaryWhatsapp = business?.primaryWhatsapp || MI_BICLA_CONTACT.primaryWhatsapp;
   return <PublicShell business={business}>
     <section className="public-hero">
-      <div className="public-hero-copy"><p className="page-eyebrow">Taller · accesorios · comunidad</p><h1>Tienda de ciclismo y taller de bicicletas<br /><em>en Querétaro.</em></h1><p><strong>Rodamos contigo, desde el primer pedalazo.</strong> Somos un negocio familiar en La Cañada, El Marqués.</p><div className="public-actions"><a className="ui-button" href={whatsappContactUrl(primaryWhatsapp)} target="_blank" rel="noopener noreferrer"><WhatsappIcon />Hablar por WhatsApp</a><a className="ui-button ui-button--outline" href={`tel:${primaryWhatsapp.replace(/\s/g, "")}`}><PhoneIcon />Llamar ahora</a></div></div>
+      <div className="public-hero-copy"><p className="page-eyebrow">Taller · accesorios · comunidad</p><h1>Tu bicicleta.<br /><em>Tu aventura.</em></h1><p>Servicio, accesorios y pasión por el ciclismo en el corazón de La Cañada.</p><div className="public-actions"><a className="ui-button" href={whatsappContactUrl(primaryWhatsapp)} target="_blank" rel="noopener noreferrer"><WhatsappIcon />Hablar por WhatsApp</a><a className="ui-button ui-button--outline" href={`tel:${primaryWhatsapp.replace(/\s/g, "")}`}><PhoneIcon />Llamar ahora</a></div></div>
       <a className="public-scroll-cue" href="#contacto"><span>Conócenos</span><b aria-hidden="true">↓</b></a>
     </section>
     <Container>
